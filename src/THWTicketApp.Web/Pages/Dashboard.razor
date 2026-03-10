@@ -39,22 +39,22 @@ else
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.ConfirmationNumber" IconColor="Color.Primary"
                       Value="_totalTickets" Label="Gesamt"
-                      OnClick="@(() => Navigation.NavigateTo("/tickets"))" />
+                      OnClick="@(() => Navigation.NavigateTo("tickets"))" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.FolderOpen" IconColor="Color.Info"
                       Value="_openTickets" Label="Offen"
-                      OnClick="@(() => Navigation.NavigateTo("/tickets?filter=open"))" />
+                      OnClick="@(() => Navigation.NavigateTo("tickets?filter=open"))" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.HourglassTop" IconColor="Color.Warning"
                       Value="_pendingTickets" Label="In Bearbeitung"
-                      OnClick="@(() => Navigation.NavigateTo("/tickets?filter=pending"))" />
+                      OnClick="@(() => Navigation.NavigateTo("tickets?filter=pending"))" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success"
                       Value="_closedTickets" Label="Geschlossen"
-                      OnClick="@(() => Navigation.NavigateTo("/tickets?filter=closed"))" />
+                      OnClick="@(() => Navigation.NavigateTo("tickets?filter=closed"))" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.PersonPin" IconColor="Color.Secondary"
@@ -73,7 +73,7 @@ else
             <div class="d-flex justify-space-between align-center mb-4">
                 <MudText Typo="Typo.h6">Letzte Tickets</MudText>
                 <MudButton Variant="Variant.Text" Color="Color.Primary"
-                           OnClick="@(() => Navigation.NavigateTo("/tickets"))">
+                           OnClick="@(() => Navigation.NavigateTo("tickets"))">
                     Alle anzeigen
                 </MudButton>
             </div>
@@ -109,17 +109,17 @@ else
             <MudText Typo="Typo.h6" Class="mb-3">Schnellaktionen</MudText>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                        StartIcon="@Icons.Material.Filled.Add" Class="mb-2"
-                       OnClick="@(() => Navigation.NavigateTo("/tickets/add"))">
+                       OnClick="@(() => Navigation.NavigateTo("tickets/add"))">
                 Neues Ticket
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
                        StartIcon="@Icons.Material.Filled.ViewKanban" Class="mb-2"
-                       OnClick="@(() => Navigation.NavigateTo("/kanban"))">
+                       OnClick="@(() => Navigation.NavigateTo("kanban"))">
                 Kanban Board
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
                        StartIcon="@Icons.Material.Filled.BarChart"
-                       OnClick="@(() => Navigation.NavigateTo("/reports"))">
+                       OnClick="@(() => Navigation.NavigateTo("reports"))">
                 Berichte
             </MudButton>
         </MudPaper>
@@ -221,7 +221,7 @@ else
 
     private void NavigateToDetail(Ticket ticket)
     {
-        Navigation.NavigateTo($"/tickets/{ticket.Uid}");
+        Navigation.NavigateTo($"tickets/{ticket.Uid}");
     }
 
     private async Task QuickAssignAsync(Ticket ticket)
