@@ -13,7 +13,7 @@
 <div class="d-flex justify-space-between align-center mb-4">
     <MudText Typo="Typo.h4">Team-Dashboard</MudText>
     <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTeamDataAsync"
-                   Disabled="_isLoading" />
+                   Disabled="_isLoading" aria-label="Aktualisieren" />
 </div>
 
 @if (_isLoading)

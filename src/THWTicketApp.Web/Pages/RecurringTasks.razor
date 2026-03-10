@@ -16,7 +16,8 @@
     <div class="d-flex gap-2">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                    OnClick="ShowCreateDialog">@L.T("recurring.new")</MudButton>
-        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTasksAsync" Disabled="_isLoading" />
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTasksAsync" Disabled="_isLoading"
+                       aria-label="@L.T("common.refresh")" />
     </div>
 </div>
 

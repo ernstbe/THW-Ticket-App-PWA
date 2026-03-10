@@ -13,9 +13,16 @@
     <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
 </head>
 <body>
+    <a href="#main-content" class="skip-link"
+       style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;z-index:9999;"
+       onfocus="this.style.cssText='position:fixed;top:8px;left:8px;z-index:9999;padding:8px 16px;background:#003399;color:#fff;border-radius:4px;text-decoration:none;font-family:Roboto,sans-serif;';"
+       onblur="this.style.cssText='position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;';">
+        Zum Inhalt springen
+    </a>
     <div id="app">
         <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;">
-            <svg width="60" height="60" viewBox="0 0 24 24" style="animation: spin 1s linear infinite;">
+            <svg width="60" height="60" viewBox="0 0 24 24" role="img" aria-label="Lade Anwendung"
+                 style="animation: spin 1s linear infinite;">
                 <path fill="#003399" d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/>
             </svg>
             <p style="margin-top:16px;color:#003399;font-family:Roboto,sans-serif;">Lade THW Ticket App...</p>
