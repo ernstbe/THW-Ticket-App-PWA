@@ -7,11 +7,13 @@ namespace THWTicketApp.Web.Services;
 public class AuthStateProvider : AuthenticationStateProvider
 {
     private readonly ITrueDeskApiService _apiService;
+    private readonly AppSettings _settings;
     private bool _initialized;
 
-    public AuthStateProvider(ITrueDeskApiService apiService)
+    public AuthStateProvider(ITrueDeskApiService apiService, AppSettings settings)
     {
         _apiService = apiService;
+        _settings = settings;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -19,7 +21,11 @@ public class AuthStateProvider : AuthenticationStateProvider
         if (!_initialized)
         {
             _initialized = true;
-            await _apiService.TryRestoreSessionAsync();
+            if (_settings.IsConfigured)
+            {
+                try { await _apiService.TryRestoreSessionAsync(); }
+                catch { /* API unreachable - stay unauthenticated */ }
+            }
         }
 
         if (_apiService.IsAuthenticated)
