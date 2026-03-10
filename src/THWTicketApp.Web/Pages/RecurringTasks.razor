@@ -1,0 +1,228 @@
+@page "/recurring-tasks"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<PageTitle>@L.T("nav.recurring") - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">@L.T("nav.recurring")</MudText>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="ShowCreateDialog">@L.T("recurring.new")</MudButton>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTasksAsync" Disabled="_isLoading" />
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+<MudGrid>
+    @foreach (var task in _tasks)
+    {
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <div class="d-flex align-center gap-2">
+                            <MudText Typo="Typo.h6">@task.Name</MudText>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(task.Enabled ? Color.Success : Color.Default)">
+                                @(task.Enabled ? L.T("recurring.active") : L.T("recurring.inactive"))
+                            </MudChip>
+                        </div>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="() => ShowEditDialog(task)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="() => DeleteTaskAsync(task)" />
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (!string.IsNullOrEmpty(task.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="mb-2">@task.Description</MudText>
+                    }
+                    <MudText Typo="Typo.body2"><strong>@L.T("recurring.schedule"):</strong> @FormatSchedule(task)</MudText>
+                    <MudText Typo="Typo.body2"><strong>@L.T("recurring.ticket_subject"):</strong> @task.TicketSubject</MudText>
+                    @if (task.NextRun.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                            @L.T("recurring.next_run"): @task.NextRun.Value.ToString("dd.MM.yyyy")
+                        </MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
+
+@if (!_isLoading && _tasks.Length == 0)
+{
+    <MudText Color="Color.Secondary" Class="mt-4">@L.T("recurring.none")</MudText>
+}
+
+@* Create / Edit Dialog *@
+<MudDialog @bind-Visible="_dialogVisible" Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true }">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editingTask == null ? L.T("recurring.new") : L.T("common.edit"))</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_formName" Label="@L.T("assets.name")" Class="mb-2" />
+        <MudTextField @bind-Value="_formDescription" Label="@L.T("detail.description")" Lines="2" Class="mb-2" />
+        <MudDivider Class="my-3" />
+        <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("recurring.ticket_template")</MudText>
+        <MudTextField @bind-Value="_formTicketSubject" Label="@L.T("detail.subject")" Class="mb-2" />
+        <MudTextField @bind-Value="_formTicketIssue" Label="@L.T("detail.description")" Lines="3" Class="mb-2" />
+        <MudDivider Class="my-3" />
+        <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("recurring.schedule")</MudText>
+        <MudSelect @bind-Value="_formScheduleType" Label="@L.T("recurring.schedule_type")" Class="mb-2">
+            <MudSelectItem Value="@("monthly")">@L.T("recurring.monthly")</MudSelectItem>
+            <MudSelectItem Value="@("quarterly")">@L.T("recurring.quarterly")</MudSelectItem>
+            <MudSelectItem Value="@("annual")">@L.T("recurring.annual")</MudSelectItem>
+        </MudSelect>
+        <MudNumericField @bind-Value="_formDayOfMonth" Label="@L.T("recurring.day_of_month")" Min="1" Max="28" Class="mb-2" />
+        <MudNumericField @bind-Value="_formDaysBeforeDeadline" Label="@L.T("recurring.days_before")" Min="0" Max="365" Class="mb-2" />
+        <MudSwitch @bind-Value="_formEnabled" Label="@L.T("recurring.enabled")" Color="Color.Primary" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _dialogVisible = false">@L.T("common.cancel")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveTaskAsync">@L.T("common.save")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _isLoading;
+    private RecurringTask[] _tasks = [];
+    private bool _dialogVisible;
+    private RecurringTask? _editingTask;
+    private string _formName = string.Empty;
+    private string _formDescription = string.Empty;
+    private string _formTicketSubject = string.Empty;
+    private string _formTicketIssue = string.Empty;
+    private string _formScheduleType = "monthly";
+    private int _formDayOfMonth = 1;
+    private int _formDaysBeforeDeadline = 7;
+    private bool _formEnabled = true;
+
+    protected override async Task OnInitializedAsync() => await LoadTasksAsync();
+
+    private async Task LoadTasksAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var json = await ApiService.GetRecurringTasksAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            _tasks = JsonHelper.DeserializeWrappedArray<RecurringTask>(json, "recurringTasks", options);
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowCreateDialog()
+    {
+        _editingTask = null;
+        _formName = _formDescription = _formTicketSubject = _formTicketIssue = string.Empty;
+        _formScheduleType = "monthly";
+        _formDayOfMonth = 1;
+        _formDaysBeforeDeadline = 7;
+        _formEnabled = true;
+        _dialogVisible = true;
+    }
+
+    private void ShowEditDialog(RecurringTask task)
+    {
+        _editingTask = task;
+        _formName = task.Name ?? string.Empty;
+        _formDescription = task.Description ?? string.Empty;
+        _formTicketSubject = task.TicketSubject ?? string.Empty;
+        _formTicketIssue = task.TicketIssue ?? string.Empty;
+        _formScheduleType = task.ScheduleType ?? "monthly";
+        _formDayOfMonth = task.DayOfMonth;
+        _formDaysBeforeDeadline = task.DaysBeforeDeadline;
+        _formEnabled = task.Enabled;
+        _dialogVisible = true;
+    }
+
+    private async Task SaveTaskAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            Snackbar.Add(L.T("recurring.name_required"), Severity.Warning);
+            return;
+        }
+
+        var data = new Dictionary<string, object?>
+        {
+            ["name"] = _formName,
+            ["description"] = _formDescription,
+            ["ticketSubject"] = _formTicketSubject,
+            ["ticketIssue"] = _formTicketIssue,
+            ["scheduleType"] = _formScheduleType,
+            ["dayOfMonth"] = _formDayOfMonth,
+            ["daysBeforeDeadline"] = _formDaysBeforeDeadline,
+            ["enabled"] = _formEnabled
+        };
+
+        bool success;
+        if (_editingTask != null)
+            success = await ApiService.UpdateRecurringTaskAsync(_editingTask.Id, data);
+        else
+            success = await ApiService.CreateRecurringTaskAsync(data);
+
+        if (success)
+        {
+            _dialogVisible = false;
+            Snackbar.Add(L.T("common.success"), Severity.Success);
+            await LoadTasksAsync();
+        }
+        else
+        {
+            Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+    }
+
+    private async Task DeleteTaskAsync(RecurringTask task)
+    {
+        if (await ApiService.DeleteRecurringTaskAsync(task.Id))
+        {
+            Snackbar.Add(L.T("common.success"), Severity.Success);
+            await LoadTasksAsync();
+        }
+        else
+        {
+            Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+    }
+
+    private string FormatSchedule(RecurringTask task)
+    {
+        var type = task.ScheduleType switch
+        {
+            "monthly" => L.T("recurring.monthly"),
+            "quarterly" => L.T("recurring.quarterly"),
+            "annual" => L.T("recurring.annual"),
+            _ => task.ScheduleType ?? "-"
+        };
+        return $"{type}, {L.T("recurring.day_of_month")} {task.DayOfMonth}";
+    }
+}

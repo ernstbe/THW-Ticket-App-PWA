@@ -1,0 +1,186 @@
+@page "/assets"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<PageTitle>@L.T("nav.assets") - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">@L.T("nav.assets")</MudText>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="ShowCreateDialog">@L.T("assets.new")</MudButton>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadAssetsAsync" Disabled="_isLoading" />
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+<MudTextField @bind-Value="_searchText" Placeholder="@L.T("common.search")"
+              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+              Immediate="true" Margin="Margin.Dense" Class="mb-4" />
+
+<MudTable Items="FilteredAssets" Hover="true" Breakpoint="Breakpoint.Sm" Dense="true">
+    <HeaderContent>
+        <MudTh>@L.T("assets.name")</MudTh>
+        <MudTh>@L.T("assets.tag")</MudTh>
+        <MudTh>@L.T("assets.category")</MudTh>
+        <MudTh>@L.T("assets.location")</MudTh>
+        <MudTh>@L.T("common.edit")</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="@L.T("assets.name")">@context.Name</MudTd>
+        <MudTd DataLabel="@L.T("assets.tag")">
+            <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.AssetTag</MudChip>
+        </MudTd>
+        <MudTd DataLabel="@L.T("assets.category")">@context.Category</MudTd>
+        <MudTd DataLabel="@L.T("assets.location")">@context.Location</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                           OnClick="() => ShowEditDialog(context)" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                           OnClick="() => DeleteAssetAsync(context)" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Color="Color.Secondary">@L.T("assets.none")</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@* Create / Edit Dialog *@
+<MudDialog @bind-Visible="_dialogVisible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editingAsset == null ? L.T("assets.new") : L.T("common.edit"))</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_formName" Label="@L.T("assets.name")" Class="mb-2" />
+        <MudTextField @bind-Value="_formTag" Label="@L.T("assets.tag")" Class="mb-2" />
+        <MudTextField @bind-Value="_formCategory" Label="@L.T("assets.category")" Class="mb-2" />
+        <MudTextField @bind-Value="_formLocation" Label="@L.T("assets.location")" Class="mb-2" />
+        <MudTextField @bind-Value="_formDescription" Label="@L.T("detail.description")" Lines="3" Class="mb-2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _dialogVisible = false">@L.T("common.cancel")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAssetAsync">@L.T("common.save")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _isLoading;
+    private Asset[] _assets = [];
+    private string _searchText = string.Empty;
+    private bool _dialogVisible;
+    private Asset? _editingAsset;
+    private string _formName = string.Empty;
+    private string _formTag = string.Empty;
+    private string _formCategory = string.Empty;
+    private string _formLocation = string.Empty;
+    private string _formDescription = string.Empty;
+
+    private IEnumerable<Asset> FilteredAssets => string.IsNullOrWhiteSpace(_searchText)
+        ? _assets
+        : _assets.Where(a =>
+            (a.Name?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) == true) ||
+            (a.AssetTag?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) == true) ||
+            (a.Category?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) == true) ||
+            (a.Location?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) == true));
+
+    protected override async Task OnInitializedAsync() => await LoadAssetsAsync();
+
+    private async Task LoadAssetsAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var json = await ApiService.GetAssetsAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            _assets = JsonHelper.DeserializeWrappedArray<Asset>(json, "assets", options);
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowCreateDialog()
+    {
+        _editingAsset = null;
+        _formName = _formTag = _formCategory = _formLocation = _formDescription = string.Empty;
+        _dialogVisible = true;
+    }
+
+    private void ShowEditDialog(Asset asset)
+    {
+        _editingAsset = asset;
+        _formName = asset.Name ?? string.Empty;
+        _formTag = asset.AssetTag ?? string.Empty;
+        _formCategory = asset.Category ?? string.Empty;
+        _formLocation = asset.Location ?? string.Empty;
+        _formDescription = asset.Description ?? string.Empty;
+        _dialogVisible = true;
+    }
+
+    private async Task SaveAssetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            Snackbar.Add(L.T("assets.name_required"), Severity.Warning);
+            return;
+        }
+
+        var data = new Dictionary<string, object?>
+        {
+            ["name"] = _formName,
+            ["assetTag"] = _formTag,
+            ["category"] = _formCategory,
+            ["location"] = _formLocation,
+            ["description"] = _formDescription
+        };
+
+        bool success;
+        if (_editingAsset != null)
+            success = await ApiService.UpdateAssetAsync(_editingAsset.Id, data);
+        else
+            success = await ApiService.CreateAssetAsync(data);
+
+        if (success)
+        {
+            _dialogVisible = false;
+            Snackbar.Add(L.T("common.success"), Severity.Success);
+            await LoadAssetsAsync();
+        }
+        else
+        {
+            Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+    }
+
+    private async Task DeleteAssetAsync(Asset asset)
+    {
+        if (await ApiService.DeleteAssetAsync(asset.Id))
+        {
+            Snackbar.Add(L.T("common.success"), Severity.Success);
+            await LoadAssetsAsync();
+        }
+        else
+        {
+            Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+    }
+}
