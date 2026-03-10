@@ -1,0 +1,291 @@
+@page "/team"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Models.Responses
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject ISnackbar Snackbar
+
+<PageTitle>Team - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Team-Dashboard</MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTeamDataAsync"
+                   Disabled="_isLoading" />
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@* Overview Stats *@
+<MudGrid Class="mb-4">
+    <MudItem xs="6" sm="4" md="2">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            <MudText Typo="Typo.h4" Color="Color.Primary">@_totalTeamMembers</MudText>
+            <MudText Typo="Typo.caption">Mitglieder</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            <MudText Typo="Typo.h4" Style="color: #FF9800;">@_averageWorkload.ToString("F1")</MudText>
+            <MudText Typo="Typo.caption">Tickets/Person</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            <MudText Typo="Typo.h4" Color="Color.Primary">@_totalTickets</MudText>
+            <MudText Typo="Typo.caption">Tickets (30T)</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            <MudText Typo="Typo.h4" Style="color: #4CAF50;">@_closedTickets</MudText>
+            <MudText Typo="Typo.caption">Geschlossen</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            <MudText Typo="Typo.h4" Style="color: #FF9800;">@_avgResponseDisplay</MudText>
+            <MudText Typo="Typo.caption">Antwortzeit</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            <MudText Typo="Typo.h4" Color="Color.Error">@_overdueCount</MudText>
+            <MudText Typo="Typo.caption">Überfällig</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@* Top Stats *@
+@if (!string.IsNullOrEmpty(_topRequester) || !string.IsNullOrEmpty(_topAssignee))
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudGrid>
+            <MudItem xs="6">
+                <MudText Typo="Typo.caption" Style="font-weight: 600;">Meiste Anfragen</MudText>
+                <MudText Typo="Typo.body2">@(_topRequester ?? "-")</MudText>
+            </MudItem>
+            <MudItem xs="6">
+                <MudText Typo="Typo.caption" Style="font-weight: 600;">Meiste Zuweisungen</MudText>
+                <MudText Typo="Typo.body2">@(_topAssignee ?? "-")</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@* Team Members *@
+<MudCard>
+    <MudCardHeader>
+        <MudText Typo="Typo.h6">Teamauslastung</MudText>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (_teamMembers.Count == 0 && !_isLoading)
+        {
+            <MudAlert Severity="Severity.Normal">Keine Teammitglieder gefunden.</MudAlert>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Name</th>
+                        <th>Zugewiesen</th>
+                        <th>Offen</th>
+                        <th>Geschlossen</th>
+                        <th>Antwortzeit</th>
+                        <th>Auslastung</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var member in _teamMembers)
+                    {
+                        <tr>
+                            <td>
+                                <div style="width: 4px; height: 28px; border-radius: 2px; background-color: @member.WorkloadColor;"></div>
+                            </td>
+                            <td>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@member.Name</MudText>
+                                @if (!string.IsNullOrEmpty(member.Email))
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@member.Email</MudText>
+                                }
+                            </td>
+                            <td><MudText Typo="Typo.body2">@member.AssignedTickets</MudText></td>
+                            <td><MudText Typo="Typo.body2">@member.OpenTickets</MudText></td>
+                            <td><MudText Typo="Typo.body2">@member.ClosedTickets</MudText></td>
+                            <td><MudText Typo="Typo.body2">@member.AvgResponseDisplay</MudText></td>
+                            <td>
+                                <MudChip T="string" Size="Size.Small"
+                                         Style="@($"background-color: {member.WorkloadColor}; color: white;")">
+                                    @member.WorkloadLabel
+                                </MudChip>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private bool _isLoading;
+    private List<TeamMemberStats> _teamMembers = [];
+    private int _totalTeamMembers;
+    private double _averageWorkload;
+    private int _totalTickets;
+    private int _closedTickets;
+    private string _avgResponseDisplay = "-";
+    private int _overdueCount;
+    private string? _topRequester;
+    private string? _topAssignee;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeamDataAsync();
+    }
+
+    private async Task LoadTeamDataAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            var usersJson = await ApiService.GetUsersAsync();
+            var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersJson, options);
+
+            // Load overall stats
+            await LoadOverallStatsAsync(options);
+            await LoadOverdueCountAsync(options);
+
+            _teamMembers.Clear();
+
+            if (userResponse?.Users != null)
+            {
+                var activeUsers = userResponse.Users.Where(u => !u.Deleted).ToList();
+
+                foreach (var user in activeUsers)
+                {
+                    var userId = user.Id ?? user.InternalId;
+                    var member = new TeamMemberStats
+                    {
+                        Name = user.Fullname ?? user.Username ?? "Unbekannt",
+                        Email = user.Email,
+                        UserId = userId
+                    };
+
+                    if (!string.IsNullOrEmpty(userId))
+                    {
+                        try
+                        {
+                            var statsJson = await ApiService.GetTicketStatsForUserAsync(userId);
+                            var userStats = JsonSerializer.Deserialize<UserTicketStats>(statsJson, options);
+                            member.AssignedTickets = userStats?.Data?.TicketCount ?? 0;
+                            member.OpenTickets = (userStats?.Data?.TicketCount ?? 0) - (userStats?.Data?.ClosedCount ?? 0);
+                            member.ClosedTickets = userStats?.Data?.ClosedCount ?? 0;
+                            member.AvgResponseHours = userStats?.Data?.AvgResponse ?? 0;
+                        }
+                        catch { }
+                    }
+
+                    _teamMembers.Add(member);
+                }
+
+                _teamMembers = _teamMembers.OrderByDescending(m => m.AssignedTickets).ToList();
+            }
+
+            _totalTeamMembers = _teamMembers.Count;
+            var totalAssigned = _teamMembers.Sum(m => m.AssignedTickets);
+            _averageWorkload = _totalTeamMembers > 0 ? Math.Round((double)totalAssigned / _totalTeamMembers, 1) : 0;
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadOverallStatsAsync(JsonSerializerOptions options)
+    {
+        try
+        {
+            var json = await ApiService.GetTicketStatsAsync(30);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("ticketCount", out var tc) && tc.ValueKind == JsonValueKind.Number)
+                _totalTickets = tc.GetInt32();
+            if (root.TryGetProperty("closedCount", out var cc) && cc.ValueKind == JsonValueKind.Number)
+                _closedTickets = cc.GetInt32();
+            if (root.TryGetProperty("ticketAvg", out var ta) && ta.ValueKind == JsonValueKind.Number)
+            {
+                var avg = ta.GetDouble();
+                _avgResponseDisplay = avg > 0 ? $"{avg:F1}h" : "-";
+            }
+            if (root.TryGetProperty("mostRequester", out var mr) && mr.ValueKind == JsonValueKind.Object)
+            {
+                var item = JsonSerializer.Deserialize<TicketStatItem>(mr.GetRawText(), options);
+                _topRequester = item?.Fullname ?? item?.Name;
+            }
+            if (root.TryGetProperty("mostAssignee", out var ma) && ma.ValueKind == JsonValueKind.Object)
+            {
+                var item = JsonSerializer.Deserialize<TicketStatItem>(ma.GetRawText(), options);
+                _topAssignee = item?.Fullname ?? item?.Name;
+            }
+        }
+        catch { }
+    }
+
+    private async Task LoadOverdueCountAsync(JsonSerializerOptions options)
+    {
+        try
+        {
+            var json = await ApiService.GetOverdueTicketsAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("tickets", out var ticketsEl) && ticketsEl.ValueKind == JsonValueKind.Array)
+                _overdueCount = ticketsEl.GetArrayLength();
+            else if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                _overdueCount = doc.RootElement.GetArrayLength();
+        }
+        catch { }
+    }
+
+    private class TeamMemberStats
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? UserId { get; set; }
+        public string? Email { get; set; }
+        public int AssignedTickets { get; set; }
+        public int OpenTickets { get; set; }
+        public int ClosedTickets { get; set; }
+        public double AvgResponseHours { get; set; }
+        public string WorkloadColor => AssignedTickets switch
+        {
+            > 10 => "#E74C3C",
+            > 5 => "#FF9800",
+            _ => "#4CAF50"
+        };
+        public string WorkloadLabel => AssignedTickets switch
+        {
+            > 10 => "Hoch",
+            > 5 => "Mittel",
+            _ => "Normal"
+        };
+        public string AvgResponseDisplay => AvgResponseHours > 0 ? $"{AvgResponseHours:F1}h" : "-";
+    }
+}

@@ -1,0 +1,181 @@
+@page "/notifications"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Benachrichtigungen - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Benachrichtigungen</MudText>
+    <div class="d-flex gap-2">
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadNotificationsAsync"
+                       Disabled="_isLoading" />
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_notifications.Count == 0 && !_isLoading)
+{
+    <MudAlert Severity="Severity.Normal" Class="mb-4">
+        <MudText>Keine Benachrichtigungen vorhanden.</MudText>
+    </MudAlert>
+}
+else
+{
+    <MudStack Spacing="2">
+        @foreach (var notification in _notifications)
+        {
+            <MudPaper Class="pa-3 cursor-pointer" Elevation="1" @onclick="@(() => OpenNotification(notification))">
+                <div class="d-flex align-center gap-3">
+                    <MudIcon Icon="@GetNotificationIcon(notification)" Color="@GetNotificationColor(notification)" />
+                    <div class="flex-grow-1">
+                        <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                            @(notification.Title ?? "Benachrichtigung")
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(notification.Description))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @notification.Description
+                            </MudText>
+                        }
+                        @if (notification.Date != default)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                @notification.Date.ToString("dd.MM.yyyy HH:mm")
+                            </MudText>
+                        }
+                    </div>
+                    @if (!notification.IsRead)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Circle" Size="Size.Small"
+                                 Color="Color.Primary" Style="font-size: 10px;" />
+                    }
+                </div>
+            </MudPaper>
+        }
+    </MudStack>
+}
+
+@code {
+    private bool _isLoading;
+    private List<NotificationItem> _notifications = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotificationsAsync();
+    }
+
+    private async Task LoadNotificationsAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var json = await ApiService.GetNotificationsAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            using var doc = JsonDocument.Parse(json);
+            _notifications.Clear();
+
+            JsonElement notificationsEl;
+            if (doc.RootElement.TryGetProperty("notifications", out notificationsEl) && notificationsEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var el in notificationsEl.EnumerateArray())
+                {
+                    var item = new NotificationItem();
+
+                    if (el.TryGetProperty("title", out var titleEl))
+                        item.Title = titleEl.GetString();
+                    if (el.TryGetProperty("message", out var msgEl))
+                        item.Description = msgEl.GetString();
+                    if (el.TryGetProperty("description", out var descEl))
+                        item.Description ??= descEl.GetString();
+                    if (el.TryGetProperty("type", out var typeEl))
+                        item.EventType = typeEl.GetString();
+                    if (el.TryGetProperty("unread", out var unreadEl))
+                        item.IsRead = !unreadEl.GetBoolean();
+                    if (el.TryGetProperty("date", out var dateEl) && dateEl.ValueKind == JsonValueKind.String)
+                    {
+                        if (DateTime.TryParse(dateEl.GetString(), out var dt))
+                            item.Date = dt;
+                    }
+                    if (el.TryGetProperty("data", out var dataEl))
+                    {
+                        if (dataEl.TryGetProperty("ticket", out var ticketEl))
+                        {
+                            if (ticketEl.ValueKind == JsonValueKind.Object && ticketEl.TryGetProperty("uid", out var uidEl))
+                                item.TicketUid = uidEl.GetInt32().ToString();
+                            else if (ticketEl.ValueKind == JsonValueKind.String)
+                                item.TicketId = ticketEl.GetString();
+                        }
+                    }
+
+                    _notifications.Add(item);
+                }
+            }
+
+            _notifications = _notifications.OrderByDescending(n => n.Date).ToList();
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenNotification(NotificationItem notification)
+    {
+        notification.IsRead = true;
+
+        if (!string.IsNullOrEmpty(notification.TicketUid))
+            Navigation.NavigateTo($"/tickets/{notification.TicketUid}");
+        else if (!string.IsNullOrEmpty(notification.TicketId))
+            Navigation.NavigateTo($"/tickets/{notification.TicketId}");
+    }
+
+    private static string GetNotificationIcon(NotificationItem n) => n.EventType switch
+    {
+        "ticket:created" => Icons.Material.Filled.AddCircle,
+        "ticket:updated" => Icons.Material.Filled.Edit,
+        "comment:added" => Icons.Material.Filled.Comment,
+        "note:added" => Icons.Material.Filled.Note,
+        "ticket:status" => Icons.Material.Filled.SwapHoriz,
+        _ => Icons.Material.Filled.Notifications
+    };
+
+    private static Color GetNotificationColor(NotificationItem n) => n.EventType switch
+    {
+        "ticket:created" => Color.Success,
+        "ticket:updated" => Color.Info,
+        "comment:added" => Color.Primary,
+        "ticket:status" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private class NotificationItem
+    {
+        public string? Title { get; set; }
+        public string? Description { get; set; }
+        public string? EventType { get; set; }
+        public string? TicketId { get; set; }
+        public string? TicketUid { get; set; }
+        public DateTime Date { get; set; }
+        public bool IsRead { get; set; }
+    }
+}
