@@ -1,0 +1,304 @@
+@page "/settings"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject AppSettings AppSettings
+@inject LocalStorageService LocalStorage
+@inject AuthStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject HttpClient HttpClient
+
+<PageTitle>Einstellungen - THW Ticket App</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Einstellungen</MudText>
+
+<MudGrid>
+    @* Appearance *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">Erscheinungsbild</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <div>
+                        <MudText>Dark Mode</MudText>
+                    </div>
+                    <MudSwitch @bind-Value="_isDarkMode" Color="Color.Primary" T="bool" />
+                </div>
+
+                <MudDivider Class="mb-3" />
+
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <div>
+                        <MudText>Benachrichtigungen</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Über neue Tickets und Änderungen informieren
+                        </MudText>
+                    </div>
+                    <MudSwitch @bind-Value="_isNotificationsEnabled" Color="Color.Primary" T="bool" />
+                </div>
+
+                @if (_isNotificationsEnabled)
+                {
+                    <div class="ml-4">
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2">Neue Tickets</MudText>
+                            <MudSwitch @bind-Value="_notifyOnNewTickets" Color="Color.Primary" T="bool" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2">Kommentare</MudText>
+                            <MudSwitch @bind-Value="_notifyOnComments" Color="Color.Primary" T="bool" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2">Statusänderungen</MudText>
+                            <MudSwitch @bind-Value="_notifyOnStatusChanges" Color="Color.Primary" T="bool" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <div>
+                                <MudText Typo="Typo.body2">Nur meine Tickets</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Nur bei mir zugewiesenen Tickets
+                                </MudText>
+                            </div>
+                            <MudSwitch @bind-Value="_notifyOnlyMyTickets" Color="Color.Primary" T="bool" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center">
+                            <div>
+                                <MudText Typo="Typo.body2">Nur hohe Priorität</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Nur bei hoher/dringender Priorität
+                                </MudText>
+                            </div>
+                            <MudSwitch @bind-Value="_notifyOnlyHighPriority" Color="Color.Primary" T="bool" />
+                        </div>
+                    </div>
+                }
+
+                <MudDivider Class="my-3" />
+
+                <MudSelect T="string" @bind-Value="_selectedLanguage" Label="Sprache / Language"
+                           Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@("de")">Deutsch</MudSelectItem>
+                    <MudSelectItem Value="@("en")">English</MudSelectItem>
+                </MudSelect>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* API Configuration *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">API-Konfiguration</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTextField @bind-Value="_apiBaseUrl" Label="Server-URL"
+                              Placeholder="http://localhost:8118/api/v1"
+                              Variant="Variant.Outlined" Class="mb-3" />
+
+                <MudNumericField @bind-Value="_connectionTimeout" Label="Verbindungs-Timeout (Sekunden)"
+                                 Min="5" Max="300" Variant="Variant.Outlined" Class="mb-3" T="int" />
+
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           OnClick="TestConnectionAsync" Disabled="_isTesting"
+                           StartIcon="@Icons.Material.Filled.NetworkCheck">
+                    @(_isTesting ? "Teste..." : "Verbindung testen")
+                </MudButton>
+
+                @if (!string.IsNullOrEmpty(_connectionStatus))
+                {
+                    <MudAlert Severity="@_connectionSeverity" Class="mt-3" Dense="true">
+                        @_connectionStatus
+                    </MudAlert>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* Cache *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">Offline-Cache</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <div>
+                        <MudText>Offline-Caching aktivieren</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Tickets lokal speichern für Offline-Zugriff
+                        </MudText>
+                    </div>
+                    <MudSwitch @bind-Value="_isOfflineCacheEnabled" Color="Color.Primary" T="bool" />
+                </div>
+
+                <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                           OnClick="ClearCacheAsync"
+                           StartIcon="@Icons.Material.Filled.DeleteSweep">
+                    Cache leeren
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* About *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardContent>
+                <div class="d-flex align-center gap-4 mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.ConfirmationNumber" Size="Size.Large"
+                             Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.h6" Color="Color.Primary">THW Ticket App</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Technisches Hilfswerk</MudText>
+                    </div>
+                </div>
+                <MudDivider Class="mb-3" />
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Version: 1.0.0 (PWA)</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<div class="d-flex gap-3 mt-4 mb-6">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync"
+               StartIcon="@Icons.Material.Filled.Save">
+        Speichern
+    </MudButton>
+    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="LogoutAsync"
+               StartIcon="@Icons.Material.Filled.Logout">
+        Abmelden
+    </MudButton>
+</div>
+
+@code {
+    private bool _isDarkMode;
+    private bool _isNotificationsEnabled;
+    private bool _notifyOnNewTickets = true;
+    private bool _notifyOnComments = true;
+    private bool _notifyOnStatusChanges = true;
+    private bool _notifyOnlyMyTickets;
+    private bool _notifyOnlyHighPriority;
+    private string _selectedLanguage = "de";
+    private string _apiBaseUrl = string.Empty;
+    private int _connectionTimeout = 30;
+    private bool _isOfflineCacheEnabled;
+    private bool _isTesting;
+    private string _connectionStatus = string.Empty;
+    private Severity _connectionSeverity = Severity.Info;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _apiBaseUrl = AppSettings.ApiBaseUrl;
+        _connectionTimeout = AppSettings.ConnectionTimeoutSeconds;
+
+        _isDarkMode = await GetBoolSetting("settings_darkmode", false);
+        _isNotificationsEnabled = await GetBoolSetting("settings_notifications", false);
+        _notifyOnNewTickets = await GetBoolSetting("settings_notify_new", true);
+        _notifyOnComments = await GetBoolSetting("settings_notify_comments", true);
+        _notifyOnStatusChanges = await GetBoolSetting("settings_notify_status", true);
+        _notifyOnlyMyTickets = await GetBoolSetting("settings_notify_only_mine", false);
+        _notifyOnlyHighPriority = await GetBoolSetting("settings_notify_high_prio", false);
+        _isOfflineCacheEnabled = await GetBoolSetting("settings_offline_cache", false);
+        _selectedLanguage = await LocalStorage.GetItemAsync("settings_language") ?? "de";
+
+        var savedUrl = await LocalStorage.GetItemAsync("settings_api_url");
+        if (!string.IsNullOrEmpty(savedUrl)) _apiBaseUrl = savedUrl;
+
+        var savedTimeout = await LocalStorage.GetItemAsync("settings_timeout");
+        if (int.TryParse(savedTimeout, out var t)) _connectionTimeout = t;
+    }
+
+    private async Task<bool> GetBoolSetting(string key, bool defaultValue)
+    {
+        var val = await LocalStorage.GetItemAsync(key);
+        return val != null ? val == "true" : defaultValue;
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        if (_connectionTimeout < 5 || _connectionTimeout > 300)
+        {
+            Snackbar.Add("Timeout muss zwischen 5 und 300 Sekunden liegen.", Severity.Warning);
+            return;
+        }
+
+        AppSettings.ApiBaseUrl = _apiBaseUrl;
+        AppSettings.ConnectionTimeoutSeconds = _connectionTimeout;
+
+        await LocalStorage.SetItemAsync("settings_api_url", _apiBaseUrl);
+        await LocalStorage.SetItemAsync("settings_timeout", _connectionTimeout.ToString());
+        await LocalStorage.SetItemAsync("settings_darkmode", _isDarkMode.ToString().ToLower());
+        await LocalStorage.SetItemAsync("settings_notifications", _isNotificationsEnabled.ToString().ToLower());
+        await LocalStorage.SetItemAsync("settings_notify_new", _notifyOnNewTickets.ToString().ToLower());
+        await LocalStorage.SetItemAsync("settings_notify_comments", _notifyOnComments.ToString().ToLower());
+        await LocalStorage.SetItemAsync("settings_notify_status", _notifyOnStatusChanges.ToString().ToLower());
+        await LocalStorage.SetItemAsync("settings_notify_only_mine", _notifyOnlyMyTickets.ToString().ToLower());
+        await LocalStorage.SetItemAsync("settings_notify_high_prio", _notifyOnlyHighPriority.ToString().ToLower());
+        await LocalStorage.SetItemAsync("settings_offline_cache", _isOfflineCacheEnabled.ToString().ToLower());
+        await LocalStorage.SetItemAsync("settings_language", _selectedLanguage);
+
+        Snackbar.Add("Einstellungen gespeichert.", Severity.Success);
+    }
+
+    private async Task TestConnectionAsync()
+    {
+        _isTesting = true;
+        _connectionStatus = "Teste Verbindung...";
+        _connectionSeverity = Severity.Info;
+        StateHasChanged();
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var testUrl = _apiBaseUrl.TrimEnd('/');
+            var response = await HttpClient.GetAsync(testUrl, cts.Token);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _connectionStatus = "Verbindung erfolgreich!";
+                _connectionSeverity = Severity.Success;
+            }
+            else
+            {
+                _connectionStatus = $"Fehler: {(int)response.StatusCode} {response.ReasonPhrase}";
+                _connectionSeverity = Severity.Error;
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            _connectionStatus = "Zeitüberschreitung. Server antwortet nicht.";
+            _connectionSeverity = Severity.Warning;
+        }
+        catch (HttpRequestException)
+        {
+            _connectionStatus = "Verbindung fehlgeschlagen. Server nicht erreichbar.";
+            _connectionSeverity = Severity.Error;
+        }
+        catch (Exception ex)
+        {
+            _connectionStatus = $"Fehler: {ex.Message}";
+            _connectionSeverity = Severity.Error;
+        }
+        finally
+        {
+            _isTesting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearCacheAsync()
+    {
+        await LocalStorage.RemoveItemAsync("ticket_cache");
+        Snackbar.Add("Cache geleert.", Severity.Success);
+    }
+
+    private async Task LogoutAsync()
+    {
+        await ApiService.LogoutAsync();
+        AuthStateProvider.NotifyAuthStateChanged();
+        Navigation.NavigateTo("/login");
+    }
+}

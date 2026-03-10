@@ -10,6 +10,8 @@
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject LocalStorageService LocalStorage
+@implements IDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
 
@@ -27,6 +29,9 @@ else
         <div class="d-flex align-center gap-3">
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/tickets"))" />
             <MudText Typo="Typo.h5">#@_ticket.Uid – @_ticket.Subject</MudText>
+            <MudIconButton Icon="@(_isFavorite ? Icons.Material.Filled.Star : Icons.Material.Filled.StarOutline)"
+                           Color="@(_isFavorite ? Color.Warning : Color.Default)"
+                           OnClick="ToggleFavoriteAsync" />
         </div>
         <div class="d-flex gap-2">
             <StatusBadge Status="@_ticket.Status" />
@@ -155,6 +160,41 @@ else
                                 }
                             </div>
                         }
+
+                        @* Linked Tickets *@
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Verknüpfte Tickets</MudText>
+                        @if (_linkedTickets.Count > 0)
+                        {
+                            @foreach (var link in _linkedTickets)
+                            {
+                                <div class="d-flex align-center gap-2 mb-1">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@link.LinkType</MudChip>
+                                    <MudLink Href="@($"/tickets/{link.Uid}")" Typo="Typo.body2">
+                                        #@link.Uid – @link.Subject
+                                    </MudLink>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                   OnClick="@(() => RemoveLinkedTicketAsync(link))" />
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Keine Verknüpfungen.</MudText>
+                        }
+                        <div class="d-flex gap-2 mt-2">
+                            <MudNumericField @bind-Value="_linkTicketUid" Label="Ticket #" Variant="Variant.Outlined"
+                                             Margin="Margin.Dense" Style="max-width: 100px;" T="int" />
+                            <MudSelect @bind-Value="_linkType" Label="Typ" Variant="Variant.Outlined" Dense="true"
+                                       Style="max-width: 130px;" T="string">
+                                <MudSelectItem Value="@("Verwandt")">Verwandt</MudSelectItem>
+                                <MudSelectItem Value="@("Blockiert")">Blockiert</MudSelectItem>
+                                <MudSelectItem Value="@("Blockiert von")">Blockiert von</MudSelectItem>
+                                <MudSelectItem Value="@("Duplikat")">Duplikat</MudSelectItem>
+                            </MudSelect>
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                                           OnClick="AddLinkedTicketAsync" />
+                        </div>
                     </MudPaper>
                 </MudItem>
             </MudGrid>
@@ -248,6 +288,70 @@ else
             }
         </MudTabPanel>
 
+        @* Time Tracking Tab *@
+        <MudTabPanel Text="Zeiterfassung" Icon="@Icons.Material.Filled.Timer">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudPaper Elevation="1" Class="pa-4">
+                        <MudText Typo="Typo.h6" Class="mb-3">Timer</MudText>
+                        <MudText Typo="Typo.h3" Class="mb-3" Style="font-family: monospace; font-weight: 600;"
+                                 Color="@(_timerRunning ? Color.Primary : Color.Default)">
+                            @FormatElapsed(_timerElapsed)
+                        </MudText>
+                        <div class="d-flex gap-2 mb-4">
+                            @if (!_timerRunning)
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Success"
+                                           StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="StartTimer">
+                                    Starten
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Error"
+                                           StartIcon="@Icons.Material.Filled.Stop" OnClick="StopTimer">
+                                    Stoppen
+                                </MudButton>
+                            }
+                        </div>
+                        <MudTextField @bind-Value="_timeEntryDescription" Label="Beschreibung (optional)"
+                                      Variant="Variant.Outlined" />
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudPaper Elevation="1" Class="pa-4">
+                        <MudText Typo="Typo.h6" Class="mb-3">Gesamt: @FormatMinutes(_totalTimeMinutes)</MudText>
+                        @if (_timeEntries.Count > 0)
+                        {
+                            <MudSimpleTable Dense="true">
+                                <thead>
+                                    <tr>
+                                        <th>Start</th>
+                                        <th>Dauer</th>
+                                        <th>Beschreibung</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var entry in _timeEntries.OrderByDescending(e => e.Start))
+                                    {
+                                        <tr>
+                                            <td>@entry.Start.ToString("dd.MM HH:mm")</td>
+                                            <td>@FormatMinutes(entry.DurationMinutes)</td>
+                                            <td>@(entry.Description ?? "-")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Keine Zeiteinträge.</MudText>
+                        }
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
         @* History Tab *@
         <MudTabPanel Text="@($"Verlauf ({_ticket.History?.Count ?? 0})")" Icon="@Icons.Material.Filled.History">
             @if (_ticket.History != null)
@@ -299,10 +403,28 @@ else
     private List<User> _users = [];
     private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
 
+    // Favorites & Linked Tickets
+    private bool _isFavorite;
+    private List<LinkedTicketItem> _linkedTickets = [];
+    private int _linkTicketUid;
+    private string _linkType = "Verwandt";
+
+    // Time tracking
+    private bool _timerRunning;
+    private DateTime _timerStart;
+    private TimeSpan _timerElapsed;
+    private string _timeEntryDescription = string.Empty;
+    private List<TimeEntryItem> _timeEntries = [];
+    private int _totalTimeMinutes;
+    private System.Threading.Timer? _timer;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadTicketAsync();
         _ = LoadReferenceDataAsync();
+        await LoadFavoriteStateAsync();
+        await LoadLinkedTicketsAsync();
+        await LoadTimeEntriesAsync();
     }
 
     private async Task LoadTicketAsync()
@@ -494,5 +616,162 @@ else
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
+    }
+
+    // Favorites
+    private async Task LoadFavoriteStateAsync()
+    {
+        var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
+        var favs = System.Text.Json.JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
+        _isFavorite = favs.Contains(TicketUid);
+    }
+
+    private async Task ToggleFavoriteAsync()
+    {
+        var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
+        var favs = System.Text.Json.JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
+
+        if (_isFavorite) favs.Remove(TicketUid);
+        else favs.Add(TicketUid);
+
+        _isFavorite = !_isFavorite;
+        await LocalStorage.SetItemAsync("favorite_tickets", System.Text.Json.JsonSerializer.Serialize(favs));
+    }
+
+    // Linked Tickets
+    private async Task LoadLinkedTicketsAsync()
+    {
+        try
+        {
+            var json = await LocalStorage.GetItemAsync($"linked_tickets_{TicketUid}");
+            if (!string.IsNullOrEmpty(json))
+                _linkedTickets = System.Text.Json.JsonSerializer.Deserialize<List<LinkedTicketItem>>(json,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+        }
+        catch { }
+    }
+
+    private async Task AddLinkedTicketAsync()
+    {
+        if (_linkTicketUid <= 0 || _linkTicketUid == TicketUid) return;
+
+        if (_linkedTickets.Any(l => l.Uid == _linkTicketUid)) return;
+
+        // Try to fetch the linked ticket's subject
+        string subject = $"Ticket #{_linkTicketUid}";
+        try
+        {
+            var json = await ApiService.GetTicketAsync(_linkTicketUid.ToString());
+            var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("ticket", out var tEl))
+            {
+                var t = System.Text.Json.JsonSerializer.Deserialize<Ticket>(tEl.GetRawText(), options);
+                if (t?.Subject != null) subject = t.Subject;
+            }
+        }
+        catch { }
+
+        _linkedTickets.Add(new LinkedTicketItem { Uid = _linkTicketUid, Subject = subject, LinkType = _linkType });
+        await SaveLinkedTicketsAsync();
+        _linkTicketUid = 0;
+    }
+
+    private async Task RemoveLinkedTicketAsync(LinkedTicketItem link)
+    {
+        _linkedTickets.Remove(link);
+        await SaveLinkedTicketsAsync();
+    }
+
+    private async Task SaveLinkedTicketsAsync()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(_linkedTickets);
+        await LocalStorage.SetItemAsync($"linked_tickets_{TicketUid}", json);
+    }
+
+    // Time tracking
+    private void StartTimer()
+    {
+        _timerStart = DateTime.Now;
+        _timerRunning = true;
+        _timerElapsed = TimeSpan.Zero;
+        _timer = new System.Threading.Timer(_ =>
+        {
+            _timerElapsed = DateTime.Now - _timerStart;
+            InvokeAsync(StateHasChanged);
+        }, null, 0, 1000);
+    }
+
+    private async Task StopTimer()
+    {
+        _timer?.Dispose();
+        _timer = null;
+        _timerRunning = false;
+        var duration = DateTime.Now - _timerStart;
+
+        if (duration.TotalMinutes >= 0.5)
+        {
+            var entry = new TimeEntryItem
+            {
+                Start = _timerStart,
+                DurationMinutes = (int)Math.Ceiling(duration.TotalMinutes),
+                Description = string.IsNullOrWhiteSpace(_timeEntryDescription) ? null : _timeEntryDescription
+            };
+            _timeEntries.Add(entry);
+            _totalTimeMinutes = _timeEntries.Sum(e => e.DurationMinutes);
+            _timeEntryDescription = string.Empty;
+            await SaveTimeEntriesAsync();
+        }
+
+        _timerElapsed = TimeSpan.Zero;
+    }
+
+    private async Task LoadTimeEntriesAsync()
+    {
+        try
+        {
+            var json = await LocalStorage.GetItemAsync($"time_entries_{TicketUid}");
+            if (!string.IsNullOrEmpty(json))
+            {
+                _timeEntries = System.Text.Json.JsonSerializer.Deserialize<List<TimeEntryItem>>(json,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+                _totalTimeMinutes = _timeEntries.Sum(e => e.DurationMinutes);
+            }
+        }
+        catch { }
+    }
+
+    private async Task SaveTimeEntriesAsync()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(_timeEntries);
+        await LocalStorage.SetItemAsync($"time_entries_{TicketUid}", json);
+    }
+
+    private static string FormatElapsed(TimeSpan ts) =>
+        $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
+
+    private static string FormatMinutes(int minutes)
+    {
+        if (minutes >= 60) return $"{minutes / 60}h {minutes % 60}m";
+        return $"{minutes}m";
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+
+    private class TimeEntryItem
+    {
+        public DateTime Start { get; set; }
+        public int DurationMinutes { get; set; }
+        public string? Description { get; set; }
+    }
+
+    private class LinkedTicketItem
+    {
+        public int Uid { get; set; }
+        public string Subject { get; set; } = string.Empty;
+        public string LinkType { get; set; } = "Verwandt";
     }
 }

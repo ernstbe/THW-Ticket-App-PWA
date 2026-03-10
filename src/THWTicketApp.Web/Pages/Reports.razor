@@ -1,0 +1,401 @@
+@page "/reports"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject ISnackbar Snackbar
+
+<PageTitle>Berichte - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Berichte</MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadReportAsync"
+                   Disabled="_isLoading" />
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+<MudGrid>
+    @* Weekly Trend *@
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">Ticket-Trend (letzte 8 Wochen)</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_weeklyTrend.Count > 0)
+                {
+                    <div class="d-flex align-center gap-4 mb-3">
+                        <div class="d-flex align-center gap-1">
+                            <div style="width: 12px; height: 12px; background: var(--mud-palette-primary); border-radius: 2px;"></div>
+                            <MudText Typo="Typo.caption">Erstellt</MudText>
+                        </div>
+                        <div class="d-flex align-center gap-1">
+                            <div style="width: 12px; height: 12px; background: #4CAF50; border-radius: 2px;"></div>
+                            <MudText Typo="Typo.caption">Geschlossen</MudText>
+                        </div>
+                    </div>
+                    @foreach (var week in _weeklyTrend)
+                    {
+                        <div class="d-flex align-center gap-2 mb-2">
+                            <MudText Typo="Typo.caption" Style="width: 50px; text-align: right;">@week.WeekLabel</MudText>
+                            <div style="flex: 1;">
+                                <div class="d-flex align-center gap-1 mb-1">
+                                    <div style="height: 14px; width: @(week.CreatedBarPercent)%; background: var(--mud-palette-primary); border-radius: 2px; min-width: 2px; transition: width 0.3s;"></div>
+                                    <MudText Typo="Typo.caption">@week.Created</MudText>
+                                </div>
+                                <div class="d-flex align-center gap-1">
+                                    <div style="height: 14px; width: @(week.ClosedBarPercent)%; background: #4CAF50; border-radius: 2px; min-width: 2px; transition: width 0.3s;"></div>
+                                    <MudText Typo="Typo.caption">@week.Closed</MudText>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else if (!_isLoading)
+                {
+                    <MudText Color="Color.Secondary">Keine Daten vorhanden.</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* Resolution Times *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">Auflösungszeiten</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudSimpleTable Dense="true">
+                    <tbody>
+                        <tr>
+                            <td><MudText Typo="Typo.body2">Gelöste Tickets</MudText></td>
+                            <td><MudText Typo="Typo.body2" Style="font-weight: 600;">@_resolvedCount</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><MudText Typo="Typo.body2">Durchschnitt</MudText></td>
+                            <td><MudText Typo="Typo.body2" Style="font-weight: 600;">@_avgResolutionTime</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><MudText Typo="Typo.body2">Schnellste</MudText></td>
+                            <td><MudText Typo="Typo.body2" Style="font-weight: 600; color: #4CAF50;">@_fastestResolution</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><MudText Typo="Typo.body2">Langsamste</MudText></td>
+                            <td><MudText Typo="Typo.body2" Style="font-weight: 600; color: #E74C3C;">@_slowestResolution</MudText></td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* SLA Compliance *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">SLA-Einhaltung</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.h4" Class="mb-2" Style="font-weight: 600;">@_slaComplianceText</MudText>
+                <MudSimpleTable Dense="true">
+                    <tbody>
+                        <tr>
+                            <td><MudChip T="string" Size="Size.Small" Style="background: #4CAF50; color: white;">Eingehalten</MudChip></td>
+                            <td><MudText Typo="Typo.body2">@_slaMetCount</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><MudChip T="string" Size="Size.Small" Style="background: #E74C3C; color: white;">Überschritten</MudChip></td>
+                            <td><MudText Typo="Typo.body2">@_slaBreachedCount</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><MudChip T="string" Size="Size.Small" Style="background: #FF9800; color: white;">Gefährdet</MudChip></td>
+                            <td><MudText Typo="Typo.body2">@_slaAtRiskCount</MudText></td>
+                        </tr>
+                        <tr>
+                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Ohne Frist</MudText></td>
+                            <td><MudText Typo="Typo.body2">@_slaNoDeadlineCount</MudText></td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* Priority Distribution *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">Prioritätsverteilung</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                @foreach (var p in _priorityDistribution)
+                {
+                    <div class="d-flex align-center gap-2 mb-2">
+                        <MudText Typo="Typo.body2" Style="width: 100px;">@p.Name</MudText>
+                        <div style="flex: 1;">
+                            <div style="height: 20px; width: @(p.BarPercent)%; background: @p.Color; border-radius: 4px; min-width: 4px; transition: width 0.3s;"></div>
+                        </div>
+                        <MudText Typo="Typo.body2" Style="font-weight: 600; width: 30px; text-align: right;">@p.Count</MudText>
+                    </div>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* Top Assignees *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">Top Bearbeiter</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                @foreach (var a in _topAssignees)
+                {
+                    <div class="mb-3">
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@a.Name</MudText>
+                            <MudText Typo="Typo.body2">@a.Total Tickets</MudText>
+                        </div>
+                        <div class="d-flex" style="height: 16px; border-radius: 4px; overflow: hidden; background: var(--mud-palette-surface);">
+                            @if (a.Total > 0)
+                            {
+                                <div style="width: @(a.ClosedPercent)%; background: #4CAF50;" title="Geschlossen: @a.Closed"></div>
+                                <div style="width: @(a.OpenPercent)%; background: var(--mud-palette-primary);" title="Offen: @a.Open"></div>
+                            }
+                        </div>
+                        <div class="d-flex gap-3 mt-1">
+                            <MudText Typo="Typo.caption" Style="color: #4CAF50;">Geschlossen: @a.Closed</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Primary">Offen: @a.Open</MudText>
+                        </div>
+                    </div>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _isLoading;
+    private List<WeeklyCount> _weeklyTrend = [];
+    private string _avgResolutionTime = "-";
+    private string _fastestResolution = "-";
+    private string _slowestResolution = "-";
+    private int _resolvedCount;
+    private int _slaMetCount;
+    private int _slaBreachedCount;
+    private int _slaAtRiskCount;
+    private int _slaNoDeadlineCount;
+    private double _slaCompliancePercent;
+    private string _slaComplianceText = "-";
+    private List<PriorityStatItem> _priorityDistribution = [];
+    private List<AssigneeStatItem> _topAssignees = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReportAsync();
+    }
+
+    private async Task LoadReportAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var json = await ApiService.GetTicketsAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(json, "tickets", options);
+
+            foreach (var t in tickets)
+                TrudeskTranslationHelper.TranslateTicket(t);
+
+            ComputeWeeklyTrend(tickets);
+            ComputeResolutionTime(tickets);
+            ComputeSlaCompliance(tickets);
+            ComputePriorityDistribution(tickets);
+            ComputeTopAssignees(tickets);
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ComputeWeeklyTrend(Ticket[] tickets)
+    {
+        _weeklyTrend.Clear();
+        var now = DateTime.Now;
+
+        for (int i = 7; i >= 0; i--)
+        {
+            var weekStart = now.Date.AddDays(-((int)now.DayOfWeek + 7 * i));
+            var weekEnd = weekStart.AddDays(7);
+            var created = tickets.Count(t => t.Date >= weekStart && t.Date < weekEnd);
+            var closed = tickets.Count(t => t.ClosedDate.HasValue && t.ClosedDate.Value >= weekStart && t.ClosedDate.Value < weekEnd);
+            _weeklyTrend.Add(new WeeklyCount(weekStart.ToString("dd.MM"), created, closed));
+        }
+
+        var maxVal = _weeklyTrend.Count > 0 ? _weeklyTrend.Max(w => Math.Max(w.Created, w.Closed)) : 1;
+        foreach (var w in _weeklyTrend)
+            w.MaxValue = maxVal > 0 ? maxVal : 1;
+    }
+
+    private void ComputeResolutionTime(Ticket[] tickets)
+    {
+        var resolved = tickets
+            .Where(t => t.ClosedDate.HasValue && t.ClosedDate.Value > t.Date)
+            .Select(t => t.ClosedDate!.Value - t.Date)
+            .ToList();
+
+        _resolvedCount = resolved.Count;
+
+        if (resolved.Count == 0)
+        {
+            _avgResolutionTime = "-";
+            _fastestResolution = "-";
+            _slowestResolution = "-";
+            return;
+        }
+
+        var avg = TimeSpan.FromTicks((long)resolved.Average(ts => ts.Ticks));
+        _avgResolutionTime = FormatDuration(avg);
+        _fastestResolution = FormatDuration(resolved.Min());
+        _slowestResolution = FormatDuration(resolved.Max());
+    }
+
+    private void ComputeSlaCompliance(Ticket[] tickets)
+    {
+        var withDeadline = tickets.Where(t => t.DueDate != DateTime.MinValue).ToList();
+        _slaNoDeadlineCount = tickets.Length - withDeadline.Count;
+
+        if (withDeadline.Count == 0)
+        {
+            _slaMetCount = 0; _slaBreachedCount = 0; _slaAtRiskCount = 0;
+            _slaCompliancePercent = 0;
+            _slaComplianceText = "Keine Tickets mit Fälligkeitsdatum";
+            return;
+        }
+
+        int met = 0, breached = 0, atRisk = 0;
+        foreach (var t in withDeadline)
+        {
+            if (t.Status?.IsResolved == true)
+            {
+                if (t.ClosedDate.HasValue && t.ClosedDate.Value <= t.DueDate) met++;
+                else breached++;
+            }
+            else
+            {
+                if (t.DueDate < DateTime.Now) breached++;
+                else if (t.DueDate < DateTime.Now.AddHours(24)) atRisk++;
+                else met++;
+            }
+        }
+
+        _slaMetCount = met; _slaBreachedCount = breached; _slaAtRiskCount = atRisk;
+        var total = met + breached + atRisk;
+        _slaCompliancePercent = total > 0 ? Math.Round(met * 100.0 / total, 1) : 0;
+        _slaComplianceText = $"{_slaCompliancePercent}% SLA-Einhaltung";
+    }
+
+    private void ComputePriorityDistribution(Ticket[] tickets)
+    {
+        _priorityDistribution.Clear();
+        var groups = tickets
+            .Where(t => t.Priority != null)
+            .GroupBy(t => new { t.Priority!.Name, t.Priority.HtmlColor })
+            .OrderByDescending(g => g.Count());
+
+        var maxCount = groups.Any() ? groups.Max(g => g.Count()) : 1;
+
+        foreach (var g in groups)
+        {
+            _priorityDistribution.Add(new PriorityStatItem
+            {
+                Name = g.Key.Name ?? "Unbekannt",
+                Count = g.Count(),
+                Color = g.Key.HtmlColor ?? "#9E9E9E",
+                BarPercent = maxCount > 0 ? (int)(g.Count() * 100.0 / maxCount) : 0
+            });
+        }
+    }
+
+    private void ComputeTopAssignees(Ticket[] tickets)
+    {
+        _topAssignees.Clear();
+        var groups = tickets
+            .Where(t => t.Assignee != null && !string.IsNullOrEmpty(t.Assignee.Fullname))
+            .GroupBy(t => t.Assignee!.Fullname)
+            .OrderByDescending(g => g.Count())
+            .Take(5);
+
+        foreach (var g in groups)
+        {
+            var open = g.Count(t => t.Status?.IsResolved != true);
+            var closed = g.Count(t => t.Status?.IsResolved == true);
+            var total = g.Count();
+            _topAssignees.Add(new AssigneeStatItem
+            {
+                Name = g.Key!,
+                Total = total,
+                Open = open,
+                Closed = closed,
+                OpenPercent = total > 0 ? (int)(open * 100.0 / total) : 0,
+                ClosedPercent = total > 0 ? (int)(closed * 100.0 / total) : 0
+            });
+        }
+    }
+
+    private static string FormatDuration(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1) return $"{(int)ts.TotalDays}T {ts.Hours}h";
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        return $"{(int)ts.TotalMinutes}m";
+    }
+
+    private class WeeklyCount
+    {
+        public string WeekLabel { get; set; }
+        public int Created { get; set; }
+        public int Closed { get; set; }
+        public int MaxValue { get; set; } = 1;
+        public int CreatedBarPercent => MaxValue > 0 ? (int)(Created * 100.0 / MaxValue) : 0;
+        public int ClosedBarPercent => MaxValue > 0 ? (int)(Closed * 100.0 / MaxValue) : 0;
+        public WeeklyCount(string weekLabel, int created, int closed)
+        {
+            WeekLabel = weekLabel; Created = created; Closed = closed;
+        }
+    }
+
+    private class PriorityStatItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Count { get; set; }
+        public string Color { get; set; } = "#9E9E9E";
+        public int BarPercent { get; set; }
+    }
+
+    private class AssigneeStatItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Total { get; set; }
+        public int Open { get; set; }
+        public int Closed { get; set; }
+        public int OpenPercent { get; set; }
+        public int ClosedPercent { get; set; }
+    }
+}

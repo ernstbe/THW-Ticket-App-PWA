@@ -1,0 +1,217 @@
+@page "/kanban"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Kanban Board - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Kanban Board</MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadBoardAsync"
+                   Disabled="_isLoading" />
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+else if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+}
+else
+{
+    <MudDropContainer T="KanbanTicketItem" Items="_ticketItems"
+                      ItemsSelector="@((item, zone) => item.StatusId == zone)"
+                      ItemDropped="OnItemDropped"
+                      Class="d-flex flex-row overflow-auto gap-4 pa-2"
+                      Style="min-height: calc(100vh - 220px);">
+        <ChildContent>
+            @foreach (var column in _columns)
+            {
+                <MudPaper Class="flex-shrink-0 rounded-lg" Style="width: 300px; background: var(--mud-palette-surface);" Elevation="1">
+                    @* Column Header *@
+                    <div class="d-flex align-center pa-3 rounded-t-lg"
+                         style="border-bottom: 3px solid @column.StatusColor;">
+                        <div style="width: 4px; height: 24px; border-radius: 2px; background-color: @column.StatusColor;"
+                             class="mr-2"></div>
+                        <MudText Typo="Typo.subtitle1" Class="flex-grow-1" Style="font-weight: 600;">
+                            @column.StatusName
+                        </MudText>
+                        <MudChip T="string" Size="Size.Small"
+                                 Style="@($"background-color: {column.StatusColor}; color: white;")"
+                                 Text="@column.TicketCount.ToString()" />
+                    </div>
+
+                    @* Drop Zone *@
+                    <MudDropZone T="KanbanTicketItem" Identifier="@column.StatusId"
+                                 Class="pa-2 mud-height-full" Style="min-height: 200px;"
+                                 AllowReorder="false" />
+                </MudPaper>
+            }
+        </ChildContent>
+        <ItemRenderer>
+            <MudPaper Class="pa-3 mb-2 rounded cursor-pointer kanban-card" Elevation="0"
+                      Outlined="true"
+                      @onclick="@(() => Navigation.NavigateTo($"/tickets/{context.Uid}"))">
+                <MudText Typo="Typo.body2" Style="font-weight: 600;" Class="mb-1">
+                    @context.Subject
+                </MudText>
+                <div class="d-flex align-center gap-2 mb-1">
+                    @if (!string.IsNullOrEmpty(context.PriorityName))
+                    {
+                        <MudText Typo="Typo.caption" Style="@($"color: {context.PriorityColor};")">
+                            @context.PriorityName
+                        </MudText>
+                    }
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @(context.AssigneeName ?? "Nicht zugewiesen")
+                    </MudText>
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Tertiary">#@context.Uid</MudText>
+            </MudPaper>
+        </ItemRenderer>
+    </MudDropContainer>
+}
+
+<style>
+    .kanban-card:hover {
+        border-color: var(--mud-palette-primary) !important;
+        transition: border-color 0.2s ease;
+    }
+</style>
+
+@code {
+    private bool _isLoading;
+    private string? _errorMessage;
+    private List<KanbanColumn> _columns = [];
+    private List<KanbanTicketItem> _ticketItems = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBoardAsync();
+    }
+
+    private async Task LoadBoardAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            var statusJson = await ApiService.GetStatusesAsync();
+            var ticketJson = await ApiService.GetTicketsAsync();
+
+            var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
+            var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(ticketJson, "tickets", options);
+
+            foreach (var t in tickets)
+                TrudeskTranslationHelper.TranslateTicket(t);
+
+            _columns = statuses.OrderBy(s => s.Order).Select(s => new KanbanColumn
+            {
+                StatusId = s.Id ?? string.Empty,
+                StatusName = TrudeskTranslationHelper.TranslateStatus(s.Name) ?? s.Name ?? "Unbekannt",
+                StatusColor = s.HtmlColor ?? "#9E9E9E"
+            }).ToList();
+
+            _ticketItems = tickets.Select(t => new KanbanTicketItem
+            {
+                TicketId = t.Id ?? string.Empty,
+                Uid = t.Uid,
+                Subject = t.Subject ?? "(Kein Betreff)",
+                StatusId = t.Status?.Id ?? string.Empty,
+                PriorityName = t.Priority?.TranslatedName ?? t.Priority?.Name,
+                PriorityColor = t.Priority?.HtmlColor ?? "#888",
+                PrioritySortOrder = t.Priority?.OverdueIn ?? 0,
+                AssigneeName = t.Assignee?.Fullname
+            }).OrderByDescending(t => t.PrioritySortOrder).ToList();
+
+            foreach (var col in _columns)
+                col.TicketCount = _ticketItems.Count(t => t.StatusId == col.StatusId);
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            _errorMessage = message;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnItemDropped(MudItemDropInfo<KanbanTicketItem> dropInfo)
+    {
+        var item = dropInfo.Item;
+        if (item == null) return;
+
+        var newStatusId = dropInfo.DropzoneIdentifier;
+        if (item.StatusId == newStatusId) return;
+
+        var oldStatusId = item.StatusId;
+        item.StatusId = newStatusId;
+
+        // Update counts
+        var oldCol = _columns.FirstOrDefault(c => c.StatusId == oldStatusId);
+        var newCol = _columns.FirstOrDefault(c => c.StatusId == newStatusId);
+        if (oldCol != null) oldCol.TicketCount--;
+        if (newCol != null) newCol.TicketCount++;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ApiService.UpdateTicketStatusAsync(item.TicketId, newStatusId);
+            if (success)
+            {
+                Snackbar.Add($"Ticket #{item.Uid} verschoben.", Severity.Success);
+            }
+            else
+            {
+                // Revert on failure
+                item.StatusId = oldStatusId;
+                if (oldCol != null) oldCol.TicketCount++;
+                if (newCol != null) newCol.TicketCount--;
+                Snackbar.Add("Status-Änderung fehlgeschlagen.", Severity.Error);
+            }
+        }
+        catch
+        {
+            item.StatusId = oldStatusId;
+            if (oldCol != null) oldCol.TicketCount++;
+            if (newCol != null) newCol.TicketCount--;
+            Snackbar.Add("Status-Änderung fehlgeschlagen.", Severity.Error);
+        }
+        StateHasChanged();
+    }
+
+    private class KanbanColumn
+    {
+        public string StatusId { get; set; } = string.Empty;
+        public string StatusName { get; set; } = string.Empty;
+        public string StatusColor { get; set; } = "#9E9E9E";
+        public int TicketCount { get; set; }
+    }
+
+    private class KanbanTicketItem
+    {
+        public string TicketId { get; set; } = string.Empty;
+        public int Uid { get; set; }
+        public string Subject { get; set; } = string.Empty;
+        public string StatusId { get; set; } = string.Empty;
+        public string? PriorityName { get; set; }
+        public string PriorityColor { get; set; } = "#888";
+        public int PrioritySortOrder { get; set; }
+        public string? AssigneeName { get; set; }
+    }
+}

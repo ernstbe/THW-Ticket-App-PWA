@@ -24,6 +24,10 @@ builder.Services.AddScoped(sp => new HttpClient
 builder.Services.AddScoped<LocalStorageService>();
 builder.Services.AddScoped<ITrueDeskApiService, TrueDeskApiService>();
 builder.Services.AddScoped<AppStateService>();
+builder.Services.AddScoped<RealtimeService>();
+builder.Services.AddScoped<IndexedDbService>();
+builder.Services.AddScoped<SyncService>();
+builder.Services.AddScoped<ISyncService>(sp => sp.GetRequiredService<SyncService>());
 
 // Auth
 builder.Services.AddScoped<AuthStateProvider>();

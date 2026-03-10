@@ -4,6 +4,9 @@
 @inject THWTicketApp.Shared.Services.ITrueDeskApiService ApiService
 @inject THWTicketApp.Web.Services.AuthStateProvider AuthStateProvider
 @inject THWTicketApp.Web.Services.AppStateService AppState
+@inject THWTicketApp.Web.Services.RealtimeService RealtimeService
+@inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
+@implements IDisposable
 
 <MudThemeProvider Theme="_theme" IsDarkMode="@_isDarkMode" />
 <MudPopoverProvider />
@@ -16,6 +19,11 @@
                        OnClick="@ToggleDrawer" />
         <MudText Typo="Typo.h6" Class="ml-3">THW Ticket App</MudText>
         <MudSpacer />
+        <MudBadge Content="@_unreadNotifications" Visible="@(_unreadNotifications > 0)"
+                  Color="Color.Error" Overlap="true">
+            <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit"
+                           OnClick="@(() => Navigation.NavigateTo("/notifications"))" />
+        </MudBadge>
         <MudIconButton Icon="@Icons.Material.Filled.DarkMode" Color="Color.Inherit"
                        OnClick="@ToggleDarkMode" />
         <MudIconButton Icon="@Icons.Material.Filled.Logout" Color="Color.Inherit"
@@ -38,6 +46,10 @@
                         Icon="@Icons.Material.Filled.BarChart">Berichte</MudNavLink>
             <MudNavLink Href="/scanner" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.QrCodeScanner">Scanner</MudNavLink>
+            <MudNavLink Href="/notifications" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Notifications">Benachrichtigungen</MudNavLink>
+            <MudNavLink Href="/sync-conflicts" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.SyncProblem">Sync-Konflikte</MudNavLink>
             <MudDivider Class="my-2" />
             <MudNavLink Href="/settings" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
@@ -54,6 +66,7 @@
 @code {
     private bool _drawerOpen = true;
     private bool _isDarkMode;
+    private int _unreadNotifications;
 
     private readonly MudTheme _theme = new()
     {
@@ -82,8 +95,46 @@
         }
     };
 
+    private bool _initialized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _unreadNotifications = await ApiService.GetNotificationCountAsync();
+        RealtimeService.TicketEvent += OnTicketEvent;
+        await RealtimeService.ConnectAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            var darkMode = await LocalStorage.GetItemAsync("settings_darkmode");
+            if (darkMode == "true")
+            {
+                _isDarkMode = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void OnTicketEvent(string eventName, string ticketId)
+    {
+        _unreadNotifications++;
+        InvokeAsync(StateHasChanged);
+    }
+
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
-    private void ToggleDarkMode() => _isDarkMode = !_isDarkMode;
+    private async Task ToggleDarkMode()
+    {
+        _isDarkMode = !_isDarkMode;
+        await LocalStorage.SetItemAsync("settings_darkmode", _isDarkMode ? "true" : "false");
+    }
+
+    public void Dispose()
+    {
+        RealtimeService.TicketEvent -= OnTicketEvent;
+    }
 
     private async Task LogoutAsync()
     {

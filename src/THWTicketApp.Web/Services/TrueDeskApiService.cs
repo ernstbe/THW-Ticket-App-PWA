@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using THWTicketApp.Shared.Models;
@@ -12,6 +13,7 @@ public class TrueDeskApiService : ITrueDeskApiService
     private readonly AppSettings _settings;
     private readonly LocalStorageService _localStorage;
     private string? _authToken;
+    private string? _refreshToken;
 
     public string? CurrentUsername { get; private set; }
     public string? CurrentUserId { get; private set; }
@@ -27,12 +29,26 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_authToken);
 
+    private string BaseUrl => _settings.ApiBaseUrl.TrimEnd('/');
+    private string ServerUrl => BaseUrl.Replace("/api/v2", "").Replace("/api/v1", "");
+    private bool IsV2 => BaseUrl.Contains("/api/v2");
+    // Some endpoints only exist in v1 - use this for those calls
+    private string V1BaseUrl => ServerUrl + "/api/v1";
+
     private void SetAuthHeader(string? token)
     {
+        // Remove old headers
+        _httpClient.DefaultRequestHeaders.Authorization = null;
         if (_httpClient.DefaultRequestHeaders.Contains("accesstoken"))
             _httpClient.DefaultRequestHeaders.Remove("accesstoken");
+
         if (!string.IsNullOrEmpty(token))
-            _httpClient.DefaultRequestHeaders.Add("accesstoken", token);
+        {
+            if (IsV2)
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            else
+                _httpClient.DefaultRequestHeaders.Add("accesstoken", token);
+        }
     }
 
     public async Task<bool> AuthenticateAsync(string username, string password)
@@ -44,12 +60,27 @@ public class TrueDeskApiService : ITrueDeskApiService
         {
             var payload = new { username, password };
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync($"{_settings.ApiBaseUrl}/login", content);
+            var response = await _httpClient.PostAsync($"{BaseUrl}/login", content);
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
                 var doc = JsonDocument.Parse(json);
-                _authToken = doc.RootElement.GetProperty("accessToken").GetString();
+
+                if (IsV2)
+                {
+                    // v2 returns { token, refreshToken }
+                    _authToken = doc.RootElement.TryGetProperty("token", out var tokenEl)
+                        ? tokenEl.GetString() : null;
+                    _refreshToken = doc.RootElement.TryGetProperty("refreshToken", out var rtEl)
+                        ? rtEl.GetString() : null;
+                }
+                else
+                {
+                    // v1 returns { accessToken }
+                    _authToken = doc.RootElement.TryGetProperty("accessToken", out var atEl)
+                        ? atEl.GetString() : null;
+                }
+
                 SetAuthHeader(_authToken);
 
                 if (doc.RootElement.TryGetProperty("user", out var userEl) &&
@@ -60,6 +91,7 @@ public class TrueDeskApiService : ITrueDeskApiService
 
                 CurrentUsername = username;
                 await _localStorage.SetItemAsync("auth_token", _authToken ?? string.Empty);
+                await _localStorage.SetItemAsync("auth_refresh_token", _refreshToken ?? string.Empty);
                 await _localStorage.SetItemAsync("auth_username", username);
                 await _localStorage.SetItemAsync("auth_userid", CurrentUserId ?? string.Empty);
                 return true;
@@ -79,22 +111,24 @@ public class TrueDeskApiService : ITrueDeskApiService
             if (!string.IsNullOrEmpty(storedToken))
             {
                 _authToken = storedToken;
+                _refreshToken = await _localStorage.GetItemAsync("auth_refresh_token");
                 CurrentUsername = await _localStorage.GetItemAsync("auth_username");
                 CurrentUserId = await _localStorage.GetItemAsync("auth_userid");
                 SetAuthHeader(_authToken);
 
                 try
                 {
-                    var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/login");
+                    var response = await _httpClient.GetAsync($"{BaseUrl}/login");
                     if (!response.IsSuccessStatusCode)
                     {
-                        _authToken = null;
-                        CurrentUsername = null;
-                        CurrentUserId = null;
-                        SetAuthHeader(null);
-                        await _localStorage.RemoveItemAsync("auth_token");
-                        await _localStorage.RemoveItemAsync("auth_username");
-                        await _localStorage.RemoveItemAsync("auth_userid");
+                        // Try token refresh for v2
+                        if (IsV2 && !string.IsNullOrEmpty(_refreshToken))
+                        {
+                            if (await TryRefreshTokenAsync())
+                                return true;
+                        }
+
+                        await ClearAuthState();
                         return false;
                     }
                 }
@@ -106,10 +140,29 @@ public class TrueDeskApiService : ITrueDeskApiService
                 return true;
             }
         }
-        catch
+        catch { }
+        return false;
+    }
+
+    private async Task<bool> TryRefreshTokenAsync()
+    {
+        try
         {
-            // localStorage not available or error reading
+            var payload = new { refreshToken = _refreshToken };
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync($"{BaseUrl}/token", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var doc = JsonDocument.Parse(json);
+                _authToken = doc.RootElement.TryGetProperty("token", out var tokenEl)
+                    ? tokenEl.GetString() : null;
+                SetAuthHeader(_authToken);
+                await _localStorage.SetItemAsync("auth_token", _authToken ?? string.Empty);
+                return true;
+            }
         }
+        catch { }
         return false;
     }
 
@@ -118,29 +171,37 @@ public class TrueDeskApiService : ITrueDeskApiService
         try
         {
             if (IsAuthenticated)
-                await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/logout");
+                await _httpClient.GetAsync($"{BaseUrl}/logout");
         }
         catch { }
 
+        await ClearAuthState();
+    }
+
+    private async Task ClearAuthState()
+    {
         _authToken = null;
+        _refreshToken = null;
         CurrentUsername = null;
         CurrentUserId = null;
         SetAuthHeader(null);
         await _localStorage.RemoveItemAsync("auth_token");
+        await _localStorage.RemoveItemAsync("auth_refresh_token");
         await _localStorage.RemoveItemAsync("auth_username");
         await _localStorage.RemoveItemAsync("auth_userid");
     }
 
+    // Tickets
     public async Task<string> GetTicketsAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets?limit=1000");
+        var response = await _httpClient.GetAsync($"{BaseUrl}/tickets?limit=1000");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetTicketsPagedAsync(int page = 0, int limit = 50)
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets?page={page}&limit={limit}");
+        var response = await _httpClient.GetAsync($"{BaseUrl}/tickets?page={page}&limit={limit}");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -153,7 +214,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         if (assignedSelf == true)
             queryParts.Add("assignedself=true");
         var query = string.Join("&", queryParts);
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets?{query}");
+        var response = await _httpClient.GetAsync($"{BaseUrl}/tickets?{query}");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -161,14 +222,24 @@ public class TrueDeskApiService : ITrueDeskApiService
     public async Task<string> SearchTicketsAsync(string query)
     {
         var encoded = Uri.EscapeDataString(query);
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/search?search={encoded}");
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync();
+        // v2 uses Elasticsearch endpoint, v1 uses ticket search
+        if (IsV2)
+        {
+            var response = await _httpClient.GetAsync($"{BaseUrl}/es/search?search={encoded}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync();
+        }
+        else
+        {
+            var response = await _httpClient.GetAsync($"{BaseUrl}/tickets/search?search={encoded}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync();
+        }
     }
 
     public async Task<string> GetTicketAsync(string ticketUid)
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/{ticketUid}");
+        var response = await _httpClient.GetAsync($"{BaseUrl}/tickets/{ticketUid}");
         return await response.Content.ReadAsStringAsync();
     }
 
@@ -187,7 +258,7 @@ public class TrueDeskApiService : ITrueDeskApiService
             payload["assignee"] = assigneeId;
 
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_settings.ApiBaseUrl}/tickets/create", content);
+        var response = await _httpClient.PostAsync($"{BaseUrl}/tickets", content);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -211,7 +282,7 @@ public class TrueDeskApiService : ITrueDeskApiService
 
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_settings.ApiBaseUrl}/tickets/create", content);
+        var response = await _httpClient.PostAsync($"{BaseUrl}/tickets", content);
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync();
@@ -225,21 +296,25 @@ public class TrueDeskApiService : ITrueDeskApiService
         if (ticket == null || string.IsNullOrWhiteSpace(ticket.Id))
             return false;
 
-        var payload = new Dictionary<string, object?>();
-        if (ticket.Subject != null) payload["subject"] = ticket.Subject;
-        if (ticket.Issue != null) payload["issue"] = ticket.Issue;
-        if (ticket.Priority?.Id != null) payload["priority"] = ticket.Priority.Id;
-        if (ticket.Status?.Id != null) payload["status"] = ticket.Status.Id;
+        var ticketData = new Dictionary<string, object?>();
+        if (ticket.Subject != null) ticketData["subject"] = ticket.Subject;
+        if (ticket.Issue != null) ticketData["issue"] = ticket.Issue;
+        if (ticket.Priority?.Id != null) ticketData["priority"] = ticket.Priority.Id;
+        if (ticket.Status?.Id != null) ticketData["status"] = ticket.Status.Id;
 
+        // v2 expects { ticket: {...} } wrapper, v1 expects flat object
+        object payload = IsV2 ? new { ticket = ticketData } : ticketData;
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_settings.ApiBaseUrl}/tickets/{ticket.Id}", content);
+        // v2 uses uid, v1 uses _id
+        var identifier = IsV2 ? ticket.Uid.ToString() : ticket.Id;
+        var response = await _httpClient.PutAsync($"{BaseUrl}/tickets/{identifier}", content);
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> DeleteTicketAsync(string ticketId)
     {
         if (string.IsNullOrWhiteSpace(ticketId)) return false;
-        var response = await _httpClient.DeleteAsync($"{_settings.ApiBaseUrl}/tickets/{ticketId}");
+        var response = await _httpClient.DeleteAsync($"{BaseUrl}/tickets/{ticketId}");
         return response.IsSuccessStatusCode;
     }
 
@@ -248,25 +323,28 @@ public class TrueDeskApiService : ITrueDeskApiService
         if (string.IsNullOrWhiteSpace(ticketId) || string.IsNullOrWhiteSpace(statusId))
             return false;
 
-        var payload = new { status = statusId };
+        var ticketData = new Dictionary<string, object?> { ["status"] = statusId };
+        object payload = IsV2 ? new { ticket = ticketData } : ticketData;
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_settings.ApiBaseUrl}/tickets/{ticketId}", content);
+        var response = await _httpClient.PutAsync($"{BaseUrl}/tickets/{ticketId}", content);
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> AssignTicketAsync(string ticketId, string userId)
     {
-        var payload = new { assignee = userId };
+        var ticketData = new Dictionary<string, object?> { ["assignee"] = userId };
+        object payload = IsV2 ? new { ticket = ticketData } : ticketData;
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_settings.ApiBaseUrl}/tickets/{ticketId}", content);
+        var response = await _httpClient.PutAsync($"{BaseUrl}/tickets/{ticketId}", content);
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> ClearTicketAssigneeAsync(string ticketId)
     {
-        var payload = new { assignee = (string?)null };
+        var ticketData = new Dictionary<string, object?> { ["assignee"] = null };
+        object payload = IsV2 ? new { ticket = ticketData } : ticketData;
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_settings.ApiBaseUrl}/tickets/{ticketId}", content);
+        var response = await _httpClient.PutAsync($"{BaseUrl}/tickets/{ticketId}", content);
         return response.IsSuccessStatusCode;
     }
 
@@ -277,7 +355,8 @@ public class TrueDeskApiService : ITrueDeskApiService
 
         var payload = new { _id = id, ownerId, comment = newComment };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_settings.ApiBaseUrl}/tickets/addcomment", content);
+        // addcomment only exists in v1
+        var response = await _httpClient.PostAsync($"{V1BaseUrl}/tickets/addcomment", content);
         return response.IsSuccessStatusCode;
     }
 
@@ -288,10 +367,12 @@ public class TrueDeskApiService : ITrueDeskApiService
 
         var payload = new { ticketid = ticketId, owner = ownerId, note };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_settings.ApiBaseUrl}/tickets/addnote", content);
+        // addnote only exists in v1
+        var response = await _httpClient.PostAsync($"{V1BaseUrl}/tickets/addnote", content);
         return response.IsSuccessStatusCode;
     }
 
+    // Attachments
     public async Task<bool> UploadAttachmentAsync(string ticketId, Stream fileStream, string fileName)
     {
         using var content = new MultipartFormDataContent();
@@ -300,15 +381,13 @@ public class TrueDeskApiService : ITrueDeskApiService
         content.Add(streamContent, "file", fileName);
         content.Add(new StringContent(ticketId), "ticketId");
 
-        var baseUrl = _settings.ApiBaseUrl.Replace("/api/v1", "");
-        var response = await _httpClient.PostAsync($"{baseUrl}/tickets/uploadattachment", content);
+        var response = await _httpClient.PostAsync($"{ServerUrl}/tickets/uploadattachment", content);
         return response.IsSuccessStatusCode;
     }
 
     public async Task<Stream?> DownloadAttachmentAsync(string attachmentPath)
     {
-        var baseUrl = _settings.ApiBaseUrl.Replace("/api/v1", "");
-        var response = await _httpClient.GetAsync($"{baseUrl}{attachmentPath}");
+        var response = await _httpClient.GetAsync($"{ServerUrl}{attachmentPath}");
         if (response.IsSuccessStatusCode)
             return await response.Content.ReadAsStreamAsync();
         return null;
@@ -316,62 +395,65 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public string GetAttachmentUrl(string attachmentPath)
     {
-        var baseUrl = _settings.ApiBaseUrl.Replace("/api/v1", "");
-        return $"{baseUrl}{attachmentPath}";
+        return $"{ServerUrl}{attachmentPath}";
     }
 
     public async Task<bool> DeleteAttachmentAsync(string ticketId, string attachmentId)
     {
         var response = await _httpClient.DeleteAsync(
-            $"{_settings.ApiBaseUrl}/tickets/{ticketId}/attachments/remove/{attachmentId}");
+            $"{BaseUrl}/tickets/{ticketId}/attachments/remove/{attachmentId}");
         return response.IsSuccessStatusCode;
     }
 
+    // Reference data
     public async Task<string> GetStatusesAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/status");
+        var response = await _httpClient.GetAsync($"{BaseUrl}/tickets/status");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetUsersAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/users");
+        var endpoint = IsV2 ? $"{BaseUrl}/accounts" : $"{BaseUrl}/users";
+        var response = await _httpClient.GetAsync(endpoint);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetAssigneesAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/users/getassignees");
+        var endpoint = IsV2 ? $"{BaseUrl}/accounts?type=agents" : $"{BaseUrl}/users/getassignees";
+        var response = await _httpClient.GetAsync(endpoint);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetTicketTypesAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/types");
+        var endpoint = IsV2 ? $"{BaseUrl}/tickets/info/types" : $"{BaseUrl}/tickets/types";
+        var response = await _httpClient.GetAsync(endpoint);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetPrioritiesAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/priorities");
+        var response = await _httpClient.GetAsync($"{BaseUrl}/tickets/priorities");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetTagsAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tags/limit");
+        var response = await _httpClient.GetAsync($"{BaseUrl}/tags/limit");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetGroupsAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/groups");
+        var response = await _httpClient.GetAsync($"{BaseUrl}/groups");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -379,14 +461,15 @@ public class TrueDeskApiService : ITrueDeskApiService
     public async Task<string> GetTicketsByGroupAsync(string groupId, int page = 0, int limit = 50)
     {
         var response = await _httpClient.GetAsync(
-            $"{_settings.ApiBaseUrl}/tickets/group/{groupId}?page={page}&limit={limit}");
+            $"{BaseUrl}/tickets/group/{groupId}?page={page}&limit={limit}");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetOverdueTicketsAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/overdue");
+        // overdue only exists in v1
+        var response = await _httpClient.GetAsync($"{V1BaseUrl}/tickets/overdue");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -398,13 +481,15 @@ public class TrueDeskApiService : ITrueDeskApiService
 
         var payload = new { user = CurrentUserId, subscribe };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_settings.ApiBaseUrl}/tickets/{ticketId}/subscribe", content);
+        // subscribe only exists in v1
+        var response = await _httpClient.PutAsync($"{V1BaseUrl}/tickets/{ticketId}/subscribe", content);
         return response.IsSuccessStatusCode;
     }
 
     public async Task<string> GetNotificationsAsync()
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/users/notifications");
+        // notifications only in v1
+        var response = await _httpClient.GetAsync($"{V1BaseUrl}/users/notifications");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -413,7 +498,8 @@ public class TrueDeskApiService : ITrueDeskApiService
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/users/notificationCount");
+            // notificationCount only in v1
+            var response = await _httpClient.GetAsync($"{V1BaseUrl}/users/notificationCount");
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync();
             var doc = JsonDocument.Parse(json);
@@ -428,23 +514,24 @@ public class TrueDeskApiService : ITrueDeskApiService
         catch { return 0; }
     }
 
+    // Stats - these endpoints exist only in v1
     public async Task<string> GetTicketStatsAsync(int timespan = 30)
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/stats/{timespan}");
+        var response = await _httpClient.GetAsync($"{V1BaseUrl}/tickets/stats/{timespan}");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetTicketStatsForGroupAsync(string groupId)
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/stats/group/{groupId}");
+        var response = await _httpClient.GetAsync($"{V1BaseUrl}/tickets/stats/group/{groupId}");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetTicketStatsForUserAsync(string userId)
     {
-        var response = await _httpClient.GetAsync($"{_settings.ApiBaseUrl}/tickets/stats/user/{userId}");
+        var response = await _httpClient.GetAsync($"{V1BaseUrl}/tickets/stats/user/{userId}");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }

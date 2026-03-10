@@ -1,0 +1,138 @@
+@page "/sync-conflicts"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using THWTicketApp.Shared.Data
+@inject THWTicketApp.Web.Services.SyncService SyncService
+@inject ISnackbar Snackbar
+
+<PageTitle>Sync-Konflikte - THW Ticket App</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Sync-Konflikte</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" Class="mb-2" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" Class="mb-2" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" />
+}
+else if (_conflicts.Count == 0)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">
+        Keine Sync-Konflikte vorhanden.
+    </MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.body1" Class="mb-4">
+        @_conflicts.Count Konflikte gefunden. Bitte entscheiden Sie für jede Aktion, ob sie trotzdem
+        angewendet oder verworfen werden soll.
+    </MudText>
+
+    @foreach (var conflict in _conflicts)
+    {
+        <MudCard Class="mb-3" Elevation="2">
+            <MudCardContent>
+                <div class="d-flex align-center gap-3 mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
+                    <MudText Typo="Typo.h6">@TranslateActionType(conflict.ActionType)</MudText>
+                    <MudSpacer />
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                        @conflict.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+                    </MudText>
+                </div>
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                    @conflict.ConflictReason
+                </MudAlert>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.PublishedWithChanges"
+                           OnClick="@(() => ForceApplyAsync(conflict))"
+                           Disabled="_processing">
+                    Trotzdem anwenden
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.Delete"
+                           OnClick="@(() => DiscardAsync(conflict))"
+                           Disabled="_processing" Class="ml-2">
+                    Verwerfen
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+}
+
+@code {
+    private List<PendingAction> _conflicts = new();
+    private bool _loading = true;
+    private bool _processing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConflictsAsync();
+    }
+
+    private async Task LoadConflictsAsync()
+    {
+        _loading = true;
+        try
+        {
+            _conflicts = await SyncService.GetConflictedActionsAsync();
+        }
+        catch
+        {
+            _conflicts = new();
+        }
+        _loading = false;
+    }
+
+    private async Task ForceApplyAsync(PendingAction conflict)
+    {
+        _processing = true;
+        try
+        {
+            var success = await SyncService.ForceApplyAsync(conflict.Id);
+            if (success)
+            {
+                _conflicts.Remove(conflict);
+                Snackbar.Add("Aktion erfolgreich angewendet.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Aktion konnte nicht angewendet werden.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+        }
+        _processing = false;
+    }
+
+    private async Task DiscardAsync(PendingAction conflict)
+    {
+        _processing = true;
+        try
+        {
+            await SyncService.DiscardActionAsync(conflict.Id);
+            _conflicts.Remove(conflict);
+            Snackbar.Add("Aktion verworfen.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+        }
+        _processing = false;
+    }
+
+    private static string TranslateActionType(string actionType) => actionType switch
+    {
+        "AddComment" => "Kommentar hinzufügen",
+        "AddNote" => "Notiz hinzufügen",
+        "AssignTicket" => "Ticket zuweisen",
+        "UpdateStatus" => "Status ändern",
+        "CreateTicket" => "Neues Ticket erstellen",
+        "ClearAssignee" => "Zuweisung entfernen",
+        _ => actionType
+    };
+}

@@ -1,0 +1,174 @@
+@page "/scanner"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using Microsoft.JSInterop
+@inject IJSRuntime JsRuntime
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@implements IAsyncDisposable
+
+<PageTitle>Scanner - THW Ticket App</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">QR-/Barcode-Scanner</MudText>
+
+@if (!_cameraActive && !_scanComplete)
+{
+    <MudCard Class="mb-4">
+        <MudCardContent Class="text-center">
+            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="Size.Large" Color="Color.Primary"
+                     Style="font-size: 64px;" Class="mb-3" />
+            <MudText Typo="Typo.body1" Class="mb-3">
+                Scannen Sie einen QR-Code oder Barcode, um ein Ticket zu öffnen.
+            </MudText>
+            @if (!_barcodeApiSupported)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-3">
+                    Ihr Browser unterstützt die BarcodeDetector API nicht. Bitte geben Sie die Ticket-Nummer manuell ein.
+                </MudAlert>
+            }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.CameraAlt"
+                       OnClick="StartScannerAsync"
+                       Disabled="!_barcodeApiSupported">
+                Kamera starten
+            </MudButton>
+        </MudCardContent>
+    </MudCard>
+}
+
+@if (_cameraActive)
+{
+    <MudPaper Elevation="2" Class="mb-4 pa-2" Style="text-align: center;">
+        <video id="scanner-video" style="width: 100%; max-width: 500px; border-radius: 8px;" autoplay playsinline muted></video>
+        <div class="mt-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="StopScannerAsync"
+                       StartIcon="@Icons.Material.Filled.Close">
+                Kamera stoppen
+            </MudButton>
+        </div>
+    </MudPaper>
+}
+
+@if (_scanComplete && !string.IsNullOrEmpty(_scannedValue))
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">
+        Erkannt: <strong>@_scannedValue</strong>
+    </MudAlert>
+}
+
+@* Manual input fallback *@
+<MudCard>
+    <MudCardContent>
+        <MudText Typo="Typo.h6" Class="mb-3">Manuelle Eingabe</MudText>
+        <div class="d-flex gap-2 align-center">
+            <MudTextField @bind-Value="_manualTicketUid" Label="Ticket-Nummer" Variant="Variant.Outlined"
+                          Placeholder="z.B. 1234" Immediate="true" T="string" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="NavigateToTicket"
+                       Disabled="@string.IsNullOrWhiteSpace(_manualTicketUid)">
+                Öffnen
+            </MudButton>
+        </div>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<Scanner>? _dotNetRef;
+    private bool _cameraActive;
+    private bool _scanComplete;
+    private string _scannedValue = string.Empty;
+    private string _manualTicketUid = string.Empty;
+    private bool _barcodeApiSupported;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/scanner-interop.js");
+            _barcodeApiSupported = await _module.InvokeAsync<bool>("isBarcodeDetectorSupported");
+            StateHasChanged();
+        }
+    }
+
+    private async Task StartScannerAsync()
+    {
+        if (_module == null) return;
+
+        _scanComplete = false;
+        _scannedValue = string.Empty;
+        _cameraActive = true;
+        StateHasChanged();
+
+        await Task.Delay(100); // Wait for video element to render
+
+        _dotNetRef = DotNetObjectReference.Create(this);
+        var started = await _module.InvokeAsync<bool>("startScanner", "scanner-video", _dotNetRef);
+        if (!started)
+        {
+            _cameraActive = false;
+            Snackbar.Add("Kamera konnte nicht gestartet werden.", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    private async Task StopScannerAsync()
+    {
+        if (_module != null)
+            await _module.InvokeVoidAsync("stopScanner");
+        _cameraActive = false;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnBarcodeDetected(string value)
+    {
+        _scannedValue = value;
+        _scanComplete = true;
+        _cameraActive = false;
+
+        // Try to extract ticket number from scanned value
+        var ticketNum = ExtractTicketNumber(value);
+        if (!string.IsNullOrEmpty(ticketNum))
+        {
+            _manualTicketUid = ticketNum;
+            InvokeAsync(() =>
+            {
+                StateHasChanged();
+                Navigation.NavigateTo($"/tickets/{ticketNum}");
+            });
+        }
+        else
+        {
+            _manualTicketUid = value;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void NavigateToTicket()
+    {
+        if (string.IsNullOrWhiteSpace(_manualTicketUid)) return;
+        var uid = _manualTicketUid.Trim().TrimStart('#');
+        Navigation.NavigateTo($"/tickets/{uid}");
+    }
+
+    private static string? ExtractTicketNumber(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return null;
+        // Direct number
+        if (int.TryParse(value.Trim().TrimStart('#'), out _))
+            return value.Trim().TrimStart('#');
+        // URL with ticket number
+        var match = System.Text.RegularExpressions.Regex.Match(value, @"tickets?[/:](\d+)");
+        if (match.Success) return match.Groups[1].Value;
+        return null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module != null)
+        {
+            await _module.InvokeVoidAsync("stopScanner");
+            await _module.DisposeAsync();
+        }
+        _dotNetRef?.Dispose();
+    }
+}
