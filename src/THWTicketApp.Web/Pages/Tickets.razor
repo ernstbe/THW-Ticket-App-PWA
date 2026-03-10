@@ -188,16 +188,13 @@ else
         {
             var json = await ApiService.GetTicketsAsync();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var tickets = JsonSerializer.Deserialize<Ticket[]>(json, options);
+            var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(json, "tickets", options);
 
             _allTickets.Clear();
-            if (tickets != null)
+            foreach (var t in tickets)
             {
-                foreach (var t in tickets)
-                {
-                    TrudeskTranslationHelper.TranslateTicket(t);
-                    _allTickets.Add(t);
-                }
+                TrudeskTranslationHelper.TranslateTicket(t);
+                _allTickets.Add(t);
             }
             ApplyFilters();
         }
