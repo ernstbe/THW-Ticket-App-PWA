@@ -9,6 +9,7 @@
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject LocalStorageService LocalStorage
 
 <PageTitle>Tickets - THW Ticket App</PageTitle>
 
@@ -58,7 +59,41 @@
     <MudText Typo="Typo.body2" Color="Color.Secondary">
         @_filteredTickets.Count Ticket(s)
     </MudText>
+    <MudSpacer />
+    @* Saved Filters *@
+    @if (_savedFilters.Count > 0)
+    {
+        <MudMenu Label="Gespeicherte Filter" Variant="Variant.Outlined" Size="Size.Small"
+                 StartIcon="@Icons.Material.Filled.FilterList" Dense="true">
+            @foreach (var f in _savedFilters)
+            {
+                <MudMenuItem>
+                    <div class="d-flex align-center gap-2">
+                        <MudLink OnClick="@(() => ApplySavedFilter(f))">@f.Name</MudLink>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                       OnClick="@(() => DeleteSavedFilterAsync(f))" />
+                    </div>
+                </MudMenuItem>
+            }
+        </MudMenu>
+    }
+    <MudIconButton Icon="@Icons.Material.Filled.BookmarkAdd" Size="Size.Small"
+                   OnClick="@(() => _showSaveFilterDialog = true)" />
 </div>
+
+@if (_showSaveFilterDialog)
+{
+    <MudPaper Elevation="2" Class="pa-3 mb-3 d-flex gap-2 align-center">
+        <MudTextField @bind-Value="_saveFilterName" Label="Filtername" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Style="max-width: 250px;" T="string" />
+        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="SaveCurrentFilterAsync" Disabled="@string.IsNullOrWhiteSpace(_saveFilterName)">
+            Speichern
+        </MudButton>
+        <MudButton Size="Size.Small" Variant="Variant.Text"
+                   OnClick="@(() => _showSaveFilterDialog = false)">Abbrechen</MudButton>
+    </MudPaper>
+}
 
 @if (_isLoading)
 {
@@ -101,11 +136,15 @@ else
     private List<Ticket> _allTickets = [];
     private List<Ticket> _filteredTickets = [];
     private bool _isServerSearchActive;
+    private List<SavedFilterItem> _savedFilters = [];
+    private bool _showSaveFilterDialog;
+    private string _saveFilterName = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         if (!string.IsNullOrEmpty(InitialFilter))
             _activeFilter = InitialFilter;
+        await LoadSavedFiltersAsync();
         await LoadTicketsAsync();
     }
 
@@ -250,5 +289,65 @@ else
             { Snackbar.Add("Ticket geschlossen.", Severity.Success); await LoadTicketsAsync(); }
         }
         catch { Snackbar.Add("Schließen fehlgeschlagen.", Severity.Error); }
+    }
+
+    // Saved Filters
+    private async Task LoadSavedFiltersAsync()
+    {
+        try
+        {
+            var json = await LocalStorage.GetItemAsync("saved_filters");
+            if (!string.IsNullOrEmpty(json))
+                _savedFilters = JsonSerializer.Deserialize<List<SavedFilterItem>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+        }
+        catch { _savedFilters = []; }
+    }
+
+    private async Task SaveCurrentFilterAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_saveFilterName)) return;
+        _savedFilters.Add(new SavedFilterItem
+        {
+            Name = _saveFilterName.Trim(),
+            Filter = _activeFilter,
+            Sort = _activeSort,
+            MyTickets = _showOnlyMyTickets,
+            SearchText = _searchText
+        });
+        await PersistSavedFiltersAsync();
+        _saveFilterName = string.Empty;
+        _showSaveFilterDialog = false;
+        Snackbar.Add("Filter gespeichert.", Severity.Success);
+    }
+
+    private void ApplySavedFilter(SavedFilterItem f)
+    {
+        _activeFilter = f.Filter;
+        _activeSort = f.Sort;
+        _showOnlyMyTickets = f.MyTickets;
+        _searchText = f.SearchText ?? string.Empty;
+        ApplyFilters();
+    }
+
+    private async Task DeleteSavedFilterAsync(SavedFilterItem f)
+    {
+        _savedFilters.Remove(f);
+        await PersistSavedFiltersAsync();
+        Snackbar.Add("Filter gelöscht.", Severity.Info);
+    }
+
+    private async Task PersistSavedFiltersAsync()
+    {
+        await LocalStorage.SetItemAsync("saved_filters", JsonSerializer.Serialize(_savedFilters));
+    }
+
+    private class SavedFilterItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Filter { get; set; } = "all";
+        public string Sort { get; set; } = "date_desc";
+        public bool MyTickets { get; set; }
+        public string? SearchText { get; set; }
     }
 }

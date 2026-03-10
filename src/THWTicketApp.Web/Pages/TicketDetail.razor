@@ -7,10 +7,12 @@
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
 @using Markdig
+@using Microsoft.AspNetCore.Components.Forms
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LocalStorageService LocalStorage
+@inject LocalizationService L
 @implements IDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
@@ -32,6 +34,11 @@ else
             <MudIconButton Icon="@(_isFavorite ? Icons.Material.Filled.Star : Icons.Material.Filled.StarOutline)"
                            Color="@(_isFavorite ? Color.Warning : Color.Default)"
                            OnClick="ToggleFavoriteAsync" />
+            <MudTooltip Text="@(_isSubscribed ? L.T("detail.unsubscribe") : L.T("detail.subscribe"))">
+                <MudIconButton Icon="@(_isSubscribed ? Icons.Material.Filled.NotificationsActive : Icons.Material.Filled.NotificationsNone)"
+                               Color="@(_isSubscribed ? Color.Info : Color.Default)"
+                               OnClick="ToggleSubscriptionAsync" />
+            </MudTooltip>
         </div>
         <div class="d-flex gap-2">
             <StatusBadge Status="@_ticket.Status" />
@@ -220,11 +227,61 @@ else
             }
 
             <MudDivider Class="my-4" />
-            <MudTextField @bind-Value="_newComment" Label="Neuer Kommentar" Variant="Variant.Outlined"
+
+            @* Quick Reply Templates *@
+            <div class="d-flex gap-2 mb-2">
+                <MudMenu Label="@L.T("comments.quickreply")" Variant="Variant.Outlined" Size="Size.Small"
+                         StartIcon="@Icons.Material.Filled.Reply" Dense="true">
+                    @foreach (var template in _quickReplyTemplates)
+                    {
+                        <MudMenuItem OnClick="@(() => InsertQuickReply(template))">@TruncateTemplate(template)</MudMenuItem>
+                    }
+                    <MudDivider />
+                    <MudMenuItem OnClick="OpenQuickReplyEditor">
+                        <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Class="mr-1" />
+                        Vorlagen bearbeiten
+                    </MudMenuItem>
+                </MudMenu>
+                <MudMenu Label="@L.T("comments.mention")" Variant="Variant.Outlined" Size="Size.Small"
+                         StartIcon="@Icons.Material.Filled.AlternateEmail" Dense="true">
+                    @foreach (var user in _users)
+                    {
+                        <MudMenuItem OnClick="@(() => InsertMention(user))">@user.Fullname</MudMenuItem>
+                    }
+                </MudMenu>
+            </div>
+
+            @* Quick Reply Editor Dialog *@
+            @if (_showQuickReplyEditor)
+            {
+                <MudPaper Elevation="2" Class="pa-3 mb-3">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Schnellantwort-Vorlagen</MudText>
+                    @for (int i = 0; i < _quickReplyTemplates.Count; i++)
+                    {
+                        var idx = i;
+                        <div class="d-flex gap-2 mb-1 align-center">
+                            <MudTextField @bind-Value="_quickReplyTemplates[idx]" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Style="flex: 1;" T="string" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           Color="Color.Error" OnClick="@(() => RemoveQuickReply(idx))" />
+                        </div>
+                    }
+                    <div class="d-flex gap-2 mt-2">
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="AddEmptyQuickReply"
+                                   StartIcon="@Icons.Material.Filled.Add">Neu</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                   OnClick="SaveQuickRepliesAsync">@L.T("common.save")</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text"
+                                   OnClick="@(() => _showQuickReplyEditor = false)">@L.T("common.close")</MudButton>
+                    </div>
+                </MudPaper>
+            }
+
+            <MudTextField @bind-Value="_newComment" Label="@L.T("comments.new")" Variant="Variant.Outlined"
                           Lines="3" Class="mb-3" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddCommentAsync"
                        Disabled="@(string.IsNullOrWhiteSpace(_newComment) || _isLoading)">
-                Kommentar senden
+                @L.T("comments.send")
             </MudButton>
         </MudTabPanel>
 
@@ -284,8 +341,23 @@ else
             }
             else
             {
-                <MudText Color="Color.Secondary">Keine Anhänge.</MudText>
+                <MudText Color="Color.Secondary">@L.T("attachments.none")</MudText>
             }
+
+            <MudDivider Class="my-4" />
+            <div class="d-flex gap-2 align-center">
+                <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
+                           accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt,.zip" />
+                <MudButton HtmlTag="label" Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
+                           Disabled="_isUploading">
+                    @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
+                </MudButton>
+                @if (_isUploading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                }
+            </div>
         </MudTabPanel>
 
         @* Time Tracking Tab *@
@@ -403,6 +475,16 @@ else
     private List<User> _users = [];
     private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
 
+    // Subscription
+    private bool _isSubscribed;
+
+    // Attachment upload
+    private bool _isUploading;
+
+    // Quick reply templates
+    private List<string> _quickReplyTemplates = new();
+    private bool _showQuickReplyEditor;
+
     // Favorites & Linked Tickets
     private bool _isFavorite;
     private List<LinkedTicketItem> _linkedTickets = [];
@@ -425,6 +507,8 @@ else
         await LoadFavoriteStateAsync();
         await LoadLinkedTicketsAsync();
         await LoadTimeEntriesAsync();
+        await LoadQuickRepliesAsync();
+        await LoadSubscriptionStateAsync();
     }
 
     private async Task LoadTicketAsync()
@@ -687,6 +771,98 @@ else
     {
         var json = System.Text.Json.JsonSerializer.Serialize(_linkedTickets);
         await LocalStorage.SetItemAsync($"linked_tickets_{TicketUid}", json);
+    }
+
+    // Subscription
+    private async Task LoadSubscriptionStateAsync()
+    {
+        var subJson = await LocalStorage.GetItemAsync("subscribed_tickets") ?? "[]";
+        var subs = System.Text.Json.JsonSerializer.Deserialize<List<int>>(subJson) ?? [];
+        _isSubscribed = subs.Contains(TicketUid);
+    }
+
+    private async Task ToggleSubscriptionAsync()
+    {
+        if (_ticket == null) return;
+        try
+        {
+            var success = await ApiService.SubscribeToTicketAsync(_ticket.Id, !_isSubscribed);
+            if (success)
+            {
+                _isSubscribed = !_isSubscribed;
+                // Track locally
+                var subJson = await LocalStorage.GetItemAsync("subscribed_tickets") ?? "[]";
+                var subs = System.Text.Json.JsonSerializer.Deserialize<List<int>>(subJson) ?? [];
+                if (_isSubscribed) { if (!subs.Contains(TicketUid)) subs.Add(TicketUid); }
+                else subs.Remove(TicketUid);
+                await LocalStorage.SetItemAsync("subscribed_tickets", System.Text.Json.JsonSerializer.Serialize(subs));
+                Snackbar.Add(_isSubscribed ? L.T("detail.subscribed") : L.T("detail.unsubscribed"), Severity.Success);
+            }
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    // Attachment upload
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        if (_ticket == null) return;
+        _isUploading = true;
+        StateHasChanged();
+        try
+        {
+            var file = e.File;
+            using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024); // 50MB max
+            if (await ApiService.UploadAttachmentAsync(_ticket.Id, stream, file.Name))
+            {
+                Snackbar.Add(L.T("attachments.uploaded"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else
+            {
+                Snackbar.Add(L.T("common.error"), Severity.Error);
+            }
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isUploading = false; StateHasChanged(); }
+    }
+
+    // Quick Reply Templates
+    private static readonly List<string> DefaultQuickReplies =
+    [
+        "Vielen Dank für Ihre Meldung. Wir kümmern uns darum.",
+        "Das Problem wurde behoben. Bitte prüfen Sie, ob alles funktioniert.",
+        "Könnten Sie bitte weitere Informationen bereitstellen?",
+        "Die Bearbeitung ist in Arbeit. Wir melden uns, sobald es Neuigkeiten gibt.",
+        "Das Ticket wird an die zuständige Abteilung weitergeleitet."
+    ];
+
+    private async Task LoadQuickRepliesAsync()
+    {
+        try
+        {
+            var json = await LocalStorage.GetItemAsync("quick_reply_templates");
+            if (!string.IsNullOrEmpty(json))
+                _quickReplyTemplates = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new(DefaultQuickReplies);
+            else
+                _quickReplyTemplates = new(DefaultQuickReplies);
+        }
+        catch { _quickReplyTemplates = new(DefaultQuickReplies); }
+    }
+
+    private void InsertQuickReply(string template) => _newComment = template;
+    private void InsertMention(User user) => _newComment += $" @{user.Fullname} ";
+    private static string TruncateTemplate(string t) => t.Length > 50 ? t[..47] + "..." : t;
+    private void OpenQuickReplyEditor() => _showQuickReplyEditor = true;
+    private void AddEmptyQuickReply() => _quickReplyTemplates.Add(string.Empty);
+    private void RemoveQuickReply(int idx) { if (idx < _quickReplyTemplates.Count) _quickReplyTemplates.RemoveAt(idx); }
+
+    private async Task SaveQuickRepliesAsync()
+    {
+        _quickReplyTemplates.RemoveAll(string.IsNullOrWhiteSpace);
+        await LocalStorage.SetItemAsync("quick_reply_templates",
+            System.Text.Json.JsonSerializer.Serialize(_quickReplyTemplates));
+        _showQuickReplyEditor = false;
+        Snackbar.Add("Vorlagen gespeichert.", Severity.Success);
     }
 
     // Time tracking

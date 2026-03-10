@@ -1,9 +1,12 @@
 @page "/login"
 @layout THWTicketApp.Web.Layout.LoginLayout
 @using MudBlazor
+@using Microsoft.JSInterop
 @inject THWTicketApp.Shared.Services.ITrueDeskApiService ApiService
 @inject THWTicketApp.Web.Services.AuthStateProvider AuthStateProvider
 @inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
+@implements IAsyncDisposable
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="height: 100vh;">
     <MudCard Elevation="4" Class="pa-8 mx-auto" Style="width: 100%; max-width: 420px;">
@@ -16,6 +19,21 @@
             </CardHeaderContent>
         </MudCardHeader>
         <MudCardContent>
+            @* Passkey Login Button *@
+            @if (_passkeyAvailable)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                           OnClick="@LoginWithPasskeyAsync" Disabled="@_isLoading" Size="Size.Large"
+                           StartIcon="@Icons.Material.Filled.Fingerprint" Class="mb-4">
+                    Mit Passkey anmelden
+                </MudButton>
+                <div class="d-flex align-center gap-2 mb-4">
+                    <MudDivider />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">oder</MudText>
+                    <MudDivider />
+                </div>
+            }
+
             <MudForm @ref="_form">
                 <MudTextField @bind-Value="_username" Label="Benutzername" Variant="Variant.Outlined"
                               Required="true" RequiredError="Benutzername ist erforderlich"
@@ -58,6 +76,26 @@
     private string _password = string.Empty;
     private string? _errorMessage;
     private bool _isLoading;
+    private bool _passkeyAvailable;
+    private IJSObjectReference? _webauthnModule;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _webauthnModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/webauthn-interop.js");
+                var supported = await _webauthnModule.InvokeAsync<bool>("isWebAuthnSupported");
+                if (supported)
+                {
+                    _passkeyAvailable = await _webauthnModule.InvokeAsync<bool>("isPasskeyRegistered");
+                    StateHasChanged();
+                }
+            }
+            catch { }
+        }
+    }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
@@ -95,5 +133,51 @@
         {
             _isLoading = false;
         }
+    }
+
+    private async Task LoginWithPasskeyAsync()
+    {
+        if (_webauthnModule == null) return;
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await _webauthnModule.InvokeAsync<PasskeyAuthResult?>("authenticatePasskey");
+            if (result != null && !string.IsNullOrEmpty(result.UserId))
+            {
+                // Passkey authentication succeeded - try to restore the stored session
+                var restored = await ApiService.TryRestoreSessionAsync();
+                if (restored)
+                {
+                    AuthStateProvider.NotifyAuthStateChanged();
+                    Navigation.NavigateTo("/");
+                    return;
+                }
+            }
+            _errorMessage = "Passkey-Anmeldung fehlgeschlagen. Bitte mit Benutzername/Passwort anmelden.";
+        }
+        catch
+        {
+            _errorMessage = "Passkey-Anmeldung abgebrochen.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_webauthnModule != null)
+            await _webauthnModule.DisposeAsync();
+    }
+
+    private class PasskeyAuthResult
+    {
+        public string? UserId { get; set; }
+        public string? UserName { get; set; }
+        public string? CredentialId { get; set; }
     }
 }

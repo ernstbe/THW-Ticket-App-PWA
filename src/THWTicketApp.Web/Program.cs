@@ -28,6 +28,8 @@ builder.Services.AddScoped<RealtimeService>();
 builder.Services.AddScoped<IndexedDbService>();
 builder.Services.AddScoped<SyncService>();
 builder.Services.AddScoped<ISyncService>(sp => sp.GetRequiredService<SyncService>());
+builder.Services.AddScoped<LocalizationService>();
+builder.Services.AddScoped<BrowserNotificationService>();
 
 // Auth
 builder.Services.AddScoped<AuthStateProvider>();
