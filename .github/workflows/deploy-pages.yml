@@ -40,6 +40,10 @@ jobs:
       - name: Update base href
         run: sed -i 's|<base href="/" />|<base href="/${{ github.event.repository.name }}/" />|g' release/wwwroot/index.html release/wwwroot/404.html
 
+      # Fix service worker base path for GitHub Pages subdirectory
+      - name: Update service worker base path
+        run: sed -i 's|const base = "/";|const base = "/${{ github.event.repository.name }}/";|g' release/wwwroot/service-worker-assets.js release/wwwroot/service-worker.published.js
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
