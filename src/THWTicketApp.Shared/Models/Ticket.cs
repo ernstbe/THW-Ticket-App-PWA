@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace THWTicketApp.Shared.Models;
@@ -13,7 +14,27 @@ public class Ticket
     public List<Tag> Tags { get; set; } = new();
     public string? Subject { get; set; }
     public string? Issue { get; set; }
-    public List<string> Subscribers { get; set; } = new();
+    [JsonIgnore]
+    public List<string> SubscriberIds { get; set; } = new();
+    [JsonPropertyName("subscribers")]
+    public JsonElement? RawSubscribers
+    {
+        get => null;
+        set
+        {
+            if (value is { ValueKind: JsonValueKind.Array } arr)
+            {
+                SubscriberIds = new List<string>();
+                foreach (var elem in arr.EnumerateArray())
+                {
+                    if (elem.ValueKind == JsonValueKind.String)
+                        SubscriberIds.Add(elem.GetString()!);
+                    else if (elem.ValueKind == JsonValueKind.Object && elem.TryGetProperty("_id", out var id))
+                        SubscriberIds.Add(id.GetString()!);
+                }
+            }
+        }
+    }
     public DateTime Date { get; set; }
     public List<Comment> Comments { get; set; } = new();
     public List<Note> Notes { get; set; } = new();
