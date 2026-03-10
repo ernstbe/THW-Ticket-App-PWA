@@ -178,6 +178,41 @@ public class LocalizationService
         // History
         ["history.title"] = "Verlauf",
 
+        // Assets
+        ["nav.assets"] = "Ausstattung",
+        ["assets.new"] = "Neues Asset",
+        ["assets.name"] = "Name",
+        ["assets.tag"] = "Asset-Tag",
+        ["assets.category"] = "Kategorie",
+        ["assets.location"] = "Standort",
+        ["assets.none"] = "Keine Assets vorhanden.",
+        ["assets.name_required"] = "Name ist erforderlich.",
+        ["assets.delete_confirm"] = "Asset wirklich löschen?",
+
+        // Recurring Tasks
+        ["nav.recurring"] = "Wiederkehrende Aufgaben",
+        ["recurring.new"] = "Neue Aufgabe",
+        ["recurring.active"] = "Aktiv",
+        ["recurring.inactive"] = "Inaktiv",
+        ["recurring.schedule"] = "Zeitplan",
+        ["recurring.ticket_subject"] = "Ticket-Betreff",
+        ["recurring.ticket_template"] = "Ticket-Vorlage",
+        ["recurring.schedule_type"] = "Wiederholungsart",
+        ["recurring.monthly"] = "Monatlich",
+        ["recurring.quarterly"] = "Quartalsweise",
+        ["recurring.annual"] = "Jährlich",
+        ["recurring.day_of_month"] = "Tag im Monat",
+        ["recurring.days_before"] = "Tage vor Fälligkeit",
+        ["recurring.enabled"] = "Aktiviert",
+        ["recurring.next_run"] = "Nächste Ausführung",
+        ["recurring.none"] = "Keine wiederkehrenden Aufgaben.",
+        ["recurring.name_required"] = "Name ist erforderlich.",
+        ["recurring.delete_confirm"] = "Aufgabe wirklich löschen?",
+
+        // Reports
+        ["reports.handover"] = "Übergabebericht",
+        ["reports.sitzung"] = "OV-Sitzungsbericht",
+
         // Settings
         ["settings.title"] = "Einstellungen",
         ["settings.appearance"] = "Erscheinungsbild",
@@ -350,6 +385,41 @@ public class LocalizationService
 
         // History
         ["history.title"] = "History",
+
+        // Assets
+        ["nav.assets"] = "Assets",
+        ["assets.new"] = "New Asset",
+        ["assets.name"] = "Name",
+        ["assets.tag"] = "Asset Tag",
+        ["assets.category"] = "Category",
+        ["assets.location"] = "Location",
+        ["assets.none"] = "No assets found.",
+        ["assets.name_required"] = "Name is required.",
+        ["assets.delete_confirm"] = "Really delete asset",
+
+        // Recurring Tasks
+        ["nav.recurring"] = "Recurring Tasks",
+        ["recurring.new"] = "New Task",
+        ["recurring.active"] = "Active",
+        ["recurring.inactive"] = "Inactive",
+        ["recurring.schedule"] = "Schedule",
+        ["recurring.ticket_subject"] = "Ticket Subject",
+        ["recurring.ticket_template"] = "Ticket Template",
+        ["recurring.schedule_type"] = "Recurrence Type",
+        ["recurring.monthly"] = "Monthly",
+        ["recurring.quarterly"] = "Quarterly",
+        ["recurring.annual"] = "Annual",
+        ["recurring.day_of_month"] = "Day of Month",
+        ["recurring.days_before"] = "Days before deadline",
+        ["recurring.enabled"] = "Enabled",
+        ["recurring.next_run"] = "Next Run",
+        ["recurring.none"] = "No recurring tasks.",
+        ["recurring.name_required"] = "Name is required.",
+        ["recurring.delete_confirm"] = "Really delete task",
+
+        // Reports
+        ["reports.handover"] = "Handover Report",
+        ["reports.sitzung"] = "Meeting Report",
 
         // Settings
         ["settings.title"] = "Settings",
