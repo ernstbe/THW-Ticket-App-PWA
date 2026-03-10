@@ -258,7 +258,9 @@ public class TrueDeskApiService : ITrueDeskApiService
             payload["assignee"] = assigneeId;
 
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{BaseUrl}/tickets", content));
+        // v1 uses /tickets/create, v2 uses /tickets
+        var endpoint = IsV2 ? $"{BaseUrl}/tickets" : $"{BaseUrl}/tickets/create";
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync(endpoint, content));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -282,7 +284,9 @@ public class TrueDeskApiService : ITrueDeskApiService
 
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{BaseUrl}/tickets", content));
+        // v1 uses /tickets/create, v2 uses /tickets
+        var endpoint = IsV2 ? $"{BaseUrl}/tickets" : $"{BaseUrl}/tickets/create";
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync(endpoint, content));
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync();
@@ -380,7 +384,9 @@ public class TrueDeskApiService : ITrueDeskApiService
         streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(GetMimeType(fileName));
         content.Add(streamContent, "file", fileName);
         content.Add(new StringContent(ticketId), "ticketId");
+        content.Add(new StringContent(CurrentUserId ?? string.Empty), "ownerId");
 
+        // Upload is a traditional route (not under /api/), requires session cookie or token in form
         var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{ServerUrl}/tickets/uploadattachment", content));
         return response.IsSuccessStatusCode;
     }
@@ -446,7 +452,9 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public async Task<string> GetTagsAsync()
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/tags/limit"));
+        // v1 has /tickets/tags (all tags) or /tags/limit (paginated)
+        var endpoint = IsV2 ? $"{BaseUrl}/tags" : $"{V1BaseUrl}/tickets/tags";
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync(endpoint));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
