@@ -6,6 +6,7 @@
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject THWTicketApp.Web.Services.LocalizationService L
 
 <PageTitle>@L.T("nav.recurring") - THW Ticket App</PageTitle>
@@ -19,7 +20,29 @@
     </div>
 </div>
 
-@if (_isLoading)
+@if (_isLoading && _tasks.Length == 0)
+{
+    <MudGrid Class="mb-4">
+        @for (var i = 0; i < 3; i++)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudCard Elevation="2">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudSkeleton Width="60%" Height="28px" />
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudSkeleton Width="80%" Class="mb-2" />
+                        <MudSkeleton Width="50%" Class="mb-2" />
+                        <MudSkeleton Width="40%" />
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (_isLoading)
 {
     <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
 }
@@ -203,6 +226,17 @@
 
     private async Task DeleteTaskAsync(RecurringTask task)
     {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, L.T("common.delete") },
+            { x => x.Message, L.T("recurring.delete_confirm") },
+            { x => x.ConfirmText, L.T("common.delete") },
+            { x => x.CancelText, L.T("common.cancel") }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(null, parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
         if (await ApiService.DeleteRecurringTaskAsync(task.Id))
         {
             Snackbar.Add(L.T("common.success"), Severity.Success);

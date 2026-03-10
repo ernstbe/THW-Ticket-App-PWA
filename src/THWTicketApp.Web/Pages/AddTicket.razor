@@ -15,16 +15,29 @@
 
 @if (_isLoading && _ticketTypes.Count == 0)
 {
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+    <MudPaper Elevation="2" Class="pa-6">
+        <MudSkeleton Width="100%" Height="56px" Class="mb-4" />
+        <MudSkeleton Width="100%" Height="120px" Class="mb-4" />
+        <MudGrid>
+            <MudItem xs="12" sm="6"><MudSkeleton Width="100%" Height="56px" Class="mb-4" /></MudItem>
+            <MudItem xs="12" sm="6"><MudSkeleton Width="100%" Height="56px" Class="mb-4" /></MudItem>
+            <MudItem xs="12" sm="6"><MudSkeleton Width="100%" Height="56px" Class="mb-4" /></MudItem>
+            <MudItem xs="12" sm="6"><MudSkeleton Width="100%" Height="56px" Class="mb-4" /></MudItem>
+        </MudGrid>
+    </MudPaper>
 }
+else
+{
 
 <MudPaper Elevation="2" Class="pa-6">
     <MudForm @ref="_form">
         <MudTextField @bind-Value="_subject" Label="Betreff" Variant="Variant.Outlined"
-                      Required="true" RequiredError="Betreff ist erforderlich" Class="mb-4" />
+                      Required="true" RequiredError="Betreff ist erforderlich"
+                      Counter="200" MaxLength="200" Immediate="true" Class="mb-4" />
 
         <MudTextField @bind-Value="_issue" Label="Beschreibung" Variant="Variant.Outlined"
-                      Lines="5" Class="mb-4" />
+                      Lines="5" Required="true" RequiredError="Beschreibung ist erforderlich"
+                      Class="mb-4" />
 
         <MudGrid>
             <MudItem xs="12" sm="6">
@@ -82,6 +95,8 @@
         </div>
     </MudForm>
 </MudPaper>
+
+}
 
 @code {
     private MudForm _form = null!;

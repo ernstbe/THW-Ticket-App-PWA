@@ -13,46 +13,59 @@
 
 <MudText Typo="Typo.h4" Class="mb-2">@_welcomeMessage</MudText>
 
-@if (_isLoading)
-{
-    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
-}
-
 @if (_hasError)
 {
     <MudAlert Severity="Severity.Warning" Class="mb-4">@_errorMessage</MudAlert>
 }
 
-<MudGrid Class="mb-6">
-    <MudItem xs="6" sm="4" md="2">
-        <StatCard Icon="@Icons.Material.Filled.ConfirmationNumber" IconColor="Color.Primary"
-                  Value="_totalTickets" Label="Gesamt"
-                  OnClick="@(() => Navigation.NavigateTo("/tickets"))" />
-    </MudItem>
-    <MudItem xs="6" sm="4" md="2">
-        <StatCard Icon="@Icons.Material.Filled.FolderOpen" IconColor="Color.Info"
-                  Value="_openTickets" Label="Offen"
-                  OnClick="@(() => Navigation.NavigateTo("/tickets?filter=open"))" />
-    </MudItem>
-    <MudItem xs="6" sm="4" md="2">
-        <StatCard Icon="@Icons.Material.Filled.HourglassTop" IconColor="Color.Warning"
-                  Value="_pendingTickets" Label="In Bearbeitung"
-                  OnClick="@(() => Navigation.NavigateTo("/tickets?filter=pending"))" />
-    </MudItem>
-    <MudItem xs="6" sm="4" md="2">
-        <StatCard Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success"
-                  Value="_closedTickets" Label="Geschlossen"
-                  OnClick="@(() => Navigation.NavigateTo("/tickets?filter=closed"))" />
-    </MudItem>
-    <MudItem xs="6" sm="4" md="2">
-        <StatCard Icon="@Icons.Material.Filled.PersonPin" IconColor="Color.Secondary"
-                  Value="_myTickets" Label="Meine" />
-    </MudItem>
-    <MudItem xs="6" sm="4" md="2">
-        <StatCard Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error"
-                  Value="_overdueTickets" Label="Überfällig" ValueColor="Color.Error" />
-    </MudItem>
-</MudGrid>
+@if (_isLoading)
+{
+    <MudGrid Class="mb-6">
+        @for (var i = 0; i < 6; i++)
+        {
+            <MudItem xs="6" sm="4" md="2">
+                <MudCard Elevation="2" Class="pa-4">
+                    <MudSkeleton SkeletonType="SkeletonType.Circle" Width="40px" Height="40px" Class="mb-2" />
+                    <MudSkeleton Width="60%" />
+                    <MudSkeleton Width="40%" />
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+else
+{
+    <MudGrid Class="mb-6">
+        <MudItem xs="6" sm="4" md="2">
+            <StatCard Icon="@Icons.Material.Filled.ConfirmationNumber" IconColor="Color.Primary"
+                      Value="_totalTickets" Label="Gesamt"
+                      OnClick="@(() => Navigation.NavigateTo("/tickets"))" />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <StatCard Icon="@Icons.Material.Filled.FolderOpen" IconColor="Color.Info"
+                      Value="_openTickets" Label="Offen"
+                      OnClick="@(() => Navigation.NavigateTo("/tickets?filter=open"))" />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <StatCard Icon="@Icons.Material.Filled.HourglassTop" IconColor="Color.Warning"
+                      Value="_pendingTickets" Label="In Bearbeitung"
+                      OnClick="@(() => Navigation.NavigateTo("/tickets?filter=pending"))" />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <StatCard Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success"
+                      Value="_closedTickets" Label="Geschlossen"
+                      OnClick="@(() => Navigation.NavigateTo("/tickets?filter=closed"))" />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <StatCard Icon="@Icons.Material.Filled.PersonPin" IconColor="Color.Secondary"
+                      Value="_myTickets" Label="Meine" />
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <StatCard Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error"
+                      Value="_overdueTickets" Label="Überfällig" ValueColor="Color.Error" />
+        </MudItem>
+    </MudGrid>
+}
 
 <MudGrid>
     <MudItem xs="12" md="8">
@@ -64,7 +77,17 @@
                     Alle anzeigen
                 </MudButton>
             </div>
-            @if (_recentTickets.Count == 0 && !_isLoading)
+            @if (_isLoading)
+            {
+                @for (var i = 0; i < 3; i++)
+                {
+                    <MudPaper Elevation="0" Class="pa-3 mb-2" Style="border: 1px solid var(--mud-palette-lines-default);">
+                        <MudSkeleton Width="70%" Class="mb-1" />
+                        <MudSkeleton Width="40%" Height="16px" />
+                    </MudPaper>
+                }
+            }
+            else if (_recentTickets.Count == 0)
             {
                 <MudText Color="Color.Secondary">Keine Tickets vorhanden.</MudText>
             }
