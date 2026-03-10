@@ -172,17 +172,14 @@ else
         {
             var json = await ApiService.GetTicketsAsync();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var tickets = JsonSerializer.Deserialize<Ticket[]>(json, options);
+            var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(json, "tickets", options);
 
-            if (tickets != null)
-            {
-                _allTickets = tickets.ToList();
-                foreach (var t in _allTickets)
-                    TrudeskTranslationHelper.TranslateTicket(t);
+            _allTickets = tickets.ToList();
+            foreach (var t in _allTickets)
+                TrudeskTranslationHelper.TranslateTicket(t);
 
-                ComputeStatistics();
-                _recentTickets = _allTickets.OrderByDescending(t => t.Updated).Take(5).ToList();
-            }
+            ComputeStatistics();
+            _recentTickets = _allTickets.OrderByDescending(t => t.Updated).Take(5).ToList();
         }
         catch (Exception ex)
         {
