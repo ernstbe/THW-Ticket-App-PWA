@@ -53,4 +53,23 @@ public interface ITrueDeskApiService
     Task<string> GetTicketStatsAsync(int timespan = 30);
     Task<string> GetTicketStatsForGroupAsync(string groupId);
     Task<string> GetTicketStatsForUserAsync(string userId);
+
+    // Recurring Tasks (v2)
+    Task<string> GetRecurringTasksAsync();
+    Task<string> GetRecurringTaskAsync(string taskId);
+    Task<bool> CreateRecurringTaskAsync(Dictionary<string, object?> taskData);
+    Task<bool> UpdateRecurringTaskAsync(string taskId, Dictionary<string, object?> taskData);
+    Task<bool> DeleteRecurringTaskAsync(string taskId);
+
+    // Assets (v2)
+    Task<string> GetAssetsAsync();
+    Task<string> GetAssetAsync(string assetId);
+    Task<bool> CreateAssetAsync(Dictionary<string, object?> assetData);
+    Task<bool> UpdateAssetAsync(string assetId, Dictionary<string, object?> assetData);
+    Task<bool> DeleteAssetAsync(string assetId);
+    Task<bool> LinkAssetToTicketAsync(string assetId, string ticketId);
+
+    // Reports (v2)
+    Task<string> GetHandoverReportAsync(string format = "json");
+    Task<string> GetSitzungReportAsync(string format = "json");
 }

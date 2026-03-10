@@ -1,0 +1,57 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Publish Blazor WASM
+        run: dotnet publish src/THWTicketApp.Web/THWTicketApp.Web.csproj --configuration Release --output release
+
+      # Blazor WASM needs a 404.html that redirects to index.html for client-side routing
+      - name: Configure SPA routing
+        run: cp release/wwwroot/index.html release/wwwroot/404.html
+
+      # GitHub Pages needs .nojekyll to serve files starting with underscore
+      - name: Add .nojekyll
+        run: touch release/wwwroot/.nojekyll
+
+      # Fix base href for GitHub Pages subdirectory
+      - name: Update base href
+        run: sed -i 's|<base href="/" />|<base href="/${{ github.event.repository.name }}/" />|g' release/wwwroot/index.html release/wwwroot/404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: release/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

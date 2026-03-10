@@ -6,13 +6,24 @@
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
 
-<PageTitle>Berichte - THW Ticket App</PageTitle>
+<PageTitle>@L.T("nav.reports") - THW Ticket App</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-4">
-    <MudText Typo="Typo.h4">Berichte</MudText>
-    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadReportAsync"
-                   Disabled="_isLoading" />
+    <MudText Typo="Typo.h4">@L.T("nav.reports")</MudText>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz"
+                   OnClick="GenerateHandoverReportAsync" Disabled="_isGenerating">
+            @L.T("reports.handover")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Groups"
+                   OnClick="GenerateSitzungReportAsync" Disabled="_isGenerating">
+            @L.T("reports.sitzung")
+        </MudButton>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadReportAsync"
+                       Disabled="_isLoading" />
+    </div>
 </div>
 
 @if (_isLoading)
@@ -149,6 +160,27 @@
         </MudCard>
     </MudItem>
 
+    @* Generated Report *@
+    @if (!string.IsNullOrEmpty(_generatedReport))
+    {
+        <MudItem xs="12">
+            <MudCard>
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">@_generatedReportTitle</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                       OnClick="() => _generatedReport = null" />
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">@_generatedReport</pre>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+
     @* Top Assignees *@
     <MudItem xs="12" md="6">
         <MudCard>
@@ -183,6 +215,9 @@
 
 @code {
     private bool _isLoading;
+    private bool _isGenerating;
+    private string? _generatedReport;
+    private string _generatedReportTitle = string.Empty;
     private List<WeeklyCount> _weeklyTrend = [];
     private string _avgResolutionTime = "-";
     private string _fastestResolution = "-";
@@ -357,6 +392,53 @@
                 OpenPercent = total > 0 ? (int)(open * 100.0 / total) : 0,
                 ClosedPercent = total > 0 ? (int)(closed * 100.0 / total) : 0
             });
+        }
+    }
+
+    private async Task GenerateHandoverReportAsync()
+    {
+        await GenerateReportAsync("handover", L.T("reports.handover"));
+    }
+
+    private async Task GenerateSitzungReportAsync()
+    {
+        await GenerateReportAsync("sitzung", L.T("reports.sitzung"));
+    }
+
+    private async Task GenerateReportAsync(string type, string title)
+    {
+        _isGenerating = true;
+        StateHasChanged();
+        try
+        {
+            var json = type == "handover"
+                ? await ApiService.GetHandoverReportAsync("markdown")
+                : await ApiService.GetSitzungReportAsync("markdown");
+
+            // Try to extract the report content from the response
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("data", out var dataEl))
+            {
+                if (dataEl.TryGetProperty("report", out var reportEl))
+                    _generatedReport = reportEl.GetString();
+                else
+                    _generatedReport = dataEl.GetRawText();
+            }
+            else
+            {
+                _generatedReport = json;
+            }
+            _generatedReportTitle = title;
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isGenerating = false;
+            StateHasChanged();
         }
     }
 
