@@ -35,5 +35,15 @@
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
     <script>navigator.serviceWorker.register('service-worker.js');</script>
+    <script>
+        window.registerConnectivityHandler = function (dotNetRef) {
+            window.addEventListener('online', function () {
+                dotNetRef.invokeMethodAsync('OnConnectivityChanged', true);
+            });
+            window.addEventListener('offline', function () {
+                dotNetRef.invokeMethodAsync('OnConnectivityChanged', false);
+            });
+        };
+    </script>
 </body>
 </html>
