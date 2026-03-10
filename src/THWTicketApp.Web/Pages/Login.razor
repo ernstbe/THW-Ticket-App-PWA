@@ -3,7 +3,9 @@
 @using MudBlazor
 @using Microsoft.JSInterop
 @inject THWTicketApp.Shared.Services.ITrueDeskApiService ApiService
+@inject THWTicketApp.Shared.Services.AppSettings AppSettings
 @inject THWTicketApp.Web.Services.AuthStateProvider AuthStateProvider
+@inject THWTicketApp.Web.Services.AppSettingsInitializer SettingsInit
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
 @implements IAsyncDisposable
@@ -34,17 +36,39 @@
                 </div>
             }
 
+            @if (!_serverConfigured)
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-4">
+                    Bitte zuerst die Server-URL konfigurieren.
+                </MudAlert>
+            }
+
+            <MudExpansionPanels Class="mb-4" Elevation="0">
+                <MudExpansionPanel Text="Server-Konfiguration" Expanded="@(!_serverConfigured)"
+                                   Style="background: transparent;">
+                    <MudTextField @bind-Value="_serverUrl" Label="Server-URL"
+                                  Placeholder="https://trudesk.example.com/api/v2"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Dns"
+                                  Disabled="@_isLoading" Class="mb-2" />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                               OnClick="SaveServerUrlAsync" FullWidth="true">
+                        URL speichern
+                    </MudButton>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+
             <MudForm @ref="_form">
                 <MudTextField @bind-Value="_username" Label="Benutzername" Variant="Variant.Outlined"
                               Required="true" RequiredError="Benutzername ist erforderlich"
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Person"
-                              Disabled="@_isLoading" Class="mb-4"
+                              Disabled="@(_isLoading || !_serverConfigured)" Class="mb-4"
                               OnKeyDown="@OnKeyDown" />
                 <MudTextField @bind-Value="_password" Label="Passwort" Variant="Variant.Outlined"
                               InputType="InputType.Password"
                               Required="true" RequiredError="Passwort ist erforderlich"
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock"
-                              Disabled="@_isLoading"
+                              Disabled="@(_isLoading || !_serverConfigured)"
                               OnKeyDown="@OnKeyDown" />
             </MudForm>
 
@@ -55,7 +79,7 @@
         </MudCardContent>
         <MudCardActions Class="d-flex flex-column px-6 pb-6">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                       OnClick="@LoginAsync" Disabled="@_isLoading" Size="Size.Large">
+                       OnClick="@LoginAsync" Disabled="@(_isLoading || !_serverConfigured)" Size="Size.Large">
                 @if (_isLoading)
                 {
                     <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
@@ -74,15 +98,22 @@
     private MudForm _form = null!;
     private string _username = string.Empty;
     private string _password = string.Empty;
+    private string _serverUrl = string.Empty;
     private string? _errorMessage;
     private bool _isLoading;
     private bool _passkeyAvailable;
+    private bool _serverConfigured;
     private IJSObjectReference? _webauthnModule;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            await SettingsInit.InitializeAsync();
+            _serverUrl = AppSettings.ApiBaseUrl;
+            _serverConfigured = AppSettings.IsConfigured;
+            StateHasChanged();
+
             try
             {
                 _webauthnModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/webauthn-interop.js");
@@ -95,6 +126,19 @@
             }
             catch { }
         }
+    }
+
+    private async Task SaveServerUrlAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_serverUrl))
+        {
+            _errorMessage = "Bitte eine gültige Server-URL eingeben.";
+            return;
+        }
+        await SettingsInit.SaveApiUrlAsync(_serverUrl);
+        _serverConfigured = AppSettings.IsConfigured;
+        _errorMessage = null;
+        StateHasChanged();
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)

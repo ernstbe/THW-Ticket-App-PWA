@@ -10,9 +10,10 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// App settings
+// App settings (URL loaded from localStorage on first render via AppSettingsInitializer)
 var settings = new AppSettings();
 builder.Services.AddSingleton(settings);
+builder.Services.AddScoped<AppSettingsInitializer>();
 
 // HTTP client
 builder.Services.AddScoped(sp => new HttpClient

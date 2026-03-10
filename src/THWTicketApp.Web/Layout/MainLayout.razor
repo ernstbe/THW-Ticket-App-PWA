@@ -8,6 +8,7 @@
 @inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
 @inject THWTicketApp.Web.Services.LocalizationService L
 @inject THWTicketApp.Web.Services.BrowserNotificationService BrowserNotifications
+@inject THWTicketApp.Web.Services.AppSettingsInitializer SettingsInit
 @implements IDisposable
 
 <MudThemeProvider Theme="_theme" IsDarkMode="@_isDarkMode" />
@@ -116,6 +117,7 @@
         if (firstRender && !_initialized)
         {
             _initialized = true;
+            await SettingsInit.InitializeAsync();
             await L.InitializeAsync();
             await BrowserNotifications.InitializeAsync();
             var darkMode = await LocalStorage.GetItemAsync("settings_darkmode");
