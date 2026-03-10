@@ -17,6 +17,10 @@ public static class JsonHelper
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
+        // Fallback: try root as array first (before property access)
+        if (root.ValueKind == JsonValueKind.Array)
+            return JsonSerializer.Deserialize<T[]>(json, options) ?? [];
+
         // v2 response: check for { data: ... } wrapper first
         if (root.TryGetProperty("data", out var dataEl))
         {
@@ -35,10 +39,6 @@ public static class JsonHelper
         // v1 response: { propertyName: [...] }
         if (root.TryGetProperty(propertyName, out var el) && el.ValueKind == JsonValueKind.Array)
             return JsonSerializer.Deserialize<T[]>(el.GetRawText(), options) ?? [];
-
-        // Fallback: try root as array
-        if (root.ValueKind == JsonValueKind.Array)
-            return JsonSerializer.Deserialize<T[]>(json, options) ?? [];
 
         return [];
     }

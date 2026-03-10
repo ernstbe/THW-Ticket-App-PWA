@@ -6,6 +6,7 @@
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject THWTicketApp.Web.Services.LocalizationService L
 
 <PageTitle>@L.T("nav.assets") - THW Ticket App</PageTitle>
@@ -20,7 +21,26 @@
     </div>
 </div>
 
-@if (_isLoading)
+@if (_isLoading && _assets.Length == 0)
+{
+    <MudTable Items="@(new int[3])" Hover="true" Breakpoint="Breakpoint.Sm" Dense="true" Class="mb-4">
+        <HeaderContent>
+            <MudTh>@L.T("assets.name")</MudTh>
+            <MudTh>@L.T("assets.tag")</MudTh>
+            <MudTh>@L.T("assets.category")</MudTh>
+            <MudTh>@L.T("assets.location")</MudTh>
+            <MudTh>@L.T("common.edit")</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><MudSkeleton Width="80%" /></MudTd>
+            <MudTd><MudSkeleton Width="60%" /></MudTd>
+            <MudTd><MudSkeleton Width="50%" /></MudTd>
+            <MudTd><MudSkeleton Width="50%" /></MudTd>
+            <MudTd><MudSkeleton Width="60px" /></MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+else if (_isLoading)
 {
     <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
 }
@@ -174,6 +194,17 @@
 
     private async Task DeleteAssetAsync(Asset asset)
     {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, L.T("common.delete") },
+            { x => x.Message, L.T("assets.delete_confirm") },
+            { x => x.ConfirmText, L.T("common.delete") },
+            { x => x.CancelText, L.T("common.cancel") }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(null, parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
         if (await ApiService.DeleteAssetAsync(asset.Id))
         {
             Snackbar.Add(L.T("common.success"), Severity.Success);
