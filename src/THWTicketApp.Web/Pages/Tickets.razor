@@ -18,7 +18,7 @@
     <div class="d-flex gap-2">
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="@(() => Navigation.NavigateTo("/tickets/add"))">
+                   OnClick="@(() => Navigation.NavigateTo("tickets/add"))">
             Neues Ticket
         </MudButton>
     </div>
@@ -290,7 +290,7 @@ else
 
     private void NavigateToDetail(Ticket ticket)
     {
-        Navigation.NavigateTo($"/tickets/{ticket.Uid}");
+        Navigation.NavigateTo($"tickets/{ticket.Uid}");
     }
 
     private async Task AssignToMeAsync(Ticket ticket)

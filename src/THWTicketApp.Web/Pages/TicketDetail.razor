@@ -29,7 +29,7 @@ else
 {
     <div class="d-flex justify-space-between align-center mb-4">
         <div class="d-flex align-center gap-3">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/tickets"))"
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("tickets"))"
                            aria-label="@L.T("common.back")" />
             <MudText Typo="Typo.h5">#@_ticket.Uid – @_ticket.Subject</MudText>
             <MudIconButton Icon="@(_isFavorite ? Icons.Material.Filled.Star : Icons.Material.Filled.StarOutline)"
@@ -695,7 +695,7 @@ else
             if (await ApiService.DeleteTicketAsync(_ticket.Id))
             {
                 Snackbar.Add("Ticket gelöscht.", Severity.Success);
-                Navigation.NavigateTo("/tickets");
+                Navigation.NavigateTo("tickets");
             }
             else Snackbar.Add("Löschen fehlgeschlagen.", Severity.Error);
         }

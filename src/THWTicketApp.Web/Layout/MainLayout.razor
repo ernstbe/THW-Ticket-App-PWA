@@ -33,7 +33,7 @@
         <MudBadge Content="@_unreadNotifications" Visible="@(_unreadNotifications > 0)"
                   Color="Color.Error" Overlap="true">
             <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit"
-                           OnClick="@(() => Navigation.NavigateTo("/notifications"))"
+                           OnClick="@(() => Navigation.NavigateTo("notifications"))"
                            aria-label="@L.T("a11y.notifications")" />
         </MudBadge>
         <MudIconButton Icon="@Icons.Material.Filled.DarkMode" Color="Color.Inherit"
@@ -44,30 +44,30 @@
 
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
         <MudNavMenu aria-label="@L.T("a11y.main_navigation")">
-            <MudNavLink Href="/" Match="NavLinkMatch.All"
+            <MudNavLink Href="./" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Dashboard">@L.T("nav.dashboard")</MudNavLink>
-            <MudNavLink Href="/tickets" Match="NavLinkMatch.Prefix"
+            <MudNavLink Href="tickets" Match="NavLinkMatch.Prefix"
                         Icon="@Icons.Material.Filled.ConfirmationNumber">@L.T("nav.tickets")</MudNavLink>
-            <MudNavLink Href="/tickets/add" Match="NavLinkMatch.All"
+            <MudNavLink Href="tickets/add" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Add">@L.T("nav.newticket")</MudNavLink>
-            <MudNavLink Href="/kanban" Match="NavLinkMatch.All"
+            <MudNavLink Href="kanban" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.ViewKanban">@L.T("nav.kanban")</MudNavLink>
-            <MudNavLink Href="/team" Match="NavLinkMatch.All"
+            <MudNavLink Href="team" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Groups">@L.T("nav.team")</MudNavLink>
-            <MudNavLink Href="/reports" Match="NavLinkMatch.All"
+            <MudNavLink Href="reports" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.BarChart">@L.T("nav.reports")</MudNavLink>
-            <MudNavLink Href="/assets" Match="NavLinkMatch.All"
+            <MudNavLink Href="assets" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Inventory2">@L.T("nav.assets")</MudNavLink>
-            <MudNavLink Href="/recurring-tasks" Match="NavLinkMatch.All"
+            <MudNavLink Href="recurring-tasks" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.EventRepeat">@L.T("nav.recurring")</MudNavLink>
-            <MudNavLink Href="/scanner" Match="NavLinkMatch.All"
+            <MudNavLink Href="scanner" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.QrCodeScanner">@L.T("nav.scanner")</MudNavLink>
-            <MudNavLink Href="/notifications" Match="NavLinkMatch.All"
+            <MudNavLink Href="notifications" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Notifications">@L.T("nav.notifications")</MudNavLink>
-            <MudNavLink Href="/sync-conflicts" Match="NavLinkMatch.All"
+            <MudNavLink Href="sync-conflicts" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.SyncProblem">@L.T("nav.syncconflicts")</MudNavLink>
             <MudDivider Class="my-2" />
-            <MudNavLink Href="/settings" Match="NavLinkMatch.All"
+            <MudNavLink Href="settings" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Settings">@L.T("nav.settings")</MudNavLink>
         </MudNavMenu>
     </MudDrawer>

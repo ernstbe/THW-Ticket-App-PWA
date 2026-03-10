@@ -89,7 +89,7 @@ else
                 }
                 Ticket erstellen
             </MudButton>
-            <MudButton Variant="Variant.Outlined" OnClick="@(() => Navigation.NavigateTo("/tickets"))">
+            <MudButton Variant="Variant.Outlined" OnClick="@(() => Navigation.NavigateTo("tickets"))">
                 Abbrechen
             </MudButton>
         </div>
@@ -181,7 +181,7 @@ else
             if (success)
             {
                 Snackbar.Add("Ticket erstellt!", Severity.Success);
-                Navigation.NavigateTo("/tickets");
+                Navigation.NavigateTo("tickets");
             }
             else
             {
