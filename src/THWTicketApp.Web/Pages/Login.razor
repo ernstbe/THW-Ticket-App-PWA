@@ -162,7 +162,7 @@
             if (success)
             {
                 AuthStateProvider.NotifyAuthStateChanged();
-                Navigation.NavigateTo(Navigation.BaseUri);
+                Navigation.NavigateTo("./");
             }
             else
             {
@@ -196,7 +196,7 @@
                 if (restored)
                 {
                     AuthStateProvider.NotifyAuthStateChanged();
-                    Navigation.NavigateTo(Navigation.BaseUri);
+                    Navigation.NavigateTo("./");
                     return;
                 }
             }
