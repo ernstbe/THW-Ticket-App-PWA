@@ -1,0 +1,94 @@
+@inherits LayoutComponentBase
+@using MudBlazor
+@inject NavigationManager Navigation
+@inject THWTicketApp.Shared.Services.ITrueDeskApiService ApiService
+@inject THWTicketApp.Web.Services.AuthStateProvider AuthStateProvider
+@inject THWTicketApp.Web.Services.AppStateService AppState
+
+<MudThemeProvider Theme="_theme" IsDarkMode="@_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="ml-3">THW Ticket App</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@Icons.Material.Filled.DarkMode" Color="Color.Inherit"
+                       OnClick="@ToggleDarkMode" />
+        <MudIconButton Icon="@Icons.Material.Filled.Logout" Color="Color.Inherit"
+                       OnClick="@LogoutAsync" />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <MudNavMenu>
+            <MudNavLink Href="/" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+            <MudNavLink Href="/tickets" Match="NavLinkMatch.Prefix"
+                        Icon="@Icons.Material.Filled.ConfirmationNumber">Tickets</MudNavLink>
+            <MudNavLink Href="/tickets/add" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Add">Neues Ticket</MudNavLink>
+            <MudNavLink Href="/kanban" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.ViewKanban">Kanban Board</MudNavLink>
+            <MudNavLink Href="/team" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Groups">Team</MudNavLink>
+            <MudNavLink Href="/reports" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.BarChart">Berichte</MudNavLink>
+            <MudNavLink Href="/scanner" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.QrCodeScanner">Scanner</MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudNavLink Href="/settings" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent Class="pt-16 px-4">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode;
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#003399",
+            Secondary = "#FFD700",
+            AppbarBackground = "#003399",
+            AppbarText = "#FFFFFF",
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#4D7FCC",
+            Secondary = "#FFD700",
+            AppbarBackground = "#1A1A2E",
+            AppbarText = "#FFFFFF",
+            Surface = "#1E1E2E",
+            Background = "#121212",
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography
+            {
+                FontFamily = ["Roboto", "Helvetica", "Arial", "sans-serif"]
+            }
+        }
+    };
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+    private void ToggleDarkMode() => _isDarkMode = !_isDarkMode;
+
+    private async Task LogoutAsync()
+    {
+        await ApiService.LogoutAsync();
+        AuthStateProvider.NotifyAuthStateChanged();
+        Navigation.NavigateTo("/login");
+    }
+}

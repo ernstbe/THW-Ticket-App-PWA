@@ -1,0 +1,99 @@
+@page "/login"
+@layout THWTicketApp.Web.Layout.LoginLayout
+@using MudBlazor
+@inject THWTicketApp.Shared.Services.ITrueDeskApiService ApiService
+@inject THWTicketApp.Web.Services.AuthStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="height: 100vh;">
+    <MudCard Elevation="4" Class="pa-8 mx-auto" Style="width: 100%; max-width: 420px;">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <div class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-2">THW</MudText>
+                    <MudText Typo="Typo.h5">Ticket App</MudText>
+                </div>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudForm @ref="_form">
+                <MudTextField @bind-Value="_username" Label="Benutzername" Variant="Variant.Outlined"
+                              Required="true" RequiredError="Benutzername ist erforderlich"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Person"
+                              Disabled="@_isLoading" Class="mb-4"
+                              OnKeyDown="@OnKeyDown" />
+                <MudTextField @bind-Value="_password" Label="Passwort" Variant="Variant.Outlined"
+                              InputType="InputType.Password"
+                              Required="true" RequiredError="Passwort ist erforderlich"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock"
+                              Disabled="@_isLoading"
+                              OnKeyDown="@OnKeyDown" />
+            </MudForm>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-4">@_errorMessage</MudAlert>
+            }
+        </MudCardContent>
+        <MudCardActions Class="d-flex flex-column px-6 pb-6">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                       OnClick="@LoginAsync" Disabled="@_isLoading" Size="Size.Large">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">Anmelden...</MudText>
+                }
+                else
+                {
+                    <MudText>Anmelden</MudText>
+                }
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private MudForm _form = null!;
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private string? _errorMessage;
+    private bool _isLoading;
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await LoginAsync();
+    }
+
+    private async Task LoginAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ApiService.AuthenticateAsync(_username, _password);
+            if (success)
+            {
+                AuthStateProvider.NotifyAuthStateChanged();
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                _errorMessage = "Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Verbindungsfehler: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
