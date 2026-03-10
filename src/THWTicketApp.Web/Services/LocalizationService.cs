@@ -244,6 +244,13 @@ public class LocalizationService
         ["settings.passkey_desc"] = "Schnelle Anmeldung per Fingerabdruck, Gesicht oder Geräte-PIN",
         ["settings.passkey_not_supported"] = "Ihr Browser unterstützt keine Passkeys.",
         ["settings.about"] = "Über",
+
+        // Accessibility
+        ["a11y.toggle_menu"] = "Menü umschalten",
+        ["a11y.notifications"] = "Benachrichtigungen",
+        ["a11y.toggle_darkmode"] = "Dark Mode umschalten",
+        ["a11y.logout"] = "Abmelden",
+        ["a11y.main_navigation"] = "Hauptnavigation",
     };
 
     private static readonly Dictionary<string, string> En = new()
@@ -452,5 +459,12 @@ public class LocalizationService
         ["settings.passkey_desc"] = "Quick sign-in via fingerprint, face, or device PIN",
         ["settings.passkey_not_supported"] = "Your browser does not support passkeys.",
         ["settings.about"] = "About",
+
+        // Accessibility
+        ["a11y.toggle_menu"] = "Toggle menu",
+        ["a11y.notifications"] = "Notifications",
+        ["a11y.toggle_darkmode"] = "Toggle dark mode",
+        ["a11y.logout"] = "Log out",
+        ["a11y.main_navigation"] = "Main navigation",
     };
 }
