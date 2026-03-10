@@ -402,7 +402,7 @@
     {
         await ApiService.LogoutAsync();
         AuthStateProvider.NotifyAuthStateChanged();
-        Navigation.NavigateTo("/login");
+        Navigation.NavigateTo("login");
     }
 
     public async ValueTask DisposeAsync()
