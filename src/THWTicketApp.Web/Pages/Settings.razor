@@ -1,30 +1,33 @@
 @page "/settings"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using THWTicketApp.Shared.Services
+@using Microsoft.JSInterop
 @inject ITrueDeskApiService ApiService
 @inject AppSettings AppSettings
 @inject LocalStorageService LocalStorage
+@inject LocalizationService L
+@inject BrowserNotificationService BrowserNotifications
 @inject AuthStateProvider AuthStateProvider
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject HttpClient HttpClient
+@inject IJSRuntime JsRuntime
+@implements IAsyncDisposable
 
-<PageTitle>Einstellungen - THW Ticket App</PageTitle>
+<PageTitle>@L.T("settings.title") - THW Ticket App</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Einstellungen</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">@L.T("settings.title")</MudText>
 
 <MudGrid>
     @* Appearance *@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">Erscheinungsbild</MudText>
+                <MudText Typo="Typo.h6">@L.T("settings.appearance")</MudText>
             </MudCardHeader>
             <MudCardContent>
                 <div class="d-flex justify-space-between align-center mb-3">
-                    <div>
-                        <MudText>Dark Mode</MudText>
-                    </div>
+                    <MudText>@L.T("settings.darkmode")</MudText>
                     <MudSwitch @bind-Value="_isDarkMode" Color="Color.Primary" T="bool" />
                 </div>
 
@@ -32,9 +35,9 @@
 
                 <div class="d-flex justify-space-between align-center mb-2">
                     <div>
-                        <MudText>Benachrichtigungen</MudText>
+                        <MudText>@L.T("settings.notifications")</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            Über neue Tickets und Änderungen informieren
+                            @L.T("settings.notifications_desc")
                         </MudText>
                     </div>
                     <MudSwitch @bind-Value="_isNotificationsEnabled" Color="Color.Primary" T="bool" />
@@ -44,31 +47,31 @@
                 {
                     <div class="ml-4">
                         <div class="d-flex justify-space-between align-center mb-1">
-                            <MudText Typo="Typo.body2">Neue Tickets</MudText>
+                            <MudText Typo="Typo.body2">@L.T("settings.notify_new")</MudText>
                             <MudSwitch @bind-Value="_notifyOnNewTickets" Color="Color.Primary" T="bool" />
                         </div>
                         <div class="d-flex justify-space-between align-center mb-1">
-                            <MudText Typo="Typo.body2">Kommentare</MudText>
+                            <MudText Typo="Typo.body2">@L.T("settings.notify_comments")</MudText>
                             <MudSwitch @bind-Value="_notifyOnComments" Color="Color.Primary" T="bool" />
                         </div>
                         <div class="d-flex justify-space-between align-center mb-1">
-                            <MudText Typo="Typo.body2">Statusänderungen</MudText>
+                            <MudText Typo="Typo.body2">@L.T("settings.notify_status")</MudText>
                             <MudSwitch @bind-Value="_notifyOnStatusChanges" Color="Color.Primary" T="bool" />
                         </div>
                         <div class="d-flex justify-space-between align-center mb-1">
                             <div>
-                                <MudText Typo="Typo.body2">Nur meine Tickets</MudText>
+                                <MudText Typo="Typo.body2">@L.T("settings.notify_mine")</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    Nur bei mir zugewiesenen Tickets
+                                    @L.T("settings.notify_mine_desc")
                                 </MudText>
                             </div>
                             <MudSwitch @bind-Value="_notifyOnlyMyTickets" Color="Color.Primary" T="bool" />
                         </div>
                         <div class="d-flex justify-space-between align-center">
                             <div>
-                                <MudText Typo="Typo.body2">Nur hohe Priorität</MudText>
+                                <MudText Typo="Typo.body2">@L.T("settings.notify_highprio")</MudText>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    Nur bei hoher/dringender Priorität
+                                    @L.T("settings.notify_highprio_desc")
                                 </MudText>
                             </div>
                             <MudSwitch @bind-Value="_notifyOnlyHighPriority" Color="Color.Primary" T="bool" />
@@ -78,7 +81,7 @@
 
                 <MudDivider Class="my-3" />
 
-                <MudSelect T="string" @bind-Value="_selectedLanguage" Label="Sprache / Language"
+                <MudSelect T="string" @bind-Value="_selectedLanguage" Label="@L.T("settings.language")"
                            Variant="Variant.Outlined" Dense="true">
                     <MudSelectItem Value="@("de")">Deutsch</MudSelectItem>
                     <MudSelectItem Value="@("en")">English</MudSelectItem>
@@ -91,20 +94,20 @@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">API-Konfiguration</MudText>
+                <MudText Typo="Typo.h6">@L.T("settings.api")</MudText>
             </MudCardHeader>
             <MudCardContent>
-                <MudTextField @bind-Value="_apiBaseUrl" Label="Server-URL"
+                <MudTextField @bind-Value="_apiBaseUrl" Label="@L.T("settings.api_url")"
                               Placeholder="http://localhost:8118/api/v1"
                               Variant="Variant.Outlined" Class="mb-3" />
 
-                <MudNumericField @bind-Value="_connectionTimeout" Label="Verbindungs-Timeout (Sekunden)"
+                <MudNumericField @bind-Value="_connectionTimeout" Label="@L.T("settings.timeout")"
                                  Min="5" Max="300" Variant="Variant.Outlined" Class="mb-3" T="int" />
 
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary"
                            OnClick="TestConnectionAsync" Disabled="_isTesting"
                            StartIcon="@Icons.Material.Filled.NetworkCheck">
-                    @(_isTesting ? "Teste..." : "Verbindung testen")
+                    @(_isTesting ? L.T("settings.testing") : L.T("settings.test_connection"))
                 </MudButton>
 
                 @if (!string.IsNullOrEmpty(_connectionStatus))
@@ -117,18 +120,59 @@
         </MudCard>
     </MudItem>
 
+    @* Passkey / Biometrics *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">@L.T("settings.passkey")</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    @L.T("settings.passkey_desc")
+                </MudText>
+
+                @if (!_webauthnSupported)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true">
+                        @L.T("settings.passkey_not_supported")
+                    </MudAlert>
+                }
+                else if (_passkeyRegistered)
+                {
+                    <div class="d-flex align-center gap-3">
+                        <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" />
+                        <MudText Color="Color.Success">@L.T("settings.passkey_registered")</MudText>
+                        <MudSpacer />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                                   OnClick="RemovePasskeyAsync">
+                            @L.T("settings.passkey_remove")
+                        </MudButton>
+                    </div>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Fingerprint"
+                               OnClick="RegisterPasskeyAsync">
+                        @L.T("settings.passkey_register")
+                    </MudButton>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
     @* Cache *@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">Offline-Cache</MudText>
+                <MudText Typo="Typo.h6">@L.T("settings.cache")</MudText>
             </MudCardHeader>
             <MudCardContent>
                 <div class="d-flex justify-space-between align-center mb-3">
                     <div>
-                        <MudText>Offline-Caching aktivieren</MudText>
+                        <MudText>@L.T("settings.cache_enable")</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            Tickets lokal speichern für Offline-Zugriff
+                            @L.T("settings.cache_desc")
                         </MudText>
                     </div>
                     <MudSwitch @bind-Value="_isOfflineCacheEnabled" Color="Color.Primary" T="bool" />
@@ -137,7 +181,7 @@
                 <MudButton Variant="Variant.Outlined" Color="Color.Error"
                            OnClick="ClearCacheAsync"
                            StartIcon="@Icons.Material.Filled.DeleteSweep">
-                    Cache leeren
+                    @L.T("settings.cache_clear")
                 </MudButton>
             </MudCardContent>
         </MudCard>
@@ -165,11 +209,11 @@
 <div class="d-flex gap-3 mt-4 mb-6">
     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync"
                StartIcon="@Icons.Material.Filled.Save">
-        Speichern
+        @L.T("common.save")
     </MudButton>
     <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="LogoutAsync"
                StartIcon="@Icons.Material.Filled.Logout">
-        Abmelden
+        @L.T("common.logout")
     </MudButton>
 </div>
 
@@ -188,6 +232,11 @@
     private bool _isTesting;
     private string _connectionStatus = string.Empty;
     private Severity _connectionSeverity = Severity.Info;
+
+    // Passkey
+    private IJSObjectReference? _webauthnModule;
+    private bool _webauthnSupported;
+    private bool _passkeyRegistered;
 
     protected override async Task OnInitializedAsync()
     {
@@ -209,6 +258,22 @@
 
         var savedTimeout = await LocalStorage.GetItemAsync("settings_timeout");
         if (int.TryParse(savedTimeout, out var t)) _connectionTimeout = t;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _webauthnModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/webauthn-interop.js");
+                _webauthnSupported = await _webauthnModule.InvokeAsync<bool>("isWebAuthnSupported");
+                if (_webauthnSupported)
+                    _passkeyRegistered = await _webauthnModule.InvokeAsync<bool>("isPasskeyRegistered");
+                StateHasChanged();
+            }
+            catch { }
+        }
     }
 
     private async Task<bool> GetBoolSetting(string key, bool defaultValue)
@@ -238,9 +303,47 @@
         await LocalStorage.SetItemAsync("settings_notify_only_mine", _notifyOnlyMyTickets.ToString().ToLower());
         await LocalStorage.SetItemAsync("settings_notify_high_prio", _notifyOnlyHighPriority.ToString().ToLower());
         await LocalStorage.SetItemAsync("settings_offline_cache", _isOfflineCacheEnabled.ToString().ToLower());
-        await LocalStorage.SetItemAsync("settings_language", _selectedLanguage);
 
-        Snackbar.Add("Einstellungen gespeichert.", Severity.Success);
+        // Update language via service
+        await L.SetLanguageAsync(_selectedLanguage);
+
+        // Request notification permission if enabled
+        if (_isNotificationsEnabled)
+            await BrowserNotifications.RequestPermissionAsync();
+
+        Snackbar.Add(L.T("settings.saved"), Severity.Success);
+    }
+
+    private async Task RegisterPasskeyAsync()
+    {
+        if (_webauthnModule == null) return;
+        try
+        {
+            var userId = ApiService.CurrentUserId ?? "unknown";
+            var userName = ApiService.CurrentUsername ?? "user";
+            var credentialId = await _webauthnModule.InvokeAsync<string?>("registerPasskey", userId, userName);
+            if (!string.IsNullOrEmpty(credentialId))
+            {
+                _passkeyRegistered = true;
+                Snackbar.Add(L.T("settings.passkey_registered"), Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Passkey-Registrierung fehlgeschlagen.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RemovePasskeyAsync()
+    {
+        if (_webauthnModule == null) return;
+        await _webauthnModule.InvokeAsync<bool>("removePasskey");
+        _passkeyRegistered = false;
+        Snackbar.Add("Passkey entfernt.", Severity.Info);
     }
 
     private async Task TestConnectionAsync()
@@ -300,5 +403,11 @@
         await ApiService.LogoutAsync();
         AuthStateProvider.NotifyAuthStateChanged();
         Navigation.NavigateTo("/login");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_webauthnModule != null)
+            await _webauthnModule.DisposeAsync();
     }
 }

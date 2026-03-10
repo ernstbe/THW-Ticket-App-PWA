@@ -6,6 +6,8 @@
 @inject THWTicketApp.Web.Services.AppStateService AppState
 @inject THWTicketApp.Web.Services.RealtimeService RealtimeService
 @inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
+@inject THWTicketApp.Web.Services.LocalizationService L
+@inject THWTicketApp.Web.Services.BrowserNotificationService BrowserNotifications
 @implements IDisposable
 
 <MudThemeProvider Theme="_theme" IsDarkMode="@_isDarkMode" />
@@ -33,26 +35,26 @@
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
         <MudNavMenu>
             <MudNavLink Href="/" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+                        Icon="@Icons.Material.Filled.Dashboard">@L.T("nav.dashboard")</MudNavLink>
             <MudNavLink Href="/tickets" Match="NavLinkMatch.Prefix"
-                        Icon="@Icons.Material.Filled.ConfirmationNumber">Tickets</MudNavLink>
+                        Icon="@Icons.Material.Filled.ConfirmationNumber">@L.T("nav.tickets")</MudNavLink>
             <MudNavLink Href="/tickets/add" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.Add">Neues Ticket</MudNavLink>
+                        Icon="@Icons.Material.Filled.Add">@L.T("nav.newticket")</MudNavLink>
             <MudNavLink Href="/kanban" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.ViewKanban">Kanban Board</MudNavLink>
+                        Icon="@Icons.Material.Filled.ViewKanban">@L.T("nav.kanban")</MudNavLink>
             <MudNavLink Href="/team" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.Groups">Team</MudNavLink>
+                        Icon="@Icons.Material.Filled.Groups">@L.T("nav.team")</MudNavLink>
             <MudNavLink Href="/reports" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.BarChart">Berichte</MudNavLink>
+                        Icon="@Icons.Material.Filled.BarChart">@L.T("nav.reports")</MudNavLink>
             <MudNavLink Href="/scanner" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.QrCodeScanner">Scanner</MudNavLink>
+                        Icon="@Icons.Material.Filled.QrCodeScanner">@L.T("nav.scanner")</MudNavLink>
             <MudNavLink Href="/notifications" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.Notifications">Benachrichtigungen</MudNavLink>
+                        Icon="@Icons.Material.Filled.Notifications">@L.T("nav.notifications")</MudNavLink>
             <MudNavLink Href="/sync-conflicts" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.SyncProblem">Sync-Konflikte</MudNavLink>
+                        Icon="@Icons.Material.Filled.SyncProblem">@L.T("nav.syncconflicts")</MudNavLink>
             <MudDivider Class="my-2" />
             <MudNavLink Href="/settings" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
+                        Icon="@Icons.Material.Filled.Settings">@L.T("nav.settings")</MudNavLink>
         </MudNavMenu>
     </MudDrawer>
 
@@ -101,6 +103,7 @@
     {
         _unreadNotifications = await ApiService.GetNotificationCountAsync();
         RealtimeService.TicketEvent += OnTicketEvent;
+        L.LanguageChanged += OnLanguageChanged;
         await RealtimeService.ConnectAsync();
     }
 
@@ -109,14 +112,18 @@
         if (firstRender && !_initialized)
         {
             _initialized = true;
+            await L.InitializeAsync();
+            await BrowserNotifications.InitializeAsync();
             var darkMode = await LocalStorage.GetItemAsync("settings_darkmode");
             if (darkMode == "true")
             {
                 _isDarkMode = true;
-                StateHasChanged();
             }
+            StateHasChanged();
         }
     }
+
+    private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
 
     private void OnTicketEvent(string eventName, string ticketId)
     {
@@ -134,6 +141,7 @@
     public void Dispose()
     {
         RealtimeService.TicketEvent -= OnTicketEvent;
+        L.LanguageChanged -= OnLanguageChanged;
     }
 
     private async Task LogoutAsync()
