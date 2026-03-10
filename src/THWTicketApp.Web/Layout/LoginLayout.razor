@@ -8,11 +8,31 @@
 
 <MudLayout>
     <MudMainContent>
-        @Body
+        <ErrorBoundary @ref="_errorBoundary">
+            <ChildContent>
+                @Body
+            </ChildContent>
+            <ErrorContent Context="ex">
+                <div style="display:flex;justify-content:center;align-items:center;height:100vh;">
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Style="max-width:420px;">
+                        <div class="d-flex flex-column gap-2">
+                            <MudText Typo="Typo.subtitle1" Style="font-weight:600;">Fehler</MudText>
+                            <MudText Typo="Typo.body2">@ex.Message</MudText>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Small"
+                                       OnClick="() => _errorBoundary?.Recover()" Class="align-self-start mt-1">
+                                Erneut versuchen
+                            </MudButton>
+                        </div>
+                    </MudAlert>
+                </div>
+            </ErrorContent>
+        </ErrorBoundary>
     </MudMainContent>
 </MudLayout>
 
 @code {
+    private ErrorBoundary? _errorBoundary;
+
     private readonly MudTheme _theme = new()
     {
         PaletteLight = new PaletteLight
