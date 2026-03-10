@@ -26,6 +26,8 @@ public class RealtimeService : IAsyncDisposable
     {
         try
         {
+            if (!_settings.IsConfigured) return;
+
             var token = await _localStorage.GetItemAsync("auth_token");
             if (string.IsNullOrEmpty(token)) return;
 

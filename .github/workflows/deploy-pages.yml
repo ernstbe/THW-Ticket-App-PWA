@@ -42,7 +42,9 @@ jobs:
 
       # Fix service worker base path for GitHub Pages subdirectory
       - name: Update service worker base path
-        run: sed -i 's|const base = "/";|const base = "/${{ github.event.repository.name }}/";|g' release/wwwroot/service-worker-assets.js release/wwwroot/service-worker.published.js
+        run: |
+          sed -i 's|const base = "/";|const base = "/${{ github.event.repository.name }}/";|g' release/wwwroot/service-worker-assets.js release/wwwroot/service-worker.published.js
+          sed -i 's|const offlineAssetsExclude = \[ /\^service-worker\\\.js\$/ \];|const offlineAssetsExclude = [ /^service-worker\\.js$/, /^index\\.html$/, /^404\\.html$/ ];|g' release/wwwroot/service-worker.published.js
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

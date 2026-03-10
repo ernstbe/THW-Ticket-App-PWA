@@ -498,6 +498,9 @@ public class TrueDeskApiService : ITrueDeskApiService
     {
         try
         {
+            if (!_settings.IsConfigured || !IsAuthenticated)
+                return 0;
+
             // notificationCount only in v1
             var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/users/notificationCount"));
             response.EnsureSuccessStatusCode();
