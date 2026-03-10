@@ -1,10 +1,240 @@
 @page "/"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using MudBlazor
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
 <PageTitle>Dashboard - THW Ticket App</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-6">Dashboard</MudText>
-<MudText Typo="Typo.body1" Color="Color.Secondary">
-    Willkommen! Die Dashboard-Inhalte werden in Phase 2 implementiert.
-</MudText>
+<MudText Typo="Typo.h4" Class="mb-2">@_welcomeMessage</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_hasError)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">@_errorMessage</MudAlert>
+}
+
+<MudGrid Class="mb-6">
+    <MudItem xs="6" sm="4" md="2">
+        <StatCard Icon="@Icons.Material.Filled.ConfirmationNumber" IconColor="Color.Primary"
+                  Value="_totalTickets" Label="Gesamt"
+                  OnClick="@(() => Navigation.NavigateTo("/tickets"))" />
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <StatCard Icon="@Icons.Material.Filled.FolderOpen" IconColor="Color.Info"
+                  Value="_openTickets" Label="Offen"
+                  OnClick="@(() => Navigation.NavigateTo("/tickets?filter=open"))" />
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <StatCard Icon="@Icons.Material.Filled.HourglassTop" IconColor="Color.Warning"
+                  Value="_pendingTickets" Label="In Bearbeitung"
+                  OnClick="@(() => Navigation.NavigateTo("/tickets?filter=pending"))" />
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <StatCard Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success"
+                  Value="_closedTickets" Label="Geschlossen"
+                  OnClick="@(() => Navigation.NavigateTo("/tickets?filter=closed"))" />
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <StatCard Icon="@Icons.Material.Filled.PersonPin" IconColor="Color.Secondary"
+                  Value="_myTickets" Label="Meine" />
+    </MudItem>
+    <MudItem xs="6" sm="4" md="2">
+        <StatCard Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error"
+                  Value="_overdueTickets" Label="Überfällig" ValueColor="Color.Error" />
+    </MudItem>
+</MudGrid>
+
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="2" Class="pa-4">
+            <div class="d-flex justify-space-between align-center mb-4">
+                <MudText Typo="Typo.h6">Letzte Tickets</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary"
+                           OnClick="@(() => Navigation.NavigateTo("/tickets"))">
+                    Alle anzeigen
+                </MudButton>
+            </div>
+            @if (_recentTickets.Count == 0 && !_isLoading)
+            {
+                <MudText Color="Color.Secondary">Keine Tickets vorhanden.</MudText>
+            }
+            else
+            {
+                @foreach (var ticket in _recentTickets)
+                {
+                    <TicketCard Ticket="ticket" ShowActions="true"
+                                OnClick="NavigateToDetail"
+                                OnAssignToMe="QuickAssignAsync"
+                                OnClose="QuickCloseAsync" />
+                }
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="2" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">Schnellaktionen</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.Add" Class="mb-2"
+                       OnClick="@(() => Navigation.NavigateTo("/tickets/add"))">
+                Neues Ticket
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.ViewKanban" Class="mb-2"
+                       OnClick="@(() => Navigation.NavigateTo("/kanban"))">
+                Kanban Board
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.BarChart"
+                       OnClick="@(() => Navigation.NavigateTo("/reports"))">
+                Berichte
+            </MudButton>
+        </MudPaper>
+
+        @if (_ticketsPerGroup.Count > 0)
+        {
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Tickets pro Gruppe</MudText>
+                @foreach (var g in _ticketsPerGroup)
+                {
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <MudText Typo="Typo.body2">@g.GroupName</MudText>
+                        <div class="d-flex align-center gap-2">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">@g.Total</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">@g.Open offen</MudChip>
+                        </div>
+                    </div>
+                }
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _isLoading;
+    private bool _hasError;
+    private string _errorMessage = string.Empty;
+    private string _welcomeMessage = "Willkommen!";
+    private int _totalTickets, _openTickets, _pendingTickets, _closedTickets, _myTickets, _overdueTickets;
+    private List<Ticket> _allTickets = [];
+    private List<Ticket> _recentTickets = [];
+    private List<GroupTicketCount> _ticketsPerGroup = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _welcomeMessage = string.IsNullOrEmpty(ApiService.CurrentUsername)
+            ? "Willkommen!"
+            : $"Willkommen, {ApiService.CurrentUsername}!";
+        await LoadDashboardAsync();
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        _hasError = false;
+        StateHasChanged();
+
+        try
+        {
+            var json = await ApiService.GetTicketsAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var tickets = JsonSerializer.Deserialize<Ticket[]>(json, options);
+
+            if (tickets != null)
+            {
+                _allTickets = tickets.ToList();
+                foreach (var t in _allTickets)
+                    TrudeskTranslationHelper.TranslateTicket(t);
+
+                ComputeStatistics();
+                _recentTickets = _allTickets.OrderByDescending(t => t.Updated).Take(5).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            _hasError = true;
+            _errorMessage = message;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ComputeStatistics()
+    {
+        _totalTickets = _allTickets.Count;
+        _openTickets = _allTickets.Count(t =>
+            t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new");
+        _pendingTickets = _allTickets.Count(t =>
+            t.Status?.Name?.ToLowerInvariant() is "ausstehend" or "pending" or "in bearbeitung" or "in progress" or "wartend" or "on hold");
+        _closedTickets = _allTickets.Count(t =>
+            t.Status?.IsResolved == true ||
+            t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved");
+        var username = ApiService.CurrentUsername;
+        if (!string.IsNullOrEmpty(username))
+            _myTickets = _allTickets.Count(t =>
+                t.Assignee?.Username?.Equals(username, StringComparison.OrdinalIgnoreCase) == true);
+        _overdueTickets = _allTickets.Count(t =>
+            t.DueDate != DateTime.MinValue && t.DueDate < DateTime.Now && t.Status?.IsResolved != true);
+
+        _ticketsPerGroup = _allTickets
+            .Where(t => t.Group != null && !string.IsNullOrEmpty(t.Group.Name))
+            .GroupBy(t => t.Group!.Name!)
+            .OrderByDescending(g => g.Count())
+            .Select(g => new GroupTicketCount(g.Key, g.Count(), g.Count(t => t.Status?.IsResolved != true)))
+            .ToList();
+    }
+
+    private void NavigateToDetail(Ticket ticket)
+    {
+        Navigation.NavigateTo($"/tickets/{ticket.Uid}");
+    }
+
+    private async Task QuickAssignAsync(Ticket ticket)
+    {
+        var userId = ApiService.CurrentUserId;
+        if (string.IsNullOrEmpty(userId)) return;
+        try
+        {
+            if (await ApiService.AssignTicketAsync(ticket.Id, userId))
+            {
+                Snackbar.Add("Ticket zugewiesen.", Severity.Success);
+                await LoadDashboardAsync();
+            }
+        }
+        catch { Snackbar.Add("Zuweisung fehlgeschlagen.", Severity.Error); }
+    }
+
+    private async Task QuickCloseAsync(Ticket ticket)
+    {
+        try
+        {
+            var statusJson = await ApiService.GetStatusesAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
+            var closedStatus = statuses.FirstOrDefault(s => s.IsResolved);
+            if (closedStatus != null && await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
+            {
+                Snackbar.Add("Ticket geschlossen.", Severity.Success);
+                await LoadDashboardAsync();
+            }
+        }
+        catch { Snackbar.Add("Schließen fehlgeschlagen.", Severity.Error); }
+    }
+
+    private record GroupTicketCount(string GroupName, int Total, int Open);
+}

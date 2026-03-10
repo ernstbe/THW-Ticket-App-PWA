@@ -1,0 +1,12 @@
+@using MudBlazor
+
+@if (Priority != null)
+{
+    <MudChip T="string" Size="Size.Small"
+             Style="@($"background-color: {Priority.HtmlColor ?? "#888"}; color: white;")"
+             Text="@(Priority.TranslatedName)" />
+}
+
+@code {
+    [Parameter] public THWTicketApp.Shared.Models.Priority? Priority { get; set; }
+}

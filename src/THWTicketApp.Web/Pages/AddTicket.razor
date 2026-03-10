@@ -1,0 +1,186 @@
+@page "/tickets/add"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using MudBlazor
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Models.Responses
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Neues Ticket - THW Ticket App</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Neues Ticket erstellen</MudText>
+
+@if (_isLoading && _ticketTypes.Count == 0)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+<MudPaper Elevation="2" Class="pa-6">
+    <MudForm @ref="_form">
+        <MudTextField @bind-Value="_subject" Label="Betreff" Variant="Variant.Outlined"
+                      Required="true" RequiredError="Betreff ist erforderlich" Class="mb-4" />
+
+        <MudTextField @bind-Value="_issue" Label="Beschreibung" Variant="Variant.Outlined"
+                      Lines="5" Class="mb-4" />
+
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="TicketType" @bind-Value="_selectedType" Label="Typ" Variant="Variant.Outlined"
+                           ToStringFunc="@(t => t?.TranslatedName ?? "")" Class="mb-4">
+                    @foreach (var type in _ticketTypes)
+                    {
+                        <MudSelectItem Value="type">@type.TranslatedName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="Priority" @bind-Value="_selectedPriority" Label="Priorität" Variant="Variant.Outlined"
+                           ToStringFunc="@(p => p?.TranslatedName ?? "")" Class="mb-4">
+                    @foreach (var priority in _priorities)
+                    {
+                        <MudSelectItem Value="priority">@priority.TranslatedName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="Group" @bind-Value="_selectedGroup" Label="Gruppe" Variant="Variant.Outlined"
+                           Required="true" RequiredError="Gruppe ist erforderlich"
+                           ToStringFunc="@(g => g?.Name ?? "")" Class="mb-4">
+                    @foreach (var group in _groups)
+                    {
+                        <MudSelectItem Value="group">@group.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="User" @bind-Value="_selectedAssignee" Label="Zuständig" Variant="Variant.Outlined"
+                           Clearable="true"
+                           ToStringFunc="@(u => u?.Fullname ?? "")" Class="mb-4">
+                    @foreach (var user in _users)
+                    {
+                        <MudSelectItem Value="user">@user.Fullname</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <div class="d-flex gap-3 mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="CreateTicketAsync" Disabled="_isLoading">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Ticket erstellen
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="@(() => Navigation.NavigateTo("/tickets"))">
+                Abbrechen
+            </MudButton>
+        </div>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm _form = null!;
+    private bool _isLoading;
+    private string _subject = string.Empty;
+    private string _issue = string.Empty;
+    private TicketType? _selectedType;
+    private Priority? _selectedPriority;
+    private Group? _selectedGroup;
+    private User? _selectedAssignee;
+    private List<TicketType> _ticketTypes = [];
+    private List<Priority> _priorities = [];
+    private List<Group> _groups = [];
+    private List<User> _users = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var typesTask = ApiService.GetTicketTypesAsync();
+            var groupsTask = ApiService.GetGroupsAsync();
+            var usersTask = ApiService.GetAssigneesAsync();
+            await Task.WhenAll(typesTask, groupsTask, usersTask);
+
+            // Types + Priorities
+            var types = JsonSerializer.Deserialize<TicketType[]>(typesTask.Result, options);
+            if (types != null)
+            {
+                _ticketTypes = types.ToList();
+                _priorities = types.SelectMany(t => t.Priorities)
+                    .DistinctBy(p => p.Id).ToList();
+                foreach (var p in _priorities)
+                    p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
+                if (_ticketTypes.Count > 0) _selectedType = _ticketTypes[0];
+            }
+
+            // Groups
+            var groupResponse = JsonSerializer.Deserialize<GetGroupResponse>(groupsTask.Result, options);
+            if (groupResponse?.Groups != null)
+            {
+                _groups = groupResponse.Groups;
+                if (_groups.Count > 0) _selectedGroup = _groups[0];
+            }
+
+            // Users
+            var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersTask.Result, options);
+            if (userResponse?.Users != null)
+                _users = userResponse.Users;
+        }
+        catch { Snackbar.Add("Fehler beim Laden der Formulardaten.", Severity.Error); }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateTicketAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await ApiService.CreateTicketAsync(
+                _subject, _issue,
+                _selectedType?.Id, _selectedPriority?.Id,
+                _selectedGroup?.Id, _selectedAssignee?.Id);
+
+            if (success)
+            {
+                Snackbar.Add("Ticket erstellt!", Severity.Success);
+                Navigation.NavigateTo("/tickets");
+            }
+            else
+            {
+                Snackbar.Add($"Fehler: {ApiService.LastError ?? "Server hat das Ticket abgelehnt."}", Severity.Error);
+            }
+        }
+        catch
+        {
+            Snackbar.Add("Netzwerkfehler. Bitte erneut versuchen.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

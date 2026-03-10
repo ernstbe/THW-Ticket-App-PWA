@@ -1,0 +1,12 @@
+@using MudBlazor
+
+@if (Status != null)
+{
+    <MudChip T="string" Size="Size.Small"
+             Style="@($"background-color: {Status.HtmlColor ?? "#888"}; color: white;")"
+             Text="@(Status.TranslatedName)" />
+}
+
+@code {
+    [Parameter] public THWTicketApp.Shared.Models.Status? Status { get; set; }
+}

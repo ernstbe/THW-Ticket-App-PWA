@@ -1,0 +1,54 @@
+@using MudBlazor
+@using THWTicketApp.Shared.Models
+
+<MudCard Elevation="1" Class="mb-2 ticket-card" Style="cursor: pointer;" @onclick="() => OnClick.InvokeAsync(Ticket)">
+    <MudCardContent Class="pa-3">
+        <div class="d-flex justify-space-between align-start">
+            <div class="flex-grow-1">
+                <div class="d-flex align-center gap-2 mb-1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        #@Ticket.Uid
+                    </MudText>
+                    <StatusBadge Status="@Ticket.Status" />
+                    <PriorityBadge Priority="@Ticket.Priority" />
+                </div>
+                <MudText Typo="Typo.subtitle1" Class="mb-1">@Ticket.Subject</MudText>
+                <div class="d-flex align-center gap-3">
+                    @if (Ticket.Assignee != null)
+                    {
+                        <MudText Typo="Typo.caption">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+                            @Ticket.Assignee.Fullname
+                        </MudText>
+                    }
+                    @if (Ticket.Group != null)
+                    {
+                        <MudText Typo="Typo.caption">
+                            <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" Class="mr-1" />
+                            @Ticket.Group.Name
+                        </MudText>
+                    }
+                    <MudText Typo="Typo.caption" Color="Color.Default">
+                        @Ticket.Updated.ToString("dd.MM.yyyy HH:mm")
+                    </MudText>
+                </div>
+            </div>
+            @if (ShowActions)
+            {
+                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
+                         AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                    <MudMenuItem OnClick="() => OnAssignToMe.InvokeAsync(Ticket)">Mir zuweisen</MudMenuItem>
+                    <MudMenuItem OnClick="() => OnClose.InvokeAsync(Ticket)">Schließen</MudMenuItem>
+                </MudMenu>
+            }
+        </div>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public Ticket Ticket { get; set; } = null!;
+    [Parameter] public bool ShowActions { get; set; }
+    [Parameter] public EventCallback<Ticket> OnClick { get; set; }
+    [Parameter] public EventCallback<Ticket> OnAssignToMe { get; set; }
+    [Parameter] public EventCallback<Ticket> OnClose { get; set; }
+}

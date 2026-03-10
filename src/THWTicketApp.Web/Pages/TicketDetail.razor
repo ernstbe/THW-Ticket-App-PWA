@@ -1,0 +1,498 @@
+@page "/tickets/{TicketUid:int}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using MudBlazor
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Models.Responses
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@using Markdig
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
+
+@if (_isLoading && _ticket == null)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+}
+else if (_ticket == null)
+{
+    <MudAlert Severity="Severity.Error">Ticket nicht gefunden.</MudAlert>
+}
+else
+{
+    <div class="d-flex justify-space-between align-center mb-4">
+        <div class="d-flex align-center gap-3">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/tickets"))" />
+            <MudText Typo="Typo.h5">#@_ticket.Uid – @_ticket.Subject</MudText>
+        </div>
+        <div class="d-flex gap-2">
+            <StatusBadge Status="@_ticket.Status" />
+            <PriorityBadge Priority="@_ticket.Priority" />
+        </div>
+    </div>
+
+    @if (_isLoading)
+    {
+        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
+    }
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="pa-4">
+        @* Details Tab *@
+        <MudTabPanel Text="Details" Icon="@Icons.Material.Filled.Info">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1">Beschreibung</MudText>
+                    <MudPaper Elevation="0" Class="pa-3 mb-4" Style="background: var(--mud-palette-background-gray);">
+                        @if (!string.IsNullOrEmpty(_ticket.Issue))
+                        {
+                            @((MarkupString)Markdown.ToHtml(_ticket.Issue, _mdPipeline))
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Keine Beschreibung.</MudText>
+                        }
+                    </MudPaper>
+
+                    @* Edit section *@
+                    <MudExpansionPanels Class="mb-4">
+                        <MudExpansionPanel Text="Ticket bearbeiten">
+                            <MudTextField @bind-Value="_editSubject" Label="Betreff" Variant="Variant.Outlined" Class="mb-3" />
+                            <MudTextField @bind-Value="_editIssue" Label="Beschreibung" Variant="Variant.Outlined" Lines="4" Class="mb-3" />
+                            <MudGrid>
+                                <MudItem xs="6">
+                                    <MudSelect T="Status" @bind-Value="_selectedStatus" Label="Status" Variant="Variant.Outlined"
+                                               ToStringFunc="@(s => s?.TranslatedName ?? "")">
+                                        @foreach (var s in _statuses)
+                                        {
+                                            <MudSelectItem Value="s">@s.TranslatedName</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudSelect T="Priority" @bind-Value="_selectedPriority" Label="Priorität" Variant="Variant.Outlined"
+                                               ToStringFunc="@(p => p?.TranslatedName ?? "")">
+                                        @foreach (var p in _priorities)
+                                        {
+                                            <MudSelectItem Value="p">@p.TranslatedName</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                            </MudGrid>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3"
+                                       OnClick="SaveEditAsync" Disabled="_isLoading">Speichern</MudButton>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="1" Class="pa-4">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Details</MudText>
+                        <MudList T="string" Dense="true">
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Person">
+                                <MudText Typo="Typo.caption">Ersteller</MudText>
+                                <MudText>@(_ticket.Owner?.Fullname ?? "Unbekannt")</MudText>
+                            </MudListItem>
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.AssignmentInd">
+                                <MudText Typo="Typo.caption">Zuständig</MudText>
+                                <MudText>@(_ticket.Assignee?.Fullname ?? "Nicht zugewiesen")</MudText>
+                            </MudListItem>
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Group">
+                                <MudText Typo="Typo.caption">Gruppe</MudText>
+                                <MudText>@(_ticket.Group?.Name ?? "-")</MudText>
+                            </MudListItem>
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Category">
+                                <MudText Typo="Typo.caption">Typ</MudText>
+                                <MudText>@(_ticket.Type?.TranslatedName ?? "-")</MudText>
+                            </MudListItem>
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.CalendarToday">
+                                <MudText Typo="Typo.caption">Erstellt</MudText>
+                                <MudText>@_ticket.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                            </MudListItem>
+                            <MudListItem T="string" Icon="@Icons.Material.Filled.Update">
+                                <MudText Typo="Typo.caption">Aktualisiert</MudText>
+                                <MudText>@_ticket.Updated.ToString("dd.MM.yyyy HH:mm")</MudText>
+                            </MudListItem>
+                            @if (_ticket.DueDate != DateTime.MinValue)
+                            {
+                                <MudListItem T="string" Icon="@Icons.Material.Filled.Event">
+                                    <MudText Typo="Typo.caption">Fällig</MudText>
+                                    <MudText Color="@(_ticket.DueDate < DateTime.Now ? Color.Error : Color.Default)">
+                                        @_ticket.DueDate.ToString("dd.MM.yyyy HH:mm")
+                                    </MudText>
+                                </MudListItem>
+                            }
+                        </MudList>
+
+                        @* Assignee picker *@
+                        <MudDivider Class="my-3" />
+                        <MudSelect T="User" @bind-Value="_selectedAssignee" Label="Zuweisen an" Variant="Variant.Outlined"
+                                   ToStringFunc="@(u => u?.Fullname ?? "")" Dense="true" Class="mb-2"
+                                   Clearable="true">
+                            @foreach (var u in _users)
+                            {
+                                <MudSelectItem Value="u">@u.Fullname</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <div class="d-flex gap-2">
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                       OnClick="AssignAsync" Disabled="_isLoading">Zuweisen</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined"
+                                       OnClick="ClearAssigneeAsync" Disabled="_isLoading">Entfernen</MudButton>
+                        </div>
+
+                        @* Tags *@
+                        @if (_ticket.Tags?.Count > 0)
+                        {
+                            <MudDivider Class="my-3" />
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Tags</MudText>
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var tag in _ticket.Tags)
+                                {
+                                    <MudChip T="string" Size="Size.Small">@tag.Name</MudChip>
+                                }
+                            </div>
+                        }
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        @* Comments Tab *@
+        <MudTabPanel Text="@($"Kommentare ({_ticket.Comments?.Count ?? 0})")" Icon="@Icons.Material.Filled.Comment">
+            @if (_ticket.Comments != null)
+            {
+                @foreach (var comment in _ticket.Comments.OrderByDescending(c => c.Date))
+                {
+                    <MudPaper Elevation="1" Class="pa-3 mb-3">
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.subtitle2">@(comment.Owner?.Fullname ?? "Unbekannt")</MudText>
+                            <MudText Typo="Typo.caption">@comment.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                        </div>
+                        @if (!string.IsNullOrEmpty(comment.Text))
+                        {
+                            @((MarkupString)Markdown.ToHtml(comment.Text, _mdPipeline))
+                        }
+                    </MudPaper>
+                }
+            }
+
+            <MudDivider Class="my-4" />
+            <MudTextField @bind-Value="_newComment" Label="Neuer Kommentar" Variant="Variant.Outlined"
+                          Lines="3" Class="mb-3" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddCommentAsync"
+                       Disabled="@(string.IsNullOrWhiteSpace(_newComment) || _isLoading)">
+                Kommentar senden
+            </MudButton>
+        </MudTabPanel>
+
+        @* Notes Tab *@
+        <MudTabPanel Text="@($"Notizen ({_ticket.Notes?.Count ?? 0})")" Icon="@Icons.Material.Filled.Note">
+            @if (_ticket.Notes != null)
+            {
+                @foreach (var note in _ticket.Notes.OrderByDescending(n => n.Date))
+                {
+                    <MudPaper Elevation="1" Class="pa-3 mb-3">
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.subtitle2">@(note.Owner?.Fullname ?? "Unbekannt")</MudText>
+                            <MudText Typo="Typo.caption">@note.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                        </div>
+                        @if (!string.IsNullOrEmpty(note.Content))
+                        {
+                            @((MarkupString)Markdown.ToHtml(note.Content, _mdPipeline))
+                        }
+                    </MudPaper>
+                }
+            }
+
+            <MudDivider Class="my-4" />
+            <MudTextField @bind-Value="_newNote" Label="Neue Notiz" Variant="Variant.Outlined"
+                          Lines="3" Class="mb-3" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddNoteAsync"
+                       Disabled="@(string.IsNullOrWhiteSpace(_newNote) || _isLoading)">
+                Notiz hinzufügen
+            </MudButton>
+        </MudTabPanel>
+
+        @* Attachments Tab *@
+        <MudTabPanel Text="@($"Anhänge ({_ticket.Attachments?.Count ?? 0})")" Icon="@Icons.Material.Filled.AttachFile">
+            @if (_ticket.Attachments != null && _ticket.Attachments.Count > 0)
+            {
+                <MudTable Items="_ticket.Attachments" Dense="true" Hover="true">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Typ</MudTh>
+                        <MudTh>Größe</MudTh>
+                        <MudTh>Datum</MudTh>
+                        <MudTh>Aktionen</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@context.MimeType</MudTd>
+                        <MudTd>@context.SizeFormatted</MudTd>
+                        <MudTd>@(context.UploadDate?.ToString("dd.MM.yyyy") ?? "-")</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small"
+                                           OnClick="() => DownloadAttachment(context)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="() => DeleteAttachmentAsync(context)" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+            else
+            {
+                <MudText Color="Color.Secondary">Keine Anhänge.</MudText>
+            }
+        </MudTabPanel>
+
+        @* History Tab *@
+        <MudTabPanel Text="@($"Verlauf ({_ticket.History?.Count ?? 0})")" Icon="@Icons.Material.Filled.History">
+            @if (_ticket.History != null)
+            {
+                <MudTimeline TimelinePosition="TimelinePosition.Start">
+                    @foreach (var item in _ticket.History.OrderByDescending(h => h.Date))
+                    {
+                        <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                            <ItemContent>
+                                <MudText Typo="Typo.subtitle2">@item.TranslatedAction</MudText>
+                                @if (!string.IsNullOrEmpty(item.Description))
+                                {
+                                    <MudText Typo="Typo.body2">@item.Description</MudText>
+                                }
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @item.Date.ToString("dd.MM.yyyy HH:mm") – @(item.Owner?.Fullname ?? "System")
+                                </MudText>
+                            </ItemContent>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            }
+        </MudTabPanel>
+    </MudTabs>
+
+    @* Delete button *@
+    <div class="d-flex justify-end mt-4">
+        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
+                   OnClick="DeleteTicketAsync">
+            Ticket löschen
+        </MudButton>
+    </div>
+}
+
+@code {
+    [Parameter] public int TicketUid { get; set; }
+
+    private Ticket? _ticket;
+    private bool _isLoading;
+    private string _newComment = string.Empty;
+    private string _newNote = string.Empty;
+    private string _editSubject = string.Empty;
+    private string _editIssue = string.Empty;
+    private Status? _selectedStatus;
+    private Priority? _selectedPriority;
+    private User? _selectedAssignee;
+    private List<Status> _statuses = [];
+    private List<Priority> _priorities = [];
+    private List<User> _users = [];
+    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTicketAsync();
+        _ = LoadReferenceDataAsync();
+    }
+
+    private async Task LoadTicketAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var json = await ApiService.GetTicketAsync(TicketUid.ToString());
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("ticket", out var ticketEl))
+                _ticket = JsonSerializer.Deserialize<Ticket>(ticketEl.GetRawText(), options);
+            else
+                _ticket = JsonSerializer.Deserialize<Ticket>(json, options);
+
+            if (_ticket != null)
+            {
+                TrudeskTranslationHelper.TranslateTicket(_ticket);
+                _editSubject = _ticket.Subject ?? string.Empty;
+                _editIssue = _ticket.Issue ?? string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Fehler: {ErrorHelper.Categorize(ex).Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadReferenceDataAsync()
+    {
+        try
+        {
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var statusTask = ApiService.GetStatusesAsync();
+            var prioTask = ApiService.GetPrioritiesAsync();
+            var usersTask = ApiService.GetAssigneesAsync();
+            await Task.WhenAll(statusTask, prioTask, usersTask);
+
+            _statuses = JsonHelper.DeserializeWrappedArray<Status>(statusTask.Result, "status", options).ToList();
+            foreach (var s in _statuses) s.Name = TrudeskTranslationHelper.TranslateStatus(s.Name);
+
+            using var prioDoc = JsonDocument.Parse(prioTask.Result);
+            if (prioDoc.RootElement.TryGetProperty("priorities", out var prioEl))
+                _priorities = JsonSerializer.Deserialize<List<Priority>>(prioEl.GetRawText(), options) ?? [];
+            else
+                _priorities = JsonSerializer.Deserialize<List<Priority>>(prioTask.Result, options) ?? [];
+            foreach (var p in _priorities) p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
+
+            var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersTask.Result, options);
+            _users = userResponse?.Users ?? [];
+
+            if (_ticket != null)
+            {
+                _selectedStatus = _statuses.FirstOrDefault(s => s.Id == _ticket.Status?.Id);
+                _selectedPriority = _priorities.FirstOrDefault(p => p.Id == _ticket.Priority?.Id);
+            }
+            StateHasChanged();
+        }
+        catch { }
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (_ticket == null || string.IsNullOrWhiteSpace(_editSubject)) return;
+        _isLoading = true;
+        try
+        {
+            _ticket.Subject = _editSubject;
+            _ticket.Issue = _editIssue;
+            if (_selectedStatus != null) _ticket.Status = _selectedStatus;
+            if (_selectedPriority != null) _ticket.Priority = _selectedPriority;
+
+            if (await ApiService.EditTicketAsync(_ticket))
+            {
+                Snackbar.Add("Ticket aktualisiert.", Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add("Aktualisierung fehlgeschlagen.", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task AssignAsync()
+    {
+        if (_ticket == null || _selectedAssignee == null) return;
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.AssignTicketAsync(_ticket.Id, _selectedAssignee.Id))
+            { Snackbar.Add("Zuweisung aktualisiert.", Severity.Success); await LoadTicketAsync(); }
+            else Snackbar.Add("Zuweisung fehlgeschlagen.", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task ClearAssigneeAsync()
+    {
+        if (_ticket == null) return;
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.ClearTicketAssigneeAsync(_ticket.Id))
+            { Snackbar.Add("Zuweisung entfernt.", Severity.Success); await LoadTicketAsync(); }
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task AddCommentAsync()
+    {
+        if (_ticket == null || string.IsNullOrWhiteSpace(_newComment)) return;
+        _isLoading = true;
+        try
+        {
+            var ownerId = _ticket.Owner?.Id ?? string.Empty;
+            if (await ApiService.AddCommentAsync(_ticket.Id, ownerId, _newComment))
+            {
+                _newComment = string.Empty;
+                Snackbar.Add("Kommentar hinzugefügt.", Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add("Fehler beim Hinzufügen.", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task AddNoteAsync()
+    {
+        if (_ticket == null || string.IsNullOrWhiteSpace(_newNote)) return;
+        _isLoading = true;
+        try
+        {
+            var ownerId = _ticket.Owner?.Id ?? string.Empty;
+            if (await ApiService.AddNoteAsync(_ticket.Id, ownerId, _newNote))
+            {
+                _newNote = string.Empty;
+                Snackbar.Add("Notiz hinzugefügt.", Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add("Fehler beim Hinzufügen.", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private void DownloadAttachment(Attachment attachment)
+    {
+        if (attachment?.Path == null) return;
+        var url = ApiService.GetAttachmentUrl(attachment.Path);
+        Navigation.NavigateTo(url, true);
+    }
+
+    private async Task DeleteAttachmentAsync(Attachment attachment)
+    {
+        if (_ticket == null || string.IsNullOrEmpty(attachment?.Id)) return;
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.DeleteAttachmentAsync(_ticket.Id, attachment.Id!))
+            { Snackbar.Add("Anhang gelöscht.", Severity.Success); await LoadTicketAsync(); }
+            else Snackbar.Add("Löschen fehlgeschlagen.", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task DeleteTicketAsync()
+    {
+        if (_ticket == null) return;
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.DeleteTicketAsync(_ticket.Id))
+            {
+                Snackbar.Add("Ticket gelöscht.", Severity.Success);
+                Navigation.NavigateTo("/tickets");
+            }
+            else Snackbar.Add("Löschen fehlgeschlagen.", Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+}

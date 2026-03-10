@@ -1,0 +1,20 @@
+@using MudBlazor
+
+<MudPaper Elevation="2" Class="pa-4" Style="cursor: pointer;" @onclick="OnClick">
+    <div class="d-flex align-center">
+        <MudIcon Icon="@Icon" Color="@IconColor" Size="Size.Large" Class="mr-4" />
+        <div>
+            <MudText Typo="Typo.h4" Color="@ValueColor">@Value</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Default">@Label</MudText>
+        </div>
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Info;
+    [Parameter] public Color IconColor { get; set; } = Color.Primary;
+    [Parameter] public int Value { get; set; }
+    [Parameter] public Color ValueColor { get; set; } = Color.Default;
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnClick { get; set; }
+}

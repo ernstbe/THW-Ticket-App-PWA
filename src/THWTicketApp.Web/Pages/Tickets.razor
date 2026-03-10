@@ -1,0 +1,254 @@
+@page "/tickets"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using MudBlazor
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Models.Responses
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Tickets - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">Tickets</MudText>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => Navigation.NavigateTo("/tickets/add"))">
+            Neues Ticket
+        </MudButton>
+    </div>
+</div>
+
+@* Search bar *@
+<MudTextField @bind-Value="_searchText" Placeholder="Tickets suchen..." Variant="Variant.Outlined"
+              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+              Immediate="true" DebounceInterval="400" TextChanged="OnSearchChanged"
+              Class="mb-3" Clearable="true" />
+
+@* Filter chips *@
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <MudChip T="string" Color="@(_activeFilter == "all" ? Color.Primary : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("all"))">Alle</MudChip>
+    <MudChip T="string" Color="@(_activeFilter == "open" ? Color.Info : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("open"))">Offen</MudChip>
+    <MudChip T="string" Color="@(_activeFilter == "pending" ? Color.Warning : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("pending"))">In Bearbeitung</MudChip>
+    <MudChip T="string" Color="@(_activeFilter == "closed" ? Color.Success : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("closed"))">Geschlossen</MudChip>
+    <MudChip T="string" Color="@(_showOnlyMyTickets ? Color.Secondary : Color.Default)"
+             Variant="Variant.Filled" OnClick="ToggleMyTickets">Meine Tickets</MudChip>
+</div>
+
+@* Sort selector *@
+<div class="d-flex align-center gap-2 mb-4">
+    <MudSelect T="string" @bind-Value="_activeSort" Label="Sortierung" Variant="Variant.Outlined"
+               Dense="true" Style="max-width: 250px;">
+        <MudSelectItem Value="@("date_desc")">Erstellt (neueste)</MudSelectItem>
+        <MudSelectItem Value="@("date_asc")">Erstellt (älteste)</MudSelectItem>
+        <MudSelectItem Value="@("updated")">Zuletzt aktualisiert</MudSelectItem>
+        <MudSelectItem Value="@("priority")">Priorität</MudSelectItem>
+        <MudSelectItem Value="@("subject")">Betreff (A-Z)</MudSelectItem>
+    </MudSelect>
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTicketsAsync"
+                   Disabled="_isLoading" />
+    <MudText Typo="Typo.body2" Color="Color.Secondary">
+        @_filteredTickets.Count Ticket(s)
+    </MudText>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (!string.IsNullOrEmpty(_statusMessage))
+{
+    <MudAlert Severity="Severity.Info" Class="mb-4">@_statusMessage</MudAlert>
+}
+
+@* Ticket list *@
+@if (_filteredTickets.Count == 0 && !_isLoading)
+{
+    <MudAlert Severity="Severity.Normal">Keine Tickets gefunden.</MudAlert>
+}
+else
+{
+    <MudStack Spacing="0">
+        @foreach (var ticket in _filteredTickets)
+        {
+            <TicketCard Ticket="ticket" ShowActions="true"
+                        OnClick="NavigateToDetail"
+                        OnAssignToMe="AssignToMeAsync"
+                        OnClose="CloseTicketAsync" />
+        }
+    </MudStack>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "filter")]
+    public string? InitialFilter { get; set; }
+
+    private bool _isLoading;
+    private string _searchText = string.Empty;
+    private string _activeFilter = "all";
+    private string _activeSort = "date_desc";
+    private bool _showOnlyMyTickets;
+    private string _statusMessage = string.Empty;
+    private List<Ticket> _allTickets = [];
+    private List<Ticket> _filteredTickets = [];
+    private bool _isServerSearchActive;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(InitialFilter))
+            _activeFilter = InitialFilter;
+        await LoadTicketsAsync();
+    }
+
+    private async Task LoadTicketsAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        _statusMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var json = await ApiService.GetTicketsAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var tickets = JsonSerializer.Deserialize<Ticket[]>(json, options);
+
+            _allTickets.Clear();
+            if (tickets != null)
+            {
+                foreach (var t in tickets)
+                {
+                    TrudeskTranslationHelper.TranslateTicket(t);
+                    _allTickets.Add(t);
+                }
+            }
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            _statusMessage = message;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnSearchChanged(string value)
+    {
+        _searchText = value;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _isServerSearchActive = false;
+            ApplyFilters();
+            return;
+        }
+        if (value.Length < 2) { ApplyFilters(); return; }
+
+        try
+        {
+            var json = await ApiService.SearchTicketsAsync(value);
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = JsonSerializer.Deserialize<GetTicketsResponse>(json, options);
+            if (response?.Tickets != null && response.Tickets.Count > 0)
+            {
+                _isServerSearchActive = true;
+                foreach (var t in response.Tickets) TrudeskTranslationHelper.TranslateTicket(t);
+                _filteredTickets = ApplySorting(ApplyLocalFilters(response.Tickets)).ToList();
+                StateHasChanged();
+                return;
+            }
+        }
+        catch { }
+        _isServerSearchActive = false;
+        ApplyFilters();
+    }
+
+    private void SetFilter(string filter) { _activeFilter = filter; ApplyFilters(); }
+    private void ToggleMyTickets() { _showOnlyMyTickets = !_showOnlyMyTickets; ApplyFilters(); }
+
+    private void ApplyFilters()
+    {
+        var source = _allTickets.AsEnumerable();
+        if (!_isServerSearchActive && !string.IsNullOrWhiteSpace(_searchText))
+        {
+            var search = _searchText.ToLowerInvariant();
+            source = source.Where(t =>
+                (t.Subject?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (t.Issue?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (t.Owner?.Fullname?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (t.Assignee?.Fullname?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                t.Uid.ToString().Contains(search));
+        }
+        _filteredTickets = ApplySorting(ApplyLocalFilters(source)).ToList();
+        StateHasChanged();
+    }
+
+    private IEnumerable<Ticket> ApplyLocalFilters(IEnumerable<Ticket> source)
+    {
+        source = _activeFilter switch
+        {
+            "open" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new"),
+            "pending" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "ausstehend" or "pending" or "in bearbeitung" or "in progress"),
+            "closed" => source.Where(t => t.Status?.IsResolved == true || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved"),
+            _ => source
+        };
+        if (_showOnlyMyTickets && !string.IsNullOrEmpty(ApiService.CurrentUserId))
+            source = source.Where(t => t.Assignee?.Id == ApiService.CurrentUserId);
+        return source;
+    }
+
+    private IOrderedEnumerable<Ticket> ApplySorting(IEnumerable<Ticket> source)
+    {
+        return _activeSort switch
+        {
+            "date_asc" => source.OrderBy(t => t.Date),
+            "updated" => source.OrderByDescending(t => t.Updated),
+            "priority" => source.OrderByDescending(t => t.Priority?.OverdueIn ?? 0),
+            "subject" => source.OrderBy(t => t.Subject, StringComparer.OrdinalIgnoreCase),
+            _ => source.OrderByDescending(t => t.Date)
+        };
+    }
+
+    private void NavigateToDetail(Ticket ticket)
+    {
+        Navigation.NavigateTo($"/tickets/{ticket.Uid}");
+    }
+
+    private async Task AssignToMeAsync(Ticket ticket)
+    {
+        var userId = ApiService.CurrentUserId;
+        if (string.IsNullOrEmpty(userId)) return;
+        try
+        {
+            if (await ApiService.AssignTicketAsync(ticket.Id, userId))
+            { Snackbar.Add("Ticket zugewiesen.", Severity.Success); await LoadTicketsAsync(); }
+        }
+        catch { Snackbar.Add("Zuweisung fehlgeschlagen.", Severity.Error); }
+    }
+
+    private async Task CloseTicketAsync(Ticket ticket)
+    {
+        try
+        {
+            var statusJson = await ApiService.GetStatusesAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
+            var closedStatus = statuses.FirstOrDefault(s => s.IsResolved);
+            if (closedStatus != null && await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
+            { Snackbar.Add("Ticket geschlossen.", Severity.Success); await LoadTicketsAsync(); }
+        }
+        catch { Snackbar.Add("Schließen fehlgeschlagen.", Severity.Error); }
+    }
+}
