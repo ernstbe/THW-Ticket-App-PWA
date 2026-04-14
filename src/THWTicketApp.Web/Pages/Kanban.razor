@@ -7,6 +7,8 @@
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.RealtimeService Realtime
+@implements IDisposable
 
 <PageTitle>Kanban Board - THW Ticket App</PageTitle>
 
@@ -92,9 +94,36 @@ else
     private List<KanbanColumn> _columns = [];
     private List<KanbanTicketItem> _ticketItems = [];
 
+    private CancellationTokenSource? _refreshDebounceCts;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadBoardAsync();
+        Realtime.AnyTicketChanged += OnRealtimeChange;
+    }
+
+    private void OnRealtimeChange(string ticketId)
+    {
+        _refreshDebounceCts?.Cancel();
+        _refreshDebounceCts = new CancellationTokenSource();
+        var token = _refreshDebounceCts.Token;
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await Task.Delay(400, token);
+                if (token.IsCancellationRequested) return;
+                await LoadBoardAsync();
+            }
+            catch (TaskCanceledException) { }
+        });
+    }
+
+    public void Dispose()
+    {
+        Realtime.AnyTicketChanged -= OnRealtimeChange;
+        _refreshDebounceCts?.Cancel();
+        _refreshDebounceCts?.Dispose();
     }
 
     private async Task LoadBoardAsync()

@@ -7,6 +7,8 @@
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.RealtimeService Realtime
+@implements IDisposable
 
 <PageTitle>Benachrichtigungen - THW Ticket App</PageTitle>
 
@@ -18,12 +20,27 @@
     </div>
 </div>
 
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <MudChip T="string" Color="@(_activeFilter == "all" ? Color.Primary : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("all"))">
+        Alle (@_notifications.Count)
+    </MudChip>
+    <MudChip T="string" Color="@(_activeFilter == "unread" ? Color.Warning : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("unread"))">
+        Ungelesen (@_notifications.Count(n => !n.IsRead))
+    </MudChip>
+    <MudChip T="string" Color="@(_activeFilter == "read" ? Color.Success : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("read"))">
+        Gelesen (@_notifications.Count(n => n.IsRead))
+    </MudChip>
+</div>
+
 @if (_isLoading)
 {
     <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
 }
 
-@if (_notifications.Count == 0 && !_isLoading)
+@if (FilteredNotifications.Count == 0 && !_isLoading)
 {
     <MudAlert Severity="Severity.Normal" Class="mb-4">
         <MudText>Keine Benachrichtigungen vorhanden.</MudText>
@@ -32,7 +49,7 @@
 else
 {
     <MudStack Spacing="2">
-        @foreach (var notification in _notifications)
+        @foreach (var notification in PagedNotifications)
         {
             <MudPaper Class="pa-3 cursor-pointer" Elevation="1" @onclick="@(() => OpenNotification(notification))">
                 <div class="d-flex align-center gap-3">
@@ -63,15 +80,61 @@ else
             </MudPaper>
         }
     </MudStack>
+
+    @if (FilteredNotifications.Count > _displayedCount)
+    {
+        <div class="d-flex justify-center mt-4">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       OnClick="LoadMore" StartIcon="@Icons.Material.Filled.ExpandMore">
+                Mehr laden (@(FilteredNotifications.Count - _displayedCount) weitere)
+            </MudButton>
+        </div>
+    }
 }
 
 @code {
+    private const int PageSize = 20;
     private bool _isLoading;
     private List<NotificationItem> _notifications = [];
+    private string _activeFilter = "all";
+    private int _displayedCount = PageSize;
+
+    private List<NotificationItem> FilteredNotifications => _activeFilter switch
+    {
+        "unread" => _notifications.Where(n => !n.IsRead).ToList(),
+        "read" => _notifications.Where(n => n.IsRead).ToList(),
+        _ => _notifications
+    };
+
+    private IEnumerable<NotificationItem> PagedNotifications => FilteredNotifications.Take(_displayedCount);
+
+    private void SetFilter(string filter)
+    {
+        _activeFilter = filter;
+        _displayedCount = PageSize;
+        StateHasChanged();
+    }
+
+    private void LoadMore()
+    {
+        _displayedCount += PageSize;
+        StateHasChanged();
+    }
 
     protected override async Task OnInitializedAsync()
     {
         await LoadNotificationsAsync();
+        Realtime.NotificationUpdate += OnNotificationUpdate;
+    }
+
+    private async void OnNotificationUpdate()
+    {
+        await InvokeAsync(LoadNotificationsAsync);
+    }
+
+    public void Dispose()
+    {
+        Realtime.NotificationUpdate -= OnNotificationUpdate;
     }
 
     private async Task LoadNotificationsAsync()
