@@ -1,21 +1,43 @@
+using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using THWTicketApp.Shared.Data;
+using THWTicketApp.Shared.Models;
 using THWTicketApp.Shared.Services;
 
 namespace THWTicketApp.Web.Services;
 
 public class SyncService : ISyncService
 {
-    private readonly IndexedDbService _indexedDb;
+    public const int MaxAttachmentBytes = 5 * 1024 * 1024; // 5 MB
+
+    // Retry backoff schedule — index = retryCount of the failed attempt (1-based).
+    // After the 6th entry is exhausted (i.e. newRetryCount > 6), the action is dropped.
+    internal static readonly TimeSpan[] RetryDelays =
+    [
+        TimeSpan.FromSeconds(2),
+        TimeSpan.FromSeconds(8),
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromMinutes(2),
+        TimeSpan.FromMinutes(10),
+        TimeSpan.FromMinutes(30)
+    ];
+
+    private readonly IIndexedDbService _indexedDb;
     private readonly ITrueDeskApiService _apiService;
     private readonly AppStateService _appState;
 
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    internal static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     public event Action<int>? PendingCountChanged;
     public event Action<PendingAction>? ConflictDetected;
 
-    public SyncService(IndexedDbService indexedDb, ITrueDeskApiService apiService, AppStateService appState)
+    public SyncService(IIndexedDbService indexedDb, ITrueDeskApiService apiService, AppStateService appState)
     {
         _indexedDb = indexedDb;
         _apiService = apiService;
@@ -38,41 +60,30 @@ public class SyncService : ISyncService
         return await _indexedDb.GetPendingActionCountAsync();
     }
 
-    public async Task EnqueueCommentAsync(string ticketId, int ticketUid, string ownerId, string comment, DateTime? ticketUpdatedAt = null)
-    {
-        var action = new PendingActionDto
+    public Task EnqueueCommentAsync(string ticketId, int ticketUid, string ownerId, string comment, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
         {
             ActionType = "AddComment",
             TicketId = ticketId,
             TicketUid = ticketUid,
             OwnerId = ownerId,
             Content = comment,
-            TicketUpdatedAt = ticketUpdatedAt?.ToString("O"),
-            CreatedAt = DateTime.UtcNow.ToString("O")
-        };
-        await _indexedDb.EnqueuePendingActionAsync(JsonSerializer.Serialize(action));
-        await UpdatePendingCount();
-    }
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
 
-    public async Task EnqueueNoteAsync(string ticketId, int ticketUid, string ownerId, string note, DateTime? ticketUpdatedAt = null)
-    {
-        var action = new PendingActionDto
+    public Task EnqueueNoteAsync(string ticketId, int ticketUid, string ownerId, string note, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
         {
             ActionType = "AddNote",
             TicketId = ticketId,
             TicketUid = ticketUid,
             OwnerId = ownerId,
             Content = note,
-            TicketUpdatedAt = ticketUpdatedAt?.ToString("O"),
-            CreatedAt = DateTime.UtcNow.ToString("O")
-        };
-        await _indexedDb.EnqueuePendingActionAsync(JsonSerializer.Serialize(action));
-        await UpdatePendingCount();
-    }
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
 
-    public async Task EnqueueCreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId)
-    {
-        var action = new PendingActionDto
+    public Task EnqueueCreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId) =>
+        EnqueueAsync(new PendingActionDto
         {
             ActionType = "CreateTicket",
             Content = subject,
@@ -81,25 +92,85 @@ public class SyncService : ISyncService
             TypeId = typeId,
             PriorityId = priorityId,
             GroupId = groupId,
-            TargetUserId = assigneeId,
-            CreatedAt = DateTime.UtcNow.ToString("O")
-        };
-        await _indexedDb.EnqueuePendingActionAsync(JsonSerializer.Serialize(action));
-        await UpdatePendingCount();
-    }
+            TargetUserId = assigneeId
+        });
 
-    public async Task EnqueueAssignAsync(string ticketId, int ticketUid, string userId, DateTime? ticketUpdatedAt = null)
-    {
-        var action = new PendingActionDto
+    public Task EnqueueAssignAsync(string ticketId, int ticketUid, string userId, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
         {
             ActionType = "AssignTicket",
             TicketId = ticketId,
             TicketUid = ticketUid,
             TargetUserId = userId,
-            TicketUpdatedAt = ticketUpdatedAt?.ToString("O"),
-            CreatedAt = DateTime.UtcNow.ToString("O")
-        };
-        await _indexedDb.EnqueuePendingActionAsync(JsonSerializer.Serialize(action));
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+
+    public Task EnqueueClearAssigneeAsync(string ticketId, int ticketUid, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
+        {
+            ActionType = "ClearAssignee",
+            TicketId = ticketId,
+            TicketUid = ticketUid,
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+
+    public Task EnqueueStatusAsync(string ticketId, int ticketUid, string statusId, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
+        {
+            ActionType = "UpdateStatus",
+            TicketId = ticketId,
+            TicketUid = ticketUid,
+            StatusId = statusId,
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+
+    public Task EnqueueUpdateTicketFieldsAsync(string ticketId, int ticketUid, string? subject, string? issue, string? priorityId, string? typeId, string? groupId, DateTime? dueDate, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
+        {
+            ActionType = "UpdateTicketFields",
+            TicketId = ticketId,
+            TicketUid = ticketUid,
+            Subject = subject,
+            Issue = issue,
+            PriorityId = priorityId,
+            TypeId = typeId,
+            GroupId = groupId,
+            DueDate = dueDate?.ToString("O"),
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+
+    public Task EnqueueDeleteTicketAsync(string ticketId, int ticketUid, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
+        {
+            ActionType = "DeleteTicket",
+            TicketId = ticketId,
+            TicketUid = ticketUid,
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+
+    public Task EnqueueUploadAttachmentAsync(string ticketId, int ticketUid, string fileName, byte[] fileContent, string contentType, DateTime? ticketUpdatedAt = null)
+    {
+        if (fileContent == null) throw new ArgumentNullException(nameof(fileContent));
+        if (fileContent.Length == 0) throw new ArgumentException("File content must not be empty.", nameof(fileContent));
+        if (fileContent.Length > MaxAttachmentBytes)
+            throw new ArgumentException($"Attachment exceeds {MaxAttachmentBytes / (1024 * 1024)} MB limit.", nameof(fileContent));
+
+        return EnqueueAsync(new PendingActionDto
+        {
+            ActionType = "UploadAttachment",
+            TicketId = ticketId,
+            TicketUid = ticketUid,
+            FileName = fileName,
+            FileContentBase64 = Convert.ToBase64String(fileContent),
+            FileContentType = contentType,
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+    }
+
+    private async Task EnqueueAsync(PendingActionDto action)
+    {
+        action.CreatedAt = DateTime.UtcNow.ToString("O");
+        await _indexedDb.EnqueuePendingActionAsync(JsonSerializer.Serialize(action, JsonOptions));
         await UpdatePendingCount();
     }
 
@@ -111,17 +182,27 @@ public class SyncService : ISyncService
             var actions = JsonSerializer.Deserialize<PendingActionDto[]>(json, JsonOptions) ?? [];
 
             var allSuccess = true;
+            var now = DateTime.UtcNow;
+
             foreach (var action in actions)
             {
-                // Skip already-conflicted actions
+                // Skip already-conflicted actions (user must resolve them explicitly)
                 if (action.IsConflicted)
                     continue;
 
+                // Respect backoff schedule
+                if (!string.IsNullOrEmpty(action.NextRetryAt)
+                    && TryParseUtc(action.NextRetryAt, out var nextRetry)
+                    && nextRetry > now)
+                {
+                    allSuccess = false;
+                    continue;
+                }
+
                 try
                 {
-                    // Check for conflicts (except for CreateTicket which has no existing ticket)
-                    if (action.ActionType != "CreateTicket" && !string.IsNullOrEmpty(action.TicketId)
-                        && !string.IsNullOrEmpty(action.TicketUpdatedAt))
+                    // Conflict detection for actions targeting an existing ticket
+                    if (NeedsConflictCheck(action))
                     {
                         var conflict = await CheckConflictAsync(action);
                         if (conflict != null)
@@ -131,47 +212,41 @@ public class SyncService : ISyncService
                             pa.IsConflicted = true;
                             pa.ConflictReason = conflict;
                             ConflictDetected?.Invoke(pa);
+                            await AppendLogAsync("warn", action, $"Conflict detected: {conflict}");
                             allSuccess = false;
                             continue;
                         }
                     }
 
-                    var success = action.ActionType switch
-                    {
-                        "AddComment" => await _apiService.AddCommentAsync(action.TicketId!, action.OwnerId!, action.Content!),
-                        "AddNote" => await _apiService.AddNoteAsync(action.TicketId!, action.OwnerId!, action.Content!),
-                        "AssignTicket" => await _apiService.AssignTicketAsync(action.TicketId!, action.TargetUserId!),
-                        "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.StatusId!),
-                        "CreateTicket" => await _apiService.CreateTicketAsync(
-                            action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId),
-                        "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!),
-                        _ => false
-                    };
+                    var success = await ApplyActionAsync(action);
 
-                    if (success && action.Id > 0)
+                    if (success)
                     {
-                        await _indexedDb.RemovePendingActionAsync(action.Id);
+                        if (action.Id > 0)
+                            await _indexedDb.RemovePendingActionAsync(action.Id);
+                        await AppendLogAsync("info", action, "Synced successfully");
                     }
-                    else if (!success)
+                    else
                     {
                         allSuccess = false;
-                        var retryCount = await _indexedDb.IncrementRetryCountAsync(action.Id);
-                        if (retryCount >= 5)
-                            await _indexedDb.RemovePendingActionAsync(action.Id);
+                        await HandleFailureAsync(action, "API call returned failure", null);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
                     allSuccess = false;
-                    if (action.Id > 0)
-                        await _indexedDb.IncrementRetryCountAsync(action.Id);
+                    await HandleFailureAsync(action, ex.Message, ex);
                 }
             }
 
             await UpdatePendingCount();
             return allSuccess;
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            await AppendLogAsync("error", null, "Sync loop crashed: " + ex.Message, ex);
+            return false;
+        }
     }
 
     public async Task<bool> ForceApplyAsync(int actionId)
@@ -183,26 +258,21 @@ public class SyncService : ISyncService
             var action = actions.FirstOrDefault(a => a.Id == actionId);
             if (action == null) return false;
 
-            var success = action.ActionType switch
-            {
-                "AddComment" => await _apiService.AddCommentAsync(action.TicketId!, action.OwnerId!, action.Content!),
-                "AddNote" => await _apiService.AddNoteAsync(action.TicketId!, action.OwnerId!, action.Content!),
-                "AssignTicket" => await _apiService.AssignTicketAsync(action.TicketId!, action.TargetUserId!),
-                "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.StatusId!),
-                "CreateTicket" => await _apiService.CreateTicketAsync(
-                    action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId),
-                "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!),
-                _ => false
-            };
+            var success = await ApplyActionAsync(action);
 
             if (success)
             {
                 await _indexedDb.RemovePendingActionAsync(actionId);
                 await UpdatePendingCount();
+                await AppendLogAsync("info", action, "Force-applied after conflict");
             }
             return success;
         }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            await AppendLogAsync("error", null, $"ForceApply crashed for action {actionId}: {ex.Message}", ex);
+            return false;
+        }
     }
 
     public async Task DiscardActionAsync(int actionId)
@@ -216,6 +286,63 @@ public class SyncService : ISyncService
         var json = await _indexedDb.GetConflictedActionsAsync();
         var dtos = JsonSerializer.Deserialize<PendingActionDto[]>(json, JsonOptions) ?? [];
         return dtos.Select(ToPendingAction).ToList();
+    }
+
+    private async Task<bool> ApplyActionAsync(PendingActionDto action) => action.ActionType switch
+    {
+        "AddComment" => await _apiService.AddCommentAsync(action.TicketId!, action.OwnerId!, action.Content!),
+        "AddNote" => await _apiService.AddNoteAsync(action.TicketId!, action.OwnerId!, action.Content!),
+        "AssignTicket" => await _apiService.AssignTicketAsync(action.TicketId!, action.TargetUserId!),
+        "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!),
+        "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.StatusId!),
+        "CreateTicket" => await _apiService.CreateTicketAsync(
+            action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId),
+        "UpdateTicketFields" => await ApplyUpdateTicketFieldsAsync(action),
+        "DeleteTicket" => await _apiService.DeleteTicketAsync(action.TicketId!),
+        "UploadAttachment" => await ApplyUploadAttachmentAsync(action),
+        _ => false
+    };
+
+    private Task<bool> ApplyUpdateTicketFieldsAsync(PendingActionDto action)
+    {
+        var ticket = new Ticket
+        {
+            Id = action.TicketId ?? string.Empty,
+            Uid = action.TicketUid,
+            Subject = action.Subject,
+            Issue = action.Issue
+        };
+        if (!string.IsNullOrEmpty(action.PriorityId))
+            ticket.Priority = new Priority { Id = action.PriorityId };
+        if (!string.IsNullOrEmpty(action.TypeId))
+            ticket.Type = new TicketType { Id = action.TypeId };
+        if (!string.IsNullOrEmpty(action.GroupId))
+            ticket.Group = new Group { Id = action.GroupId };
+        if (!string.IsNullOrEmpty(action.DueDate) && DateTime.TryParse(action.DueDate, out var dd))
+            ticket.DueDate = dd;
+
+        return _apiService.EditTicketAsync(ticket);
+    }
+
+    private async Task<bool> ApplyUploadAttachmentAsync(PendingActionDto action)
+    {
+        if (string.IsNullOrEmpty(action.TicketId) || string.IsNullOrEmpty(action.FileContentBase64) || string.IsNullOrEmpty(action.FileName))
+            return false;
+
+        var bytes = Convert.FromBase64String(action.FileContentBase64);
+        using var stream = new MemoryStream(bytes);
+        return await _apiService.UploadAttachmentAsync(action.TicketId, stream, action.FileName);
+    }
+
+    private static bool NeedsConflictCheck(PendingActionDto action)
+    {
+        // Actions that target an existing ticket's state need conflict checks.
+        // CreateTicket has no pre-existing ticket; DeleteTicket & UploadAttachment
+        // intentionally bypass the updated-field check since deletion and
+        // attachments shouldn't block on unrelated edits.
+        if (action.ActionType is "CreateTicket" or "DeleteTicket" or "UploadAttachment")
+            return false;
+        return !string.IsNullOrEmpty(action.TicketId) && !string.IsNullOrEmpty(action.TicketUpdatedAt);
     }
 
     private async Task<string?> CheckConflictAsync(PendingActionDto action)
@@ -242,7 +369,6 @@ public class SyncService : ISyncService
                 var serverUpdated = updatedEl.GetString();
                 if (!string.IsNullOrEmpty(serverUpdated) && serverUpdated != action.TicketUpdatedAt)
                 {
-                    // Ticket was modified since the action was queued
                     var updatedTime = DateTime.TryParse(serverUpdated, out var dt)
                         ? $"vor {FormatTimeAgo(dt)}" : "kürzlich";
                     return $"Ticket wurde {updatedTime} geändert (seitdem die Aktion erstellt wurde)";
@@ -254,6 +380,64 @@ public class SyncService : ISyncService
             // Cannot check - allow the action to proceed
         }
         return null;
+    }
+
+    private async Task HandleFailureAsync(PendingActionDto action, string errorMessage, Exception? exception)
+    {
+        if (action.Id <= 0)
+            return;
+
+        var newRetryCount = action.RetryCount + 1;
+
+        if (newRetryCount > RetryDelays.Length)
+        {
+            // Exhausted all retries — drop the action and record a permanent failure.
+            await _indexedDb.RemovePendingActionAsync(action.Id);
+            await AppendLogAsync("error", action, $"Gave up after {newRetryCount} failed attempts: {errorMessage}", exception);
+            return;
+        }
+
+        var delay = RetryDelays[newRetryCount - 1];
+        var nextRetry = DateTime.UtcNow + delay;
+        await _indexedDb.UpdateRetryStateAsync(action.Id, nextRetry.ToString("O"), newRetryCount, errorMessage);
+        await AppendLogAsync("warn", action, $"Attempt {newRetryCount} failed, retrying in {FormatDelay(delay)}: {errorMessage}", exception);
+    }
+
+    private async Task AppendLogAsync(string level, PendingActionDto? action, string message, Exception? exception = null)
+    {
+        try
+        {
+            var entry = new SyncLogEntry
+            {
+                Timestamp = DateTime.UtcNow.ToString("O"),
+                Level = level,
+                ActionId = action?.Id,
+                ActionType = action?.ActionType,
+                TicketId = action?.TicketId,
+                Message = message,
+                Exception = exception?.ToString()
+            };
+            await _indexedDb.AppendSyncLogAsync(JsonSerializer.Serialize(entry, JsonOptions));
+        }
+        catch
+        {
+            // Logging must never throw back into the sync loop.
+        }
+    }
+
+    private static bool TryParseUtc(string value, out DateTime utc)
+    {
+        if (DateTime.TryParse(value, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out utc))
+            return true;
+        utc = default;
+        return false;
+    }
+
+    private static string FormatDelay(TimeSpan delay)
+    {
+        if (delay.TotalMinutes >= 1) return $"{(int)delay.TotalMinutes}min";
+        return $"{(int)delay.TotalSeconds}s";
     }
 
     private static string FormatTimeAgo(DateTime utcTime)
@@ -269,7 +453,7 @@ public class SyncService : ISyncService
     {
         Id = dto.Id,
         ActionType = dto.ActionType,
-        PayloadJson = JsonSerializer.Serialize(dto),
+        PayloadJson = JsonSerializer.Serialize(dto, JsonOptions),
         CreatedAt = DateTime.TryParse(dto.CreatedAt, out var dt) ? dt : DateTime.UtcNow,
         RetryCount = dto.RetryCount,
         TicketUpdatedAt = DateTime.TryParse(dto.TicketUpdatedAt, out var tdt) ? tdt : null,
@@ -284,25 +468,14 @@ public class SyncService : ISyncService
         PendingCountChanged?.Invoke(_appState.PendingActionsCount);
     }
 
-    private class PendingActionDto
+    private sealed class SyncLogEntry
     {
-        public int Id { get; set; }
-        public string ActionType { get; set; } = string.Empty;
+        public string Timestamp { get; set; } = string.Empty;
+        public string Level { get; set; } = string.Empty;
+        public int? ActionId { get; set; }
+        public string? ActionType { get; set; }
         public string? TicketId { get; set; }
-        public int TicketUid { get; set; }
-        public string? OwnerId { get; set; }
-        public string? Content { get; set; }
-        public string? Subject { get; set; }
-        public string? Issue { get; set; }
-        public string? TypeId { get; set; }
-        public string? PriorityId { get; set; }
-        public string? GroupId { get; set; }
-        public string? TargetUserId { get; set; }
-        public string? StatusId { get; set; }
-        public string? TicketUpdatedAt { get; set; }
-        public string? CreatedAt { get; set; }
-        public int RetryCount { get; set; }
-        public bool IsConflicted { get; set; }
-        public string? ConflictReason { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string? Exception { get; set; }
     }
 }

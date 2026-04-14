@@ -24,4 +24,8 @@
     <ProjectReference Include="..\THWTicketApp.Shared\THWTicketApp.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="THWTicketApp.Tests" />
+  </ItemGroup>
+
 </Project>
