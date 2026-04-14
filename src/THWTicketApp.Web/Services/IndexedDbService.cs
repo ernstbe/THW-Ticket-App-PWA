@@ -73,10 +73,10 @@ public class IndexedDbService : IIndexedDbService, IAsyncDisposable
         await module.InvokeAsync<bool>("clearPendingActions");
     }
 
-    public async Task<bool> MarkActionConflictedAsync(int id, string reason)
+    public async Task<bool> MarkActionConflictedAsync(int id, string reason, string conflictType)
     {
         var module = await GetModuleAsync();
-        return await module.InvokeAsync<bool>("markActionConflicted", id, reason);
+        return await module.InvokeAsync<bool>("markActionConflicted", id, reason, conflictType);
     }
 
     public async Task<string> GetConflictedActionsAsync()

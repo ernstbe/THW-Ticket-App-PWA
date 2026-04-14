@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NSubstitute;
+using THWTicketApp.Shared.Data;
 using THWTicketApp.Shared.Models;
 using THWTicketApp.Shared.Services;
 using THWTicketApp.Web.Services;
@@ -322,6 +323,133 @@ public class SyncServiceTests
         await _sut.SyncPendingActionsAsync();
 
         await _db.Received().AppendSyncLogAsync(Arg.Is<string>(s => s.Contains("\"level\":\"info\"") && s.Contains("Synced successfully")));
+    }
+
+    // ---------------------------------------------------------------------
+    // R2.2 — Conflict detection with typed results
+    // ---------------------------------------------------------------------
+
+    private PendingActionDto ActionTargetingTicket(string actionType = "AddComment", string? statusId = null, string? ticketUpdatedAt = null)
+        => new()
+        {
+            Id = 100,
+            ActionType = actionType,
+            TicketId = "t1",
+            TicketUid = 1001,
+            OwnerId = "u1",
+            Content = "hi",
+            StatusId = statusId,
+            TicketUpdatedAt = ticketUpdatedAt ?? "2026-04-01T10:00:00.0000000Z"
+        };
+
+    [Fact]
+    public async Task CheckConflict_ticketDeleted_returnsTicketDeletedType()
+    {
+        _api.GetTicketRawAsync("1001").Returns((404, "{\"success\":false,\"error\":\"not found\"}"));
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket());
+
+        Assert.NotNull(result);
+        Assert.Equal(ConflictType.TicketDeleted, result!.Type);
+    }
+
+    [Fact]
+    public async Task CheckConflict_ticketDeleted_isNotAConflictForDeleteTicketAction()
+    {
+        _api.GetTicketRawAsync("1001").Returns((404, ""));
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket("DeleteTicket"));
+
+        Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData(401)]
+    [InlineData(403)]
+    public async Task CheckConflict_authFailure_returnsPermissionRevoked(int statusCode)
+    {
+        _api.GetTicketRawAsync("1001").Returns((statusCode, "{\"error\":\"forbidden\"}"));
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket());
+
+        Assert.NotNull(result);
+        Assert.Equal(ConflictType.PermissionRevoked, result!.Type);
+    }
+
+    [Fact]
+    public async Task CheckConflict_transientError_returnsNullSoRetryLoopTakesOver()
+    {
+        _api.GetTicketRawAsync("1001").Returns((500, "boom"));
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task CheckConflict_sameUpdatedTimestamp_returnsNull()
+    {
+        var baseline = "2026-04-01T10:00:00.0000000Z";
+        _api.GetTicketRawAsync("1001").Returns((200,
+            $"{{\"_id\":\"t1\",\"updated\":\"{baseline}\",\"status\":{{\"_id\":\"s1\"}}}}"));
+
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket(ticketUpdatedAt: baseline));
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task CheckConflict_driftedUpdatedTimestamp_returnsTicketUpdated()
+    {
+        _api.GetTicketRawAsync("1001").Returns((200,
+            "{\"_id\":\"t1\",\"updated\":\"2026-04-05T12:00:00.0000000Z\",\"status\":{\"_id\":\"s1\"}}"));
+
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket(ticketUpdatedAt: "2026-04-01T10:00:00.0000000Z"));
+
+        Assert.NotNull(result);
+        Assert.Equal(ConflictType.TicketUpdated, result!.Type);
+    }
+
+    [Fact]
+    public async Task CheckConflict_updateStatusAgainstDifferentServerStatus_returnsStatusChanged()
+    {
+        _api.GetTicketRawAsync("1001").Returns((200,
+            "{\"_id\":\"t1\",\"updated\":\"2026-04-05T12:00:00.0000000Z\",\"status\":{\"_id\":\"s-other\"}}"));
+
+        var action = ActionTargetingTicket("UpdateStatus", statusId: "s-wanted", ticketUpdatedAt: "2026-04-01T10:00:00.0000000Z");
+        var result = await _sut.CheckConflictAsync(action);
+
+        Assert.NotNull(result);
+        Assert.Equal(ConflictType.StatusChanged, result!.Type);
+    }
+
+    [Fact]
+    public async Task CheckConflict_updateStatusAgainstSameServerStatus_fallsBackToTicketUpdated()
+    {
+        // Someone else touched a different field but kept the same status.
+        // Our UpdateStatus action could still be considered "done" by the server,
+        // so it's classified as a generic TicketUpdated (not StatusChanged).
+        _api.GetTicketRawAsync("1001").Returns((200,
+            "{\"_id\":\"t1\",\"updated\":\"2026-04-05T12:00:00.0000000Z\",\"status\":{\"_id\":\"s-wanted\"}}"));
+
+        var action = ActionTargetingTicket("UpdateStatus", statusId: "s-wanted", ticketUpdatedAt: "2026-04-01T10:00:00.0000000Z");
+        var result = await _sut.CheckConflictAsync(action);
+
+        Assert.NotNull(result);
+        Assert.Equal(ConflictType.TicketUpdated, result!.Type);
+    }
+
+    [Fact]
+    public async Task Sync_withTicketDeletedConflict_marksActionWithTypedReason()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 200, ActionType = "AddComment",
+            TicketId = "t1", TicketUid = 1001, OwnerId = "u1", Content = "hi",
+            TicketUpdatedAt = "2026-04-01T10:00:00.0000000Z"
+        });
+        _api.GetTicketRawAsync("1001").Returns((404, ""));
+
+        await _sut.SyncPendingActionsAsync();
+
+        await _db.Received(1).MarkActionConflictedAsync(200, Arg.Any<string>(), "TicketDeleted");
+        await _api.DidNotReceive().AddCommentAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]

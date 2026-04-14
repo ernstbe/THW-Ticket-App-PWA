@@ -13,7 +13,7 @@ public interface IIndexedDbService
     Task RemovePendingActionAsync(int id);
     Task ClearPendingActionsAsync();
 
-    Task<bool> MarkActionConflictedAsync(int id, string reason);
+    Task<bool> MarkActionConflictedAsync(int id, string reason, string conflictType);
     Task<string> GetConflictedActionsAsync();
 
     Task<bool> UpdateRetryStateAsync(int id, string nextRetryAtIso, int retryCount, string? errorMessage);

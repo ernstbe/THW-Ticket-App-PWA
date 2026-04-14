@@ -31,4 +31,5 @@ internal sealed class PendingActionDto
     public string? LastErrorMessage { get; set; }
     public bool IsConflicted { get; set; }
     public string? ConflictReason { get; set; }
+    public string? ConflictType { get; set; }
 }
