@@ -137,7 +137,7 @@
     protected override async Task OnInitializedAsync()
     {
         _unreadNotifications = await ApiService.GetNotificationCountAsync();
-        RealtimeService.TicketEvent += OnTicketEvent;
+        RealtimeService.NotificationUpdate += OnNotificationUpdate;
         L.LanguageChanged += OnLanguageChanged;
         await RealtimeService.ConnectAsync();
     }
@@ -167,10 +167,17 @@
 
     private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
 
-    private void OnTicketEvent(string eventName, string ticketId)
+    private async void OnNotificationUpdate()
     {
-        _unreadNotifications++;
-        InvokeAsync(StateHasChanged);
+        try
+        {
+            _unreadNotifications = await ApiService.GetNotificationCountAsync();
+        }
+        catch
+        {
+            _unreadNotifications++;
+        }
+        await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]
@@ -191,7 +198,7 @@
 
     public void Dispose()
     {
-        RealtimeService.TicketEvent -= OnTicketEvent;
+        RealtimeService.NotificationUpdate -= OnNotificationUpdate;
         L.LanguageChanged -= OnLanguageChanged;
         _dotNetRef?.Dispose();
     }

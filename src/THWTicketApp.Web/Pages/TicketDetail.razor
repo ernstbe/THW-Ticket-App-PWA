@@ -13,6 +13,7 @@
 @inject ISnackbar Snackbar
 @inject LocalStorageService LocalStorage
 @inject LocalizationService L
+@inject THWTicketApp.Web.Services.RealtimeService Realtime
 @implements IDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
@@ -501,6 +502,8 @@ else
     private int _totalTimeMinutes;
     private System.Threading.Timer? _timer;
 
+    private CancellationTokenSource? _refreshDebounceCts;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadTicketAsync();
@@ -510,6 +513,25 @@ else
         await LoadTimeEntriesAsync();
         await LoadQuickRepliesAsync();
         await LoadSubscriptionStateAsync();
+        Realtime.AnyTicketChanged += OnRealtimeChange;
+    }
+
+    private void OnRealtimeChange(string ticketId)
+    {
+        if (string.IsNullOrEmpty(ticketId) || _ticket?.Id != ticketId) return;
+        _refreshDebounceCts?.Cancel();
+        _refreshDebounceCts = new CancellationTokenSource();
+        var token = _refreshDebounceCts.Token;
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await Task.Delay(400, token);
+                if (token.IsCancellationRequested) return;
+                await LoadTicketAsync();
+            }
+            catch (TaskCanceledException) { }
+        });
     }
 
     private async Task LoadTicketAsync()
@@ -935,6 +957,9 @@ else
 
     public void Dispose()
     {
+        Realtime.AnyTicketChanged -= OnRealtimeChange;
+        _refreshDebounceCts?.Cancel();
+        _refreshDebounceCts?.Dispose();
         _timer?.Dispose();
     }
 

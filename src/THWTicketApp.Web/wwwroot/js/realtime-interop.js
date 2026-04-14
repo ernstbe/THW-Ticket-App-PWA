@@ -43,6 +43,7 @@ export function connect(serverUrl, token, objRef) {
             '$trudesk:tickets:ui:priority:update': 'priorityUpdated',
             '$trudesk:tickets:ui:type:update':     'typeUpdated',
             '$trudesk:tickets:ui:group:update':    'groupUpdated',
+            '$trudesk:tickets:ui:duedate:update':  'duedateUpdated',
             '$trudesk:tickets:ui:tags:update':     'tagsUpdated',
             '$trudesk:tickets:comment_note:set':   'commentNoteAdded',
             '$trudesk:tickets:comment_note:remove':'commentNoteRemoved',

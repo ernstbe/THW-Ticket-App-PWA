@@ -10,6 +10,8 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LocalStorageService LocalStorage
+@inject THWTicketApp.Web.Services.RealtimeService Realtime
+@implements IDisposable
 
 <PageTitle>Tickets - THW Ticket App</PageTitle>
 
@@ -169,12 +171,39 @@ else
     private bool _showSaveFilterDialog;
     private string _saveFilterName = string.Empty;
 
+    private CancellationTokenSource? _refreshDebounceCts;
+
     protected override async Task OnInitializedAsync()
     {
         if (!string.IsNullOrEmpty(InitialFilter))
             _activeFilter = InitialFilter;
         await LoadSavedFiltersAsync();
         await LoadTicketsAsync();
+        Realtime.AnyTicketChanged += OnRealtimeChange;
+    }
+
+    private void OnRealtimeChange(string ticketId)
+    {
+        _refreshDebounceCts?.Cancel();
+        _refreshDebounceCts = new CancellationTokenSource();
+        var token = _refreshDebounceCts.Token;
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await Task.Delay(400, token);
+                if (token.IsCancellationRequested) return;
+                await LoadTicketsAsync();
+            }
+            catch (TaskCanceledException) { }
+        });
+    }
+
+    public void Dispose()
+    {
+        Realtime.AnyTicketChanged -= OnRealtimeChange;
+        _refreshDebounceCts?.Cancel();
+        _refreshDebounceCts?.Dispose();
     }
 
     private async Task LoadTicketsAsync()
