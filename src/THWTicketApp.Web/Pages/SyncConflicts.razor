@@ -1,7 +1,8 @@
 @page "/sync-conflicts"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using THWTicketApp.Shared.Data
-@inject THWTicketApp.Web.Services.SyncService SyncService
+@using THWTicketApp.Shared.Services
+@inject ISyncService SyncService
 @inject ISnackbar Snackbar
 
 <PageTitle>Sync-Konflikte - THW Ticket App</PageTitle>
@@ -30,27 +31,38 @@ else
 
     @foreach (var conflict in _conflicts)
     {
-        <MudCard Class="mb-3" Elevation="2">
+        var branch = GetConflictBranch(conflict.ConflictType);
+        <MudCard Class="mb-3" Elevation="2" data-conflict-type="@conflict.ConflictType">
             <MudCardContent>
                 <div class="d-flex align-center gap-3 mb-2">
-                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
+                    <MudIcon Icon="@branch.Icon" Color="@branch.IconColor" />
                     <MudText Typo="Typo.h6">@TranslateActionType(conflict.ActionType)</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@branch.IconColor" Variant="Variant.Outlined">
+                        @branch.Label
+                    </MudChip>
                     <MudSpacer />
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">
                         @conflict.CreatedAt.ToString("dd.MM.yyyy HH:mm")
                     </MudText>
                 </div>
-                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
-                    @conflict.ConflictReason
+                <MudAlert Severity="@branch.AlertSeverity" Dense="true" Class="mb-2">
+                    @(conflict.ConflictReason ?? branch.Label)
                 </MudAlert>
+                @if (branch.Advice is not null)
+                {
+                    <MudText Typo="Typo.caption" Class="mt-1">@branch.Advice</MudText>
+                }
             </MudCardContent>
             <MudCardActions>
-                <MudButton Variant="Variant.Filled" Color="Color.Warning"
-                           StartIcon="@Icons.Material.Filled.PublishedWithChanges"
-                           OnClick="@(() => ForceApplyAsync(conflict))"
-                           Disabled="_processing">
-                    Trotzdem anwenden
-                </MudButton>
+                @if (branch.AllowForceApply)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                               StartIcon="@Icons.Material.Filled.PublishedWithChanges"
+                               OnClick="@(() => ForceApplyAsync(conflict))"
+                               Disabled="_processing">
+                        Trotzdem anwenden
+                    </MudButton>
+                }
                 <MudButton Variant="Variant.Outlined" Color="Color.Error"
                            StartIcon="@Icons.Material.Filled.Delete"
                            OnClick="@(() => DiscardAsync(conflict))"
@@ -125,7 +137,52 @@ else
         _processing = false;
     }
 
-    private static string TranslateActionType(string actionType) => actionType switch
+    internal record ConflictBranch(string Label, string Icon, Color IconColor, Severity AlertSeverity, bool AllowForceApply, string? Advice);
+
+    internal static ConflictBranch GetConflictBranch(ConflictType type) => type switch
+    {
+        ConflictType.TicketDeleted => new(
+            Label: "Ticket gelöscht",
+            Icon: Icons.Material.Filled.DeleteForever,
+            IconColor: Color.Error,
+            AlertSeverity: Severity.Error,
+            AllowForceApply: false,
+            Advice: "Da das Ticket serverseitig nicht mehr existiert, kann die Aktion nur verworfen werden."),
+
+        ConflictType.PermissionRevoked => new(
+            Label: "Keine Berechtigung",
+            Icon: Icons.Material.Filled.Block,
+            IconColor: Color.Error,
+            AlertSeverity: Severity.Error,
+            AllowForceApply: false,
+            Advice: "Deine Berechtigung für dieses Ticket wurde entzogen. Bitte wende dich an einen Administrator."),
+
+        ConflictType.StatusChanged => new(
+            Label: "Status bereits geändert",
+            Icon: Icons.Material.Filled.SyncProblem,
+            IconColor: Color.Warning,
+            AlertSeverity: Severity.Warning,
+            AllowForceApply: true,
+            Advice: "Jemand anderes hat den Status in der Zwischenzeit gesetzt. Erzwingen überschreibt diesen Wert."),
+
+        ConflictType.TicketUpdated => new(
+            Label: "Ticket bearbeitet",
+            Icon: Icons.Material.Filled.Warning,
+            IconColor: Color.Warning,
+            AlertSeverity: Severity.Warning,
+            AllowForceApply: true,
+            Advice: null),
+
+        _ => new(
+            Label: "Konflikt",
+            Icon: Icons.Material.Filled.Warning,
+            IconColor: Color.Warning,
+            AlertSeverity: Severity.Warning,
+            AllowForceApply: true,
+            Advice: null)
+    };
+
+    internal static string TranslateActionType(string actionType) => actionType switch
     {
         "AddComment" => "Kommentar hinzufügen",
         "AddNote" => "Notiz hinzufügen",
@@ -133,6 +190,9 @@ else
         "UpdateStatus" => "Status ändern",
         "CreateTicket" => "Neues Ticket erstellen",
         "ClearAssignee" => "Zuweisung entfernen",
+        "UpdateTicketFields" => "Ticket-Felder aktualisieren",
+        "DeleteTicket" => "Ticket löschen",
+        "UploadAttachment" => "Anhang hochladen",
         _ => actionType
     };
 }

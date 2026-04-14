@@ -10,4 +10,5 @@ public class PendingAction
     public DateTime? TicketUpdatedAt { get; set; }
     public bool IsConflicted { get; set; }
     public string? ConflictReason { get; set; }
+    public ConflictType ConflictType { get; set; } = ConflictType.None;
 }

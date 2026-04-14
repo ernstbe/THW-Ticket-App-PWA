@@ -109,7 +109,7 @@ export async function clearPendingActions() {
     return true;
 }
 
-export async function markActionConflicted(id, reason) {
+export async function markActionConflicted(id, reason, conflictType) {
     const database = await openDb();
     return new Promise((resolve, reject) => {
         const tx = database.transaction('pendingActions', 'readwrite');
@@ -120,6 +120,7 @@ export async function markActionConflicted(id, reason) {
             if (action) {
                 action.isConflicted = true;
                 action.conflictReason = reason;
+                action.conflictType = conflictType || 'TicketUpdated';
                 store.put(action);
                 resolve(true);
             } else {

@@ -243,6 +243,13 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
+    public async Task<(int StatusCode, string Body)> GetTicketRawAsync(string ticketUid)
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/tickets/{ticketUid}"));
+        var body = await response.Content.ReadAsStringAsync();
+        return ((int)response.StatusCode, body);
+    }
+
     public async Task<string> AddTicketAsync(string title, string description, string? assigneeId)
     {
         if (string.IsNullOrWhiteSpace(title))

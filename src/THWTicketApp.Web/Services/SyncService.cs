@@ -205,14 +205,15 @@ public class SyncService : ISyncService
                     if (NeedsConflictCheck(action))
                     {
                         var conflict = await CheckConflictAsync(action);
-                        if (conflict != null)
+                        if (conflict is { } c && c.Type != ConflictType.None)
                         {
-                            await _indexedDb.MarkActionConflictedAsync(action.Id, conflict);
+                            await _indexedDb.MarkActionConflictedAsync(action.Id, c.Reason, c.Type.ToString());
                             var pa = ToPendingAction(action);
                             pa.IsConflicted = true;
-                            pa.ConflictReason = conflict;
+                            pa.ConflictReason = c.Reason;
+                            pa.ConflictType = c.Type;
                             ConflictDetected?.Invoke(pa);
-                            await AppendLogAsync("warn", action, $"Conflict detected: {conflict}");
+                            await AppendLogAsync("warn", action, $"Conflict ({c.Type}): {c.Reason}");
                             allSuccess = false;
                             continue;
                         }
@@ -337,23 +338,58 @@ public class SyncService : ISyncService
     private static bool NeedsConflictCheck(PendingActionDto action)
     {
         // Actions that target an existing ticket's state need conflict checks.
-        // CreateTicket has no pre-existing ticket; DeleteTicket & UploadAttachment
-        // intentionally bypass the updated-field check since deletion and
-        // attachments shouldn't block on unrelated edits.
-        if (action.ActionType is "CreateTicket" or "DeleteTicket" or "UploadAttachment")
+        // CreateTicket has no pre-existing ticket; UploadAttachment intentionally
+        // bypasses the updated-field check since attachments shouldn't block on
+        // unrelated edits. DeleteTicket DOES check — if the ticket is already
+        // gone, we want to surface that as TicketDeleted rather than silently
+        // retrying and failing.
+        if (action.ActionType is "CreateTicket" or "UploadAttachment")
             return false;
-        return !string.IsNullOrEmpty(action.TicketId) && !string.IsNullOrEmpty(action.TicketUpdatedAt);
+        return !string.IsNullOrEmpty(action.TicketId) && action.TicketUid > 0;
     }
 
-    private async Task<string?> CheckConflictAsync(PendingActionDto action)
+    internal async Task<ConflictResult?> CheckConflictAsync(PendingActionDto action)
     {
-        if (string.IsNullOrEmpty(action.TicketUpdatedAt) || action.TicketUid <= 0)
+        if (action.TicketUid <= 0)
             return null;
 
+        (int statusCode, string body) response;
         try
         {
-            var ticketJson = await _apiService.GetTicketAsync(action.TicketUid.ToString());
-            using var doc = JsonDocument.Parse(ticketJson);
+            response = await _apiService.GetTicketRawAsync(action.TicketUid.ToString());
+        }
+        catch
+        {
+            // Network error — allow the normal retry loop to handle it.
+            return null;
+        }
+
+        // 404 — ticket was deleted server-side since the action was queued.
+        if (response.statusCode == 404)
+        {
+            if (action.ActionType == "DeleteTicket")
+                return null; // our action's goal was achieved by someone else
+            return new ConflictResult(
+                ConflictType.TicketDeleted,
+                "Das Ticket wurde serverseitig gelöscht, seit die Aktion erstellt wurde.");
+        }
+
+        // 401/403 — the user lost access to the ticket.
+        if (response.statusCode is 401 or 403)
+        {
+            return new ConflictResult(
+                ConflictType.PermissionRevoked,
+                "Keine Berechtigung mehr für dieses Ticket.");
+        }
+
+        // Non-success for any other reason — treat as transient, let retry handle it.
+        if (response.statusCode < 200 || response.statusCode >= 300)
+            return null;
+
+        // Happy path: parse body and look for update/status drift.
+        try
+        {
+            using var doc = JsonDocument.Parse(response.body);
 
             // Navigate to ticket data (handles both v1 and v2 response formats)
             JsonElement ticketEl;
@@ -364,20 +400,55 @@ public class SyncService : ISyncService
             else
                 ticketEl = doc.RootElement;
 
-            if (ticketEl.TryGetProperty("updated", out var updatedEl))
+            // No expected baseline to compare against — skip.
+            if (string.IsNullOrEmpty(action.TicketUpdatedAt))
+                return null;
+
+            if (!ticketEl.TryGetProperty("updated", out var updatedEl))
+                return null;
+
+            var serverUpdated = updatedEl.GetString();
+            if (string.IsNullOrEmpty(serverUpdated) || serverUpdated == action.TicketUpdatedAt)
+                return null;
+
+            // Ticket has drifted. Is it specifically a status change while our
+            // action is an UpdateStatus targeting a different status?
+            if (action.ActionType == "UpdateStatus"
+                && !string.IsNullOrEmpty(action.StatusId)
+                && ticketEl.TryGetProperty("status", out var statusEl))
             {
-                var serverUpdated = updatedEl.GetString();
-                if (!string.IsNullOrEmpty(serverUpdated) && serverUpdated != action.TicketUpdatedAt)
+                var serverStatusId = ExtractStatusId(statusEl);
+                if (!string.IsNullOrEmpty(serverStatusId) && serverStatusId != action.StatusId)
                 {
-                    var updatedTime = DateTime.TryParse(serverUpdated, out var dt)
-                        ? $"vor {FormatTimeAgo(dt)}" : "kürzlich";
-                    return $"Ticket wurde {updatedTime} geändert (seitdem die Aktion erstellt wurde)";
+                    return new ConflictResult(
+                        ConflictType.StatusChanged,
+                        $"Der Status wurde bereits auf einen anderen Wert geändert.");
                 }
             }
+
+            var updatedTime = TryParseUtc(serverUpdated, out var dt)
+                ? $"vor {FormatTimeAgo(dt)}" : "kürzlich";
+            return new ConflictResult(
+                ConflictType.TicketUpdated,
+                $"Ticket wurde {updatedTime} geändert (seitdem die Aktion erstellt wurde)");
         }
         catch
         {
-            // Cannot check - allow the action to proceed
+            // Body isn't parseable — can't confirm a conflict, let the apply step try.
+            return null;
+        }
+    }
+
+    private static string? ExtractStatusId(JsonElement statusEl)
+    {
+        // trudesk returns status as either a populated object {_id, name, ...}
+        // or the raw id string, depending on the endpoint version.
+        if (statusEl.ValueKind == JsonValueKind.String)
+            return statusEl.GetString();
+        if (statusEl.ValueKind == JsonValueKind.Object)
+        {
+            if (statusEl.TryGetProperty("_id", out var idEl)) return idEl.GetString();
+            if (statusEl.TryGetProperty("id", out var idEl2)) return idEl2.GetString();
         }
         return null;
     }
@@ -458,7 +529,8 @@ public class SyncService : ISyncService
         RetryCount = dto.RetryCount,
         TicketUpdatedAt = DateTime.TryParse(dto.TicketUpdatedAt, out var tdt) ? tdt : null,
         IsConflicted = dto.IsConflicted,
-        ConflictReason = dto.ConflictReason
+        ConflictReason = dto.ConflictReason,
+        ConflictType = Enum.TryParse<ConflictType>(dto.ConflictType, out var ct) ? ct : ConflictType.None
     };
 
     private async Task UpdatePendingCount()
