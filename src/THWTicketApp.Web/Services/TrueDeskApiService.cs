@@ -34,6 +34,9 @@ public class TrueDeskApiService : ITrueDeskApiService
     private bool IsV2 => BaseUrl.Contains("/api/v2");
     // Some endpoints only exist in v1 - use this for those calls
     private string V1BaseUrl => ServerUrl + "/api/v1";
+    // Newer CRUD endpoints (teams, departments, ticket-templates, calendar,
+    // recurring tasks, assets) exist only under v2 regardless of the configured base URL.
+    private string V2BaseUrl => ServerUrl + "/api/v2";
 
     private void SetAuthHeader(string? token)
     {
@@ -681,5 +684,212 @@ public class TrueDeskApiService : ITrueDeskApiService
             ".zip" => "application/zip",
             _ => "application/octet-stream"
         };
+    }
+
+    // -----------------------------------------------------------------
+    // Teams (v2)
+    // -----------------------------------------------------------------
+
+    public async Task<string> GetTeamsAsync()
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/teams"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<string> GetTeamAsync(string teamId)
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/teams/{teamId}"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<bool> CreateTeamAsync(Dictionary<string, object?> teamData)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(teamData), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/teams", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UpdateTeamAsync(string teamId, Dictionary<string, object?> teamData)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(teamData), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/teams/{teamId}", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteTeamAsync(string teamId)
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/teams/{teamId}"));
+        return response.IsSuccessStatusCode;
+    }
+
+    // -----------------------------------------------------------------
+    // Departments (v2)
+    // -----------------------------------------------------------------
+
+    public async Task<string> GetDepartmentsAsync()
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/departments"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<string> GetDepartmentAsync(string departmentId)
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/departments/{departmentId}"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<bool> CreateDepartmentAsync(Dictionary<string, object?> departmentData)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(departmentData), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/departments", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UpdateDepartmentAsync(string departmentId, Dictionary<string, object?> departmentData)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(departmentData), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/departments/{departmentId}", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteDepartmentAsync(string departmentId)
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/departments/{departmentId}"));
+        return response.IsSuccessStatusCode;
+    }
+
+    // -----------------------------------------------------------------
+    // Ticket Templates (v2)
+    // -----------------------------------------------------------------
+
+    public async Task<string> GetTicketTemplatesAsync()
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/ticket-templates"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<string> GetTicketTemplateAsync(string templateId)
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/ticket-templates/{templateId}"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<bool> CreateTicketTemplateAsync(Dictionary<string, object?> templateData)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(templateData), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/ticket-templates", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UpdateTicketTemplateAsync(string templateId, Dictionary<string, object?> templateData)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(templateData), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/ticket-templates/{templateId}", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteTicketTemplateAsync(string templateId)
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/ticket-templates/{templateId}"));
+        return response.IsSuccessStatusCode;
+    }
+
+    // -----------------------------------------------------------------
+    // Calendar (v2)
+    // -----------------------------------------------------------------
+
+    public async Task<string> GetCalendarEventsAsync(DateTime? from = null, DateTime? to = null)
+    {
+        var query = new List<string>();
+        if (from.HasValue) query.Add($"from={Uri.EscapeDataString(from.Value.ToUniversalTime().ToString("O"))}");
+        if (to.HasValue) query.Add($"to={Uri.EscapeDataString(to.Value.ToUniversalTime().ToString("O"))}");
+        var qs = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/calendar/events{qs}"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    // -----------------------------------------------------------------
+    // Ticket tags — implemented on top of the existing ticket update endpoint.
+    // trudesk doesn't expose a dedicated /tickets/:uid/tags endpoint, so Add/Remove
+    // do a read-modify-write cycle via GetTicketRawAsync + PUT /tickets/:uid.
+    // -----------------------------------------------------------------
+
+    public async Task<bool> UpdateTicketTagsAsync(string ticketId, IEnumerable<string> tagIds)
+    {
+        if (string.IsNullOrWhiteSpace(ticketId)) return false;
+        var payload = new Dictionary<string, object?> { ["tags"] = tagIds.ToArray() };
+        object body = IsV2 ? new { ticket = payload } : (object)payload;
+        var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{ticketId}", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> AddTagToTicketAsync(string ticketId, string tagId)
+    {
+        if (string.IsNullOrWhiteSpace(ticketId) || string.IsNullOrWhiteSpace(tagId)) return false;
+        var current = await ReadTicketTagsAsync(ticketId);
+        if (current == null) return false;
+        if (current.Contains(tagId)) return true; // already present, no-op
+        current.Add(tagId);
+        return await UpdateTicketTagsAsync(ticketId, current);
+    }
+
+    public async Task<bool> RemoveTagFromTicketAsync(string ticketId, string tagId)
+    {
+        if (string.IsNullOrWhiteSpace(ticketId) || string.IsNullOrWhiteSpace(tagId)) return false;
+        var current = await ReadTicketTagsAsync(ticketId);
+        if (current == null) return false;
+        if (!current.Remove(tagId)) return true; // already absent, no-op
+        return await UpdateTicketTagsAsync(ticketId, current);
+    }
+
+    private async Task<List<string>?> ReadTicketTagsAsync(string ticketId)
+    {
+        var (status, body) = await GetTicketRawAsync(ticketId);
+        if (status < 200 || status >= 300) return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            JsonElement ticketEl;
+            if (doc.RootElement.TryGetProperty("data", out var dataEl) && dataEl.ValueKind == JsonValueKind.Object)
+                ticketEl = dataEl;
+            else if (doc.RootElement.TryGetProperty("ticket", out var tEl))
+                ticketEl = tEl;
+            else
+                ticketEl = doc.RootElement;
+
+            if (!ticketEl.TryGetProperty("tags", out var tagsEl) || tagsEl.ValueKind != JsonValueKind.Array)
+                return new List<string>();
+
+            var result = new List<string>();
+            foreach (var t in tagsEl.EnumerateArray())
+            {
+                if (t.ValueKind == JsonValueKind.String)
+                {
+                    var s = t.GetString();
+                    if (!string.IsNullOrEmpty(s)) result.Add(s);
+                }
+                else if (t.ValueKind == JsonValueKind.Object)
+                {
+                    if (t.TryGetProperty("_id", out var idEl) && idEl.ValueKind == JsonValueKind.String)
+                        result.Add(idEl.GetString()!);
+                    else if (t.TryGetProperty("id", out var idEl2) && idEl2.ValueKind == JsonValueKind.String)
+                        result.Add(idEl2.GetString()!);
+                }
+            }
+            return result;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
