@@ -807,13 +807,15 @@ public class TrueDeskApiService : ITrueDeskApiService
     // Calendar (v2)
     // -----------------------------------------------------------------
 
-    public async Task<string> GetCalendarEventsAsync(DateTime? from = null, DateTime? to = null)
+    public async Task<string> GetCalendarEventsAsync(DateTime start, DateTime end)
     {
-        var query = new List<string>();
-        if (from.HasValue) query.Add($"from={Uri.EscapeDataString(from.Value.ToUniversalTime().ToString("O"))}");
-        if (to.HasValue) query.Add($"to={Uri.EscapeDataString(to.Value.ToUniversalTime().ToString("O"))}");
-        var qs = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/calendar/events{qs}"));
+        // Backend contract: start and end are both REQUIRED query params.
+        // trudesk/src/controllers/api/v2/calendar.js:8-10 rejects missing bounds
+        // with a 400, and reads them as `start` / `end` — not `from` / `to`.
+        var startIso = Uri.EscapeDataString(start.ToUniversalTime().ToString("O"));
+        var endIso = Uri.EscapeDataString(end.ToUniversalTime().ToString("O"));
+        var response = await SendWithAutoRefreshAsync(() =>
+            _httpClient.GetAsync($"{V2BaseUrl}/calendar/events?start={startIso}&end={endIso}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }

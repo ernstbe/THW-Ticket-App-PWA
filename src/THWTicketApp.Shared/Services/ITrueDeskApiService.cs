@@ -96,7 +96,7 @@ public interface ITrueDeskApiService
     Task<bool> DeleteTicketTemplateAsync(string templateId);
 
     // Calendar (v2)
-    Task<string> GetCalendarEventsAsync(DateTime? from = null, DateTime? to = null);
+    Task<string> GetCalendarEventsAsync(DateTime start, DateTime end);
 
     // Ticket tags — implemented on top of the existing ticket PUT endpoint
     Task<bool> UpdateTicketTagsAsync(string ticketId, IEnumerable<string> tagIds);

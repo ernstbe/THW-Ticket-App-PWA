@@ -1,0 +1,207 @@
+@page "/calendar"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<PageTitle>@L.T("nav.calendar") - THW Ticket App</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">@L.T("nav.calendar")</MudText>
+
+<div class="d-flex gap-2 mb-4 align-center flex-wrap">
+    <MudDatePicker Label="@L.T("calendar.from")" @bind-Date="_start" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" Style="max-width:200px" data-testid="cal-from" />
+    <MudDatePicker Label="@L.T("calendar.to")" @bind-Date="_end" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" Style="max-width:200px" data-testid="cal-to" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Search"
+               OnClick="LoadEventsAsync" Disabled="_isLoading">
+        @L.T("calendar.load")
+    </MudButton>
+    <MudButton Variant="Variant.Text"
+               OnClick="ResetToCurrentMonth" Disabled="_isLoading">
+        @L.T("calendar.this_month")
+    </MudButton>
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (!_isLoading && _events.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">@L.T("calendar.none")</MudAlert>
+}
+else
+{
+    @foreach (var group in GroupByDate(_events))
+    {
+        <MudText Typo="Typo.h6" Class="mt-4 mb-2">@group.Key.ToString("dddd, dd. MMMM yyyy")</MudText>
+        <MudPaper Elevation="0">
+            @foreach (var evt in group)
+            {
+                <div class="d-flex align-center gap-3 pa-2"
+                     data-testid="cal-event"
+                     data-event-type="@evt.Type"
+                     data-overdue="@(evt.IsOverdue.ToString().ToLowerInvariant())">
+                    <MudIcon Icon="@IconFor(evt.Type)" Color="@ColorFor(evt)" />
+                    <div class="flex-grow-1">
+                        <MudText Typo="Typo.body1">@evt.Title</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                            @evt.Start.ToLocalTime().ToString("HH:mm") · @LabelFor(evt.Type)
+                        </MudText>
+                    </div>
+                    @if (evt.Type == "ticket-deadline" && !string.IsNullOrEmpty(evt.ResourceUid))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
+                                       OnClick="() => OpenTicket(evt.ResourceUid!)"
+                                       aria-label="@L.T("calendar.open_ticket")" />
+                    }
+                </div>
+                <MudDivider />
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    private bool _isLoading;
+    private DateTime? _start;
+    private DateTime? _end;
+    private List<CalendarEventVm> _events = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        ResetToCurrentMonth();
+        await LoadEventsAsync();
+    }
+
+    private void ResetToCurrentMonth()
+    {
+        var now = DateTime.Now;
+        _start = new DateTime(now.Year, now.Month, 1);
+        _end = _start.Value.AddMonths(1).AddDays(-1);
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        if (_start is null || _end is null)
+        {
+            Snackbar.Add(L.T("calendar.range_required"), Severity.Warning);
+            return;
+        }
+        if (_end < _start)
+        {
+            Snackbar.Add(L.T("calendar.range_invalid"), Severity.Warning);
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var json = await ApiService.GetCalendarEventsAsync(
+                DateTime.SpecifyKind(_start.Value, DateTimeKind.Local).ToUniversalTime(),
+                DateTime.SpecifyKind(_end.Value.AddDays(1).AddSeconds(-1), DateTimeKind.Local).ToUniversalTime());
+            _events = ParseEvents(json);
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+            _events = new();
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenTicket(string uid) => Nav.NavigateTo($"/ticket/{uid}");
+
+    private static string IconFor(string type) => type switch
+    {
+        "ticket-deadline" => Icons.Material.Filled.ConfirmationNumber,
+        "recurring-task" => Icons.Material.Filled.Repeat,
+        _ => Icons.Material.Filled.Event
+    };
+
+    private static Color ColorFor(CalendarEventVm evt) => evt.IsOverdue
+        ? Color.Error
+        : evt.Type switch
+        {
+            "ticket-deadline" => Color.Info,
+            "recurring-task" => Color.Success,
+            _ => Color.Default
+        };
+
+    private string LabelFor(string type) => type switch
+    {
+        "ticket-deadline" => L.T("calendar.ticket_deadline"),
+        "recurring-task" => L.T("calendar.recurring_task"),
+        _ => type
+    };
+
+    // -----------------------------------------------------------------
+    // Exposed for unit tests
+    // -----------------------------------------------------------------
+
+    internal sealed class CalendarEventVm
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public DateTime Start { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string? ResourceUid { get; set; }
+        public bool IsOverdue { get; set; }
+    }
+
+    internal static List<CalendarEventVm> ParseEvents(string json, DateTime? now = null)
+    {
+        var clock = now ?? DateTime.UtcNow;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("events", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return new();
+
+            var list = new List<CalendarEventVm>();
+            foreach (var el in arr.EnumerateArray())
+            {
+                var start = el.TryGetProperty("start", out var startEl) && startEl.ValueKind == JsonValueKind.String
+                    ? DateTime.Parse(startEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind)
+                    : DateTime.MinValue;
+                var type = el.TryGetProperty("type", out var typeEl) ? typeEl.GetString() ?? "" : "";
+                list.Add(new CalendarEventVm
+                {
+                    Id = el.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "",
+                    Title = el.TryGetProperty("title", out var titleEl) ? titleEl.GetString() ?? "" : "",
+                    Start = start,
+                    Type = type,
+                    ResourceUid = el.TryGetProperty("resourceUid", out var uidEl) && uidEl.ValueKind == JsonValueKind.Number
+                        ? uidEl.GetInt32().ToString()
+                        : (el.TryGetProperty("resourceUid", out var uidStrEl) && uidStrEl.ValueKind == JsonValueKind.String
+                            ? uidStrEl.GetString()
+                            : null),
+                    IsOverdue = type == "ticket-deadline" && start != DateTime.MinValue && start.ToUniversalTime() < clock
+                });
+            }
+            return list;
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    internal static IEnumerable<IGrouping<DateTime, CalendarEventVm>> GroupByDate(List<CalendarEventVm> events)
+        => events
+            .OrderBy(e => e.Start)
+            .GroupBy(e => e.Start.ToLocalTime().Date);
+}

@@ -1,0 +1,247 @@
+@page "/templates"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<PageTitle>@L.T("nav.templates") - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">@L.T("nav.templates")</MudText>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="ShowCreateDialog">@L.T("templates.new")</MudButton>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTemplatesAsync" Disabled="_isLoading"
+                       aria-label="@L.T("common.refresh")" />
+    </div>
+</div>
+
+@if (_isLoading && _templates.Count == 0)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_templates.Count == 0 && !_isLoading)
+{
+    <MudAlert Severity="Severity.Info">@L.T("templates.none")</MudAlert>
+}
+else
+{
+    <MudTable Items="_templates" Hover="true" Breakpoint="Breakpoint.Sm" Dense="true">
+        <HeaderContent>
+            <MudTh>@L.T("templates.name")</MudTh>
+            <MudTh>@L.T("templates.subject")</MudTh>
+            <MudTh>@L.T("templates.issue_preview")</MudTh>
+            <MudTh>@L.T("common.edit")</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="@L.T("templates.name")">@context.Name</MudTd>
+            <MudTd DataLabel="@L.T("templates.subject")">@context.Subject</MudTd>
+            <MudTd DataLabel="@L.T("templates.issue_preview")">@TrimIssue(context.Issue)</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                               OnClick="() => ShowEditDialog(context)" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                               OnClick="() => DeleteTemplateAsync(context)"
+                               data-testid="tpl-delete-btn" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+<MudDialog @bind-Visible="_dialogVisible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editing == null ? L.T("templates.new") : L.T("common.edit"))</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_formName" Label="@L.T("templates.name")"
+                      Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+        <MudTextField @bind-Value="_formSubject" Label="@L.T("templates.subject")"
+                      Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+        <MudTextField @bind-Value="_formIssue" Label="@L.T("templates.issue")"
+                      Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _dialogVisible = false">@L.T("common.cancel")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync">@L.T("common.save")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _isLoading;
+    private List<TicketTemplateVm> _templates = new();
+    private bool _dialogVisible;
+    private TicketTemplateVm? _editing;
+    private string _formName = string.Empty;
+    private string _formSubject = string.Empty;
+    private string _formIssue = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await LoadTemplatesAsync();
+
+    private async Task LoadTemplatesAsync()
+    {
+        if (_isLoading) return;
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var json = await ApiService.GetTicketTemplatesAsync();
+            _templates = ParseTemplates(json);
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowCreateDialog()
+    {
+        _editing = null;
+        _formName = _formSubject = _formIssue = string.Empty;
+        _dialogVisible = true;
+    }
+
+    private void ShowEditDialog(TicketTemplateVm template)
+    {
+        _editing = template;
+        _formName = template.Name;
+        _formSubject = template.Subject;
+        _formIssue = template.Issue ?? string.Empty;
+        _dialogVisible = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        var validation = ValidateForm(_formName, _formSubject);
+        if (validation != null)
+        {
+            Snackbar.Add(L.T(validation), Severity.Warning);
+            return;
+        }
+
+        var data = BuildPayload(_formName, _formSubject, _formIssue);
+        bool ok;
+        try
+        {
+            ok = _editing is null
+                ? await ApiService.CreateTicketTemplateAsync(data)
+                : await ApiService.UpdateTicketTemplateAsync(_editing.Id, data);
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+
+        if (ok)
+        {
+            _dialogVisible = false;
+            Snackbar.Add(L.T("common.success"), Severity.Success);
+            await LoadTemplatesAsync();
+        }
+        else
+        {
+            Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+    }
+
+    private async Task DeleteTemplateAsync(TicketTemplateVm template)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, L.T("common.delete") },
+            { x => x.Message, L.T("templates.delete_confirm") },
+            { x => x.ConfirmText, L.T("common.delete") },
+            { x => x.CancelText, L.T("common.cancel") }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(null, parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        try
+        {
+            if (await ApiService.DeleteTicketTemplateAsync(template.Id))
+            {
+                Snackbar.Add(L.T("common.success"), Severity.Success);
+                await LoadTemplatesAsync();
+            }
+            else
+            {
+                Snackbar.Add(L.T("common.error"), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+    }
+
+    private static string TrimIssue(string? issue)
+    {
+        if (string.IsNullOrEmpty(issue)) return string.Empty;
+        return issue.Length <= 60 ? issue : issue[..60] + "…";
+    }
+
+    // Exposed for unit tests ---------------------------------------------
+
+    internal sealed class TicketTemplateVm
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Subject { get; set; } = string.Empty;
+        public string? Issue { get; set; }
+    }
+
+    internal static List<TicketTemplateVm> ParseTemplates(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("ticketTemplates", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return new();
+            var list = new List<TicketTemplateVm>();
+            foreach (var el in arr.EnumerateArray())
+            {
+                list.Add(new TicketTemplateVm
+                {
+                    Id = el.TryGetProperty("_id", out var idEl) ? idEl.GetString() ?? "" : "",
+                    Name = el.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "",
+                    Subject = el.TryGetProperty("subject", out var subjEl) ? subjEl.GetString() ?? "" : "",
+                    Issue = el.TryGetProperty("issue", out var issueEl) ? issueEl.GetString() : null
+                });
+            }
+            return list;
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    internal static string? ValidateForm(string? name, string? subject)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "templates.name_required";
+        if (string.IsNullOrWhiteSpace(subject)) return "templates.subject_required";
+        return null;
+    }
+
+    internal static Dictionary<string, object?> BuildPayload(string name, string subject, string? issue)
+        => new()
+        {
+            ["name"] = name.Trim(),
+            ["subject"] = subject.Trim(),
+            ["issue"] = string.IsNullOrWhiteSpace(issue) ? null : issue.Trim()
+        };
+}

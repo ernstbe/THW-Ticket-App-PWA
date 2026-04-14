@@ -154,26 +154,21 @@ public class TrueDeskApiServiceTests
     // -----------------------------------------------------------------
 
     [Fact]
-    public async Task GetCalendarEventsAsync_withoutRange_omitsQueryString()
+    public async Task GetCalendarEventsAsync_forwardsStartAndEndAsQueryParams()
     {
-        _handler.SetDefault(HttpStatusCode.OK, "[]");
-        await _sut.GetCalendarEventsAsync();
+        _handler.SetDefault(HttpStatusCode.OK, "{\"events\":[]}");
+        var start = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 5, 31, 23, 59, 59, DateTimeKind.Utc);
+
+        await _sut.GetCalendarEventsAsync(start, end);
+
         Assert.Equal("/api/v2/calendar/events", LastRequest.RequestUri!.AbsolutePath);
-        Assert.True(string.IsNullOrEmpty(LastRequest.RequestUri!.Query));
-    }
-
-    [Fact]
-    public async Task GetCalendarEventsAsync_withRange_forwardsUtcIsoInQueryString()
-    {
-        _handler.SetDefault(HttpStatusCode.OK, "[]");
-        var from = new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc);
-        var to = new DateTime(2026, 5, 31, 23, 59, 59, DateTimeKind.Utc);
-
-        await _sut.GetCalendarEventsAsync(from, to);
-
         var query = LastRequest.RequestUri!.Query;
-        Assert.Contains("from=", query);
-        Assert.Contains("to=", query);
+        // Backend reads req.query.start and req.query.end — exact names matter.
+        Assert.Contains("start=", query);
+        Assert.Contains("end=", query);
+        Assert.DoesNotContain("from=", query);
+        Assert.DoesNotContain("to=", query);
         Assert.Contains("2026-05-01", query);
         Assert.Contains("2026-05-31", query);
     }

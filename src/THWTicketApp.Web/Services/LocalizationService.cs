@@ -194,6 +194,31 @@ public class LocalizationService
         ["assets.link_ticket_success"] = "Asset mit Ticket verknüpft.",
         ["assets.link_ticket_failed"] = "Verknüpfung fehlgeschlagen.",
 
+        // Templates
+        ["nav.templates"] = "Ticket-Vorlagen",
+        ["templates.new"] = "Neue Vorlage",
+        ["templates.none"] = "Keine Vorlagen vorhanden.",
+        ["templates.name"] = "Name",
+        ["templates.subject"] = "Betreff",
+        ["templates.issue"] = "Beschreibung",
+        ["templates.issue_preview"] = "Beschreibung",
+        ["templates.name_required"] = "Name ist erforderlich.",
+        ["templates.subject_required"] = "Betreff ist erforderlich.",
+        ["templates.delete_confirm"] = "Vorlage wirklich löschen?",
+
+        // Calendar
+        ["nav.calendar"] = "Kalender",
+        ["calendar.from"] = "Von",
+        ["calendar.to"] = "Bis",
+        ["calendar.load"] = "Laden",
+        ["calendar.this_month"] = "Aktueller Monat",
+        ["calendar.none"] = "Keine Ereignisse im gewählten Zeitraum.",
+        ["calendar.range_required"] = "Bitte Start- und Enddatum wählen.",
+        ["calendar.range_invalid"] = "Das Enddatum muss nach dem Startdatum liegen.",
+        ["calendar.ticket_deadline"] = "Ticket-Frist",
+        ["calendar.recurring_task"] = "Wiederkehrende Aufgabe",
+        ["calendar.open_ticket"] = "Ticket öffnen",
+
         // Recurring Tasks
         ["nav.recurring"] = "Wiederkehrende Aufgaben",
         ["recurring.new"] = "Neue Aufgabe",
@@ -413,6 +438,31 @@ public class LocalizationService
         ["assets.link_ticket_empty"] = "Please enter a ticket number.",
         ["assets.link_ticket_success"] = "Asset linked to ticket.",
         ["assets.link_ticket_failed"] = "Linking failed.",
+
+        // Templates
+        ["nav.templates"] = "Ticket Templates",
+        ["templates.new"] = "New Template",
+        ["templates.none"] = "No templates yet.",
+        ["templates.name"] = "Name",
+        ["templates.subject"] = "Subject",
+        ["templates.issue"] = "Description",
+        ["templates.issue_preview"] = "Description",
+        ["templates.name_required"] = "Name is required.",
+        ["templates.subject_required"] = "Subject is required.",
+        ["templates.delete_confirm"] = "Really delete template?",
+
+        // Calendar
+        ["nav.calendar"] = "Calendar",
+        ["calendar.from"] = "From",
+        ["calendar.to"] = "To",
+        ["calendar.load"] = "Load",
+        ["calendar.this_month"] = "Current month",
+        ["calendar.none"] = "No events in the selected range.",
+        ["calendar.range_required"] = "Please pick a start and end date.",
+        ["calendar.range_invalid"] = "End date must be after start date.",
+        ["calendar.ticket_deadline"] = "Ticket deadline",
+        ["calendar.recurring_task"] = "Recurring task",
+        ["calendar.open_ticket"] = "Open ticket",
 
         // Recurring Tasks
         ["nav.recurring"] = "Recurring Tasks",
