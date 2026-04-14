@@ -2,7 +2,7 @@ using Microsoft.JSInterop;
 
 namespace THWTicketApp.Web.Services;
 
-public class IndexedDbService : IAsyncDisposable
+public class IndexedDbService : IIndexedDbService, IAsyncDisposable
 {
     private readonly IJSRuntime _jsRuntime;
     private IJSObjectReference? _module;
@@ -85,10 +85,28 @@ public class IndexedDbService : IAsyncDisposable
         return await module.InvokeAsync<string>("getConflictedActions");
     }
 
-    public async Task<int> IncrementRetryCountAsync(int id)
+    public async Task<bool> UpdateRetryStateAsync(int id, string nextRetryAtIso, int retryCount, string? errorMessage)
     {
         var module = await GetModuleAsync();
-        return await module.InvokeAsync<int>("incrementRetryCount", id);
+        return await module.InvokeAsync<bool>("updateRetryState", id, nextRetryAtIso, retryCount, errorMessage);
+    }
+
+    public async Task AppendSyncLogAsync(string entryJson)
+    {
+        var module = await GetModuleAsync();
+        await module.InvokeAsync<bool>("appendSyncLog", entryJson);
+    }
+
+    public async Task<string> GetSyncLogAsync(int limit = 0)
+    {
+        var module = await GetModuleAsync();
+        return await module.InvokeAsync<string>("getSyncLog", limit);
+    }
+
+    public async Task ClearSyncLogAsync()
+    {
+        var module = await GetModuleAsync();
+        await module.InvokeAsync<bool>("clearSyncLog");
     }
 
     public async Task<string?> GetLastCacheTimeAsync()

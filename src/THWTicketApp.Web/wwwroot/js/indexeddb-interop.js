@@ -1,6 +1,6 @@
 // IndexedDB interop for offline caching
 const DB_NAME = 'thw-ticket-cache';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let db = null;
 
@@ -16,6 +16,8 @@ function openDb() {
                 database.createObjectStore('pendingActions', { keyPath: 'id', autoIncrement: true });
             if (!database.objectStoreNames.contains('meta'))
                 database.createObjectStore('meta', { keyPath: 'key' });
+            if (!database.objectStoreNames.contains('syncLog'))
+                database.createObjectStore('syncLog', { keyPath: 'id', autoIncrement: true });
         };
         request.onsuccess = (e) => { db = e.target.result; resolve(db); };
         request.onerror = (e) => reject(e.target.error);
@@ -141,7 +143,7 @@ export async function getConflictedActions() {
     });
 }
 
-export async function incrementRetryCount(id) {
+export async function updateRetryState(id, nextRetryAtIso, retryCount, errorMessage) {
     const database = await openDb();
     return new Promise((resolve, reject) => {
         const tx = database.transaction('pendingActions', 'readwrite');
@@ -149,16 +151,46 @@ export async function incrementRetryCount(id) {
         const request = store.get(id);
         request.onsuccess = () => {
             const action = request.result;
-            if (action) {
-                action.retryCount = (action.retryCount || 0) + 1;
-                store.put(action);
-                resolve(action.retryCount);
-            } else {
-                resolve(-1);
-            }
+            if (!action) { resolve(false); return; }
+            action.retryCount = retryCount;
+            action.nextRetryAt = nextRetryAtIso;
+            action.lastErrorMessage = errorMessage || null;
+            store.put(action);
+            resolve(true);
         };
         request.onerror = () => reject(request.error);
     });
+}
+
+export async function appendSyncLog(entryJson) {
+    const database = await openDb();
+    const tx = database.transaction('syncLog', 'readwrite');
+    const entry = JSON.parse(entryJson);
+    tx.objectStore('syncLog').add(entry);
+    return true;
+}
+
+export async function getSyncLog(limit) {
+    const database = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction('syncLog', 'readonly');
+        const request = tx.objectStore('syncLog').getAll();
+        request.onsuccess = () => {
+            const all = request.result;
+            // Return newest first, capped at `limit` if provided
+            all.sort((a, b) => (b.id || 0) - (a.id || 0));
+            const sliced = limit > 0 ? all.slice(0, limit) : all;
+            resolve(JSON.stringify(sliced));
+        };
+        request.onerror = () => reject(request.error);
+    });
+}
+
+export async function clearSyncLog() {
+    const database = await openDb();
+    const tx = database.transaction('syncLog', 'readwrite');
+    tx.objectStore('syncLog').clear();
+    return true;
 }
 
 export async function getLastCacheTime() {

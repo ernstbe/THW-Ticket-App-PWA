@@ -27,6 +27,7 @@ builder.Services.AddScoped<ITrueDeskApiService, TrueDeskApiService>();
 builder.Services.AddScoped<AppStateService>();
 builder.Services.AddScoped<RealtimeService>();
 builder.Services.AddScoped<IndexedDbService>();
+builder.Services.AddScoped<IIndexedDbService>(sp => sp.GetRequiredService<IndexedDbService>());
 builder.Services.AddScoped<SyncService>();
 builder.Services.AddScoped<ISyncService>(sp => sp.GetRequiredService<SyncService>());
 builder.Services.AddScoped<LocalizationService>();
