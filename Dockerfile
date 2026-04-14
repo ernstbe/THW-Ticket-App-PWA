@@ -2,10 +2,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-COPY *.sln ./
 COPY src/THWTicketApp.Shared/*.csproj src/THWTicketApp.Shared/
 COPY src/THWTicketApp.Web/*.csproj src/THWTicketApp.Web/
-RUN dotnet restore
+RUN dotnet restore src/THWTicketApp.Web/THWTicketApp.Web.csproj
 
 COPY . .
 RUN dotnet publish src/THWTicketApp.Web/THWTicketApp.Web.csproj \
