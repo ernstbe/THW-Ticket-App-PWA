@@ -65,6 +65,10 @@ else if (_isLoading)
         <MudTd DataLabel="@L.T("assets.category")">@context.Category</MudTd>
         <MudTd DataLabel="@L.T("assets.location")">@context.Location</MudTd>
         <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Link" Size="Size.Small" Color="Color.Primary"
+                           OnClick="() => ShowLinkTicketDialog(context)"
+                           aria-label="@L.T("assets.link_ticket")"
+                           data-testid="link-ticket-btn" />
             <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                            OnClick="() => ShowEditDialog(context)" />
             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
@@ -75,6 +79,34 @@ else if (_isLoading)
         <MudText Color="Color.Secondary">@L.T("assets.none")</MudText>
     </NoRecordsContent>
 </MudTable>
+
+@* Link to Ticket Dialog *@
+<MudDialog @bind-Visible="_linkDialogVisible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@L.T("assets.link_ticket")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-2">@(_linkTargetAsset?.Name)</MudText>
+        <MudTextField @bind-Value="_linkTicketUid" Label="@L.T("assets.link_ticket_prompt")"
+                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.ConfirmationNumber"
+                      OnKeyDown="OnLinkTicketKeyDown"
+                      Disabled="_linkProcessing"
+                      data-testid="link-ticket-input" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _linkDialogVisible = false" Disabled="_linkProcessing">@L.T("common.cancel")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="LinkAssetToTicketAsync" Disabled="_linkProcessing"
+                   data-testid="link-ticket-confirm">
+            @if (_linkProcessing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @L.T("assets.link_ticket")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 @* Create / Edit Dialog *@
 <MudDialog @bind-Visible="_dialogVisible">
@@ -105,6 +137,11 @@ else if (_isLoading)
     private string _formCategory = string.Empty;
     private string _formLocation = string.Empty;
     private string _formDescription = string.Empty;
+
+    private bool _linkDialogVisible;
+    private bool _linkProcessing;
+    private Asset? _linkTargetAsset;
+    private string _linkTicketUid = string.Empty;
 
     private IEnumerable<Asset> FilteredAssets => string.IsNullOrWhiteSpace(_searchText)
         ? _assets
@@ -189,6 +226,63 @@ else if (_isLoading)
         else
         {
             Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+    }
+
+    internal void ShowLinkTicketDialog(Asset asset)
+    {
+        _linkTargetAsset = asset;
+        _linkTicketUid = string.Empty;
+        _linkDialogVisible = true;
+    }
+
+    private async Task OnLinkTicketKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !_linkProcessing)
+            await LinkAssetToTicketAsync();
+    }
+
+    internal async Task LinkAssetToTicketAsync()
+    {
+        if (_linkTargetAsset == null) return;
+        _linkProcessing = true;
+        try
+        {
+            var outcome = await TryLinkAssetAsync(ApiService, _linkTargetAsset, _linkTicketUid);
+            switch (outcome)
+            {
+                case LinkTicketOutcome.EmptyUid:
+                    Snackbar.Add(L.T("assets.link_ticket_empty"), Severity.Warning);
+                    break;
+                case LinkTicketOutcome.Success:
+                    _linkDialogVisible = false;
+                    Snackbar.Add(L.T("assets.link_ticket_success"), Severity.Success);
+                    break;
+                case LinkTicketOutcome.Failed:
+                    Snackbar.Add(L.T("assets.link_ticket_failed"), Severity.Error);
+                    break;
+            }
+        }
+        finally
+        {
+            _linkProcessing = false;
+        }
+    }
+
+    internal enum LinkTicketOutcome { EmptyUid, Success, Failed }
+
+    internal static async Task<LinkTicketOutcome> TryLinkAssetAsync(ITrueDeskApiService api, Asset asset, string? rawUid)
+    {
+        var uid = rawUid?.Trim();
+        if (string.IsNullOrWhiteSpace(uid))
+            return LinkTicketOutcome.EmptyUid;
+        try
+        {
+            return await api.LinkAssetToTicketAsync(asset.Id, uid) ? LinkTicketOutcome.Success : LinkTicketOutcome.Failed;
+        }
+        catch
+        {
+            return LinkTicketOutcome.Failed;
         }
     }
 

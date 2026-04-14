@@ -630,9 +630,12 @@ public class TrueDeskApiService : ITrueDeskApiService
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> LinkAssetToTicketAsync(string assetId, string ticketId)
+    public async Task<bool> LinkAssetToTicketAsync(string assetId, string ticketUid)
     {
-        var payload = new { ticketId };
+        if (string.IsNullOrWhiteSpace(assetId) || string.IsNullOrWhiteSpace(ticketUid))
+            return false;
+        // The backend expects { ticketUid: "<uid>" }, not { ticketId }.
+        var payload = new { ticketUid };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
         var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{BaseUrl}/assets/{assetId}/link-ticket", content));
         return response.IsSuccessStatusCode;
