@@ -73,4 +73,33 @@ public interface ITrueDeskApiService
     // Reports (v2)
     Task<string> GetHandoverReportAsync(string format = "json");
     Task<string> GetSitzungReportAsync(string format = "json");
+
+    // Teams (v2)
+    Task<string> GetTeamsAsync();
+    Task<string> GetTeamAsync(string teamId);
+    Task<bool> CreateTeamAsync(Dictionary<string, object?> teamData);
+    Task<bool> UpdateTeamAsync(string teamId, Dictionary<string, object?> teamData);
+    Task<bool> DeleteTeamAsync(string teamId);
+
+    // Departments (v2)
+    Task<string> GetDepartmentsAsync();
+    Task<string> GetDepartmentAsync(string departmentId);
+    Task<bool> CreateDepartmentAsync(Dictionary<string, object?> departmentData);
+    Task<bool> UpdateDepartmentAsync(string departmentId, Dictionary<string, object?> departmentData);
+    Task<bool> DeleteDepartmentAsync(string departmentId);
+
+    // Ticket Templates (v2)
+    Task<string> GetTicketTemplatesAsync();
+    Task<string> GetTicketTemplateAsync(string templateId);
+    Task<bool> CreateTicketTemplateAsync(Dictionary<string, object?> templateData);
+    Task<bool> UpdateTicketTemplateAsync(string templateId, Dictionary<string, object?> templateData);
+    Task<bool> DeleteTicketTemplateAsync(string templateId);
+
+    // Calendar (v2)
+    Task<string> GetCalendarEventsAsync(DateTime? from = null, DateTime? to = null);
+
+    // Ticket tags — implemented on top of the existing ticket PUT endpoint
+    Task<bool> UpdateTicketTagsAsync(string ticketId, IEnumerable<string> tagIds);
+    Task<bool> AddTagToTicketAsync(string ticketId, string tagId);
+    Task<bool> RemoveTagFromTicketAsync(string ticketId, string tagId);
 }
