@@ -188,6 +188,11 @@ public class LocalizationService
         ["assets.none"] = "Keine Assets vorhanden.",
         ["assets.name_required"] = "Name ist erforderlich.",
         ["assets.delete_confirm"] = "Asset wirklich löschen?",
+        ["assets.link_ticket"] = "Mit Ticket verknüpfen",
+        ["assets.link_ticket_prompt"] = "Ticket-Nummer",
+        ["assets.link_ticket_empty"] = "Bitte Ticket-Nummer eingeben.",
+        ["assets.link_ticket_success"] = "Asset mit Ticket verknüpft.",
+        ["assets.link_ticket_failed"] = "Verknüpfung fehlgeschlagen.",
 
         // Recurring Tasks
         ["nav.recurring"] = "Wiederkehrende Aufgaben",
@@ -403,6 +408,11 @@ public class LocalizationService
         ["assets.none"] = "No assets found.",
         ["assets.name_required"] = "Name is required.",
         ["assets.delete_confirm"] = "Really delete asset",
+        ["assets.link_ticket"] = "Link to ticket",
+        ["assets.link_ticket_prompt"] = "Ticket number",
+        ["assets.link_ticket_empty"] = "Please enter a ticket number.",
+        ["assets.link_ticket_success"] = "Asset linked to ticket.",
+        ["assets.link_ticket_failed"] = "Linking failed.",
 
         // Recurring Tasks
         ["nav.recurring"] = "Recurring Tasks",

@@ -68,7 +68,7 @@ public interface ITrueDeskApiService
     Task<bool> CreateAssetAsync(Dictionary<string, object?> assetData);
     Task<bool> UpdateAssetAsync(string assetId, Dictionary<string, object?> assetData);
     Task<bool> DeleteAssetAsync(string assetId);
-    Task<bool> LinkAssetToTicketAsync(string assetId, string ticketId);
+    Task<bool> LinkAssetToTicketAsync(string assetId, string ticketUid);
 
     // Reports (v2)
     Task<string> GetHandoverReportAsync(string format = "json");
