@@ -352,7 +352,7 @@
         _selectedLanguage = await LocalStorage.GetItemAsync("settings_language") ?? "de";
         _selectedColor = await LocalStorage.GetItemAsync("settings_primary_color") ?? "#003399";
 
-        var savedUrl = await LocalStorage.GetItemAsync("settings_api_url");
+        var savedUrl = await LocalStorage.GetItemAsync("settings_apiurl");
         if (!string.IsNullOrEmpty(savedUrl)) _apiBaseUrl = savedUrl;
 
         var savedTimeout = await LocalStorage.GetItemAsync("settings_timeout");
@@ -394,7 +394,7 @@
         AppSettings.ApiBaseUrl = _apiBaseUrl;
         AppSettings.ConnectionTimeoutSeconds = _connectionTimeout;
 
-        await LocalStorage.SetItemAsync("settings_api_url", _apiBaseUrl);
+        await LocalStorage.SetItemAsync("settings_apiurl", _apiBaseUrl);
         await LocalStorage.SetItemAsync("settings_timeout", _connectionTimeout.ToString());
         await LocalStorage.SetItemAsync("settings_darkmode", _isDarkMode.ToString().ToLower());
         await LocalStorage.SetItemAsync("settings_notifications", _isNotificationsEnabled.ToString().ToLower());
