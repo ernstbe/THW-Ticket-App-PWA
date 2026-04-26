@@ -1,10 +1,18 @@
 @using MudBlazor
 @using THWTicketApp.Shared.Models
+@inject THWTicketApp.Web.Services.LocalizationService L
 
-<MudCard Elevation="1" Class="mb-2 ticket-card" Style="cursor: pointer;" @onclick="() => OnClick.InvokeAsync(Ticket)"
+<MudCard Elevation="@(IsSelected ? 3 : 1)" Class="@($"mb-2 ticket-card{(IsSelected ? " mud-border-primary" : "")}")"
+         Style="cursor: pointer;" @onclick="HandleClick"
          role="article" aria-label="@($"Ticket #{Ticket.Uid}: {Ticket.Subject}")">
     <MudCardContent Class="pa-3">
         <div class="d-flex justify-space-between align-start">
+            @if (IsSelectable)
+            {
+                <MudCheckBox T="bool" Value="@IsSelected" Dense="true" Class="mr-2 mt-n1"
+                             ValueChanged="@(v => OnSelectedChanged.InvokeAsync(v))"
+                             @onclick:stopPropagation="true" />
+            }
             <div class="flex-grow-1">
                 <div class="d-flex align-center gap-2 mb-1">
                     <MudText Typo="Typo.caption" Color="Color.Secondary">
@@ -34,13 +42,13 @@
                     </MudText>
                 </div>
             </div>
-            @if (ShowActions)
+            @if (ShowActions && !IsSelectable)
             {
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
                          AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
-                         aria-label="Ticket-Aktionen">
-                    <MudMenuItem OnClick="() => OnAssignToMe.InvokeAsync(Ticket)">Mir zuweisen</MudMenuItem>
-                    <MudMenuItem OnClick="() => OnClose.InvokeAsync(Ticket)">Schließen</MudMenuItem>
+                         aria-label="@L.T("tickets.actions")">
+                    <MudMenuItem OnClick="() => OnAssignToMe.InvokeAsync(Ticket)">@L.T("tickets.assign_me")</MudMenuItem>
+                    <MudMenuItem OnClick="() => OnClose.InvokeAsync(Ticket)">@L.T("common.close")</MudMenuItem>
                 </MudMenu>
             }
         </div>
@@ -50,7 +58,18 @@
 @code {
     [Parameter, EditorRequired] public Ticket Ticket { get; set; } = null!;
     [Parameter] public bool ShowActions { get; set; }
+    [Parameter] public bool IsSelectable { get; set; }
+    [Parameter] public bool IsSelected { get; set; }
     [Parameter] public EventCallback<Ticket> OnClick { get; set; }
     [Parameter] public EventCallback<Ticket> OnAssignToMe { get; set; }
     [Parameter] public EventCallback<Ticket> OnClose { get; set; }
+    [Parameter] public EventCallback<bool> OnSelectedChanged { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (IsSelectable)
+            await OnSelectedChanged.InvokeAsync(!IsSelected);
+        else
+            await OnClick.InvokeAsync(Ticket);
+    }
 }
