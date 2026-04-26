@@ -1,22 +1,28 @@
 {
-  "name": "THWTicketApp.Web",
-  "short_name": "THWTicketApp.Web",
+  "name": "THW Ticket App",
+  "short_name": "THW Tickets",
+  "description": "Ticket-System für das Technische Hilfswerk",
   "id": "./",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#ffffff",
-  "theme_color": "#03173d",
+  "theme_color": "#003399",
   "prefer_related_applications": false,
+  "categories": ["productivity", "utilities"],
   "icons": [
-    {
-      "src": "icon-512.png",
-      "type": "image/png",
-      "sizes": "512x512"
-    },
     {
       "src": "icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ]
 }

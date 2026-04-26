@@ -43,6 +43,40 @@
     <script src="_framework/blazor.webassembly.js"></script>
     <script>navigator.serviceWorker.register('service-worker.js');</script>
     <script>
+        // PWA install prompt
+        let deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            if (window._pwaInstallRef) {
+                window._pwaInstallRef.invokeMethodAsync('OnInstallAvailable');
+            }
+        });
+        window.addEventListener('appinstalled', function () {
+            deferredInstallPrompt = null;
+            if (window._pwaInstallRef) {
+                window._pwaInstallRef.invokeMethodAsync('OnAppInstalled');
+            }
+        });
+        window.registerInstallHandler = function (dotNetRef) {
+            window._pwaInstallRef = dotNetRef;
+            if (deferredInstallPrompt) {
+                dotNetRef.invokeMethodAsync('OnInstallAvailable');
+            }
+        };
+        window.promptInstall = async function () {
+            if (!deferredInstallPrompt) return false;
+            deferredInstallPrompt.prompt();
+            const result = await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            return result.outcome === 'accepted';
+        };
+        window.isPwaInstalled = function () {
+            return window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true;
+        };
+    </script>
+    <script>
         window.registerConnectivityHandler = function (dotNetRef) {
             window.addEventListener('online', function () {
                 dotNetRef.invokeMethodAsync('OnConnectivityChanged', true);

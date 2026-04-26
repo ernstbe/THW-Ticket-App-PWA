@@ -79,6 +79,19 @@
     </MudDrawer>
 
     <MudMainContent Class="pt-16 px-4" id="main-content">
+        @if (_showInstallBanner)
+        {
+            <MudAlert Severity="Severity.Info" Class="mx-4 mt-4" Dense="true" ShowCloseIcon="true"
+                      CloseIconClicked="DismissInstallBanner">
+                <div class="d-flex align-center gap-3">
+                    <MudText>@L.T("pwa.install_hint")</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               OnClick="PromptInstallAsync" StartIcon="@Icons.Material.Filled.InstallMobile">
+                        @L.T("pwa.install")
+                    </MudButton>
+                </div>
+            </MudAlert>
+        }
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4">
             <ErrorBoundary @ref="_errorBoundary">
                 <ChildContent>
@@ -108,6 +121,8 @@
     private bool _drawerOpen = true;
     private bool _isDarkMode;
     private bool _isOffline;
+    private bool _showInstallBanner;
+    private bool _isInstalled;
     private int _unreadNotifications;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
 
@@ -162,6 +177,11 @@
             _dotNetRef = DotNetObjectReference.Create(this);
             await JsRuntime.InvokeVoidAsync("window.registerConnectivityHandler", _dotNetRef);
 
+            // PWA install prompt
+            _isInstalled = await JsRuntime.InvokeAsync<bool>("window.isPwaInstalled");
+            if (!_isInstalled)
+                await JsRuntime.InvokeVoidAsync("window.registerInstallHandler", _dotNetRef);
+
             var darkMode = await LocalStorage.GetItemAsync("settings_darkmode");
             if (darkMode == "true")
             {
@@ -185,6 +205,29 @@
         }
         await InvokeAsync(StateHasChanged);
     }
+
+    [JSInvokable]
+    public void OnInstallAvailable()
+    {
+        _showInstallBanner = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnAppInstalled()
+    {
+        _showInstallBanner = false;
+        _isInstalled = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PromptInstallAsync()
+    {
+        await JsRuntime.InvokeVoidAsync("window.promptInstall");
+        _showInstallBanner = false;
+    }
+
+    private void DismissInstallBanner() => _showInstallBanner = false;
 
     [JSInvokable]
     public void OnConnectivityChanged(bool isOnline)

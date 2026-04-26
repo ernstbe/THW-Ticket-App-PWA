@@ -320,6 +320,10 @@ public class LocalizationService
         ["profile.password_too_short"] = "Das Passwort muss mindestens 6 Zeichen haben.",
         ["profile.password_failed"] = "Passwortänderung fehlgeschlagen.",
 
+        // PWA
+        ["pwa.install_hint"] = "App zum Startbildschirm hinzufügen für schnelleren Zugriff.",
+        ["pwa.install"] = "Installieren",
+
         // Kanban
         ["kanban.board"] = "Kanban-Board",
         ["kanban.tickets"] = "Tickets",
@@ -766,6 +770,10 @@ public class LocalizationService
         ["profile.password_mismatch"] = "Passwords do not match.",
         ["profile.password_too_short"] = "Password must be at least 6 characters.",
         ["profile.password_failed"] = "Password change failed.",
+
+        // PWA
+        ["pwa.install_hint"] = "Add app to home screen for faster access.",
+        ["pwa.install"] = "Install",
 
         // Kanban
         ["kanban.board"] = "Kanban board",
