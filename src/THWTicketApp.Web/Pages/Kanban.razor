@@ -58,7 +58,7 @@ else
                     @* Drop Zone *@
                     <MudDropZone T="KanbanTicketItem" Identifier="@column.StatusId"
                                  Class="pa-2 mud-height-full" Style="min-height: 200px;"
-                                 AllowReorder="false" />
+                                 AllowReorder="true" />
                 </MudPaper>
             }
         </ChildContent>
@@ -195,7 +195,20 @@ else
         if (item == null) return;
 
         var newStatusId = dropInfo.DropzoneIdentifier;
-        if (item.StatusId == newStatusId) return;
+
+        // Reorder within same column
+        if (item.StatusId == newStatusId)
+        {
+            _ticketItems.Remove(item);
+            var zoneItems = _ticketItems.Where(t => t.StatusId == newStatusId).ToList();
+            var insertIndex = Math.Min(dropInfo.IndexInZone, zoneItems.Count);
+            var globalIndex = insertIndex < zoneItems.Count
+                ? _ticketItems.IndexOf(zoneItems[insertIndex])
+                : (_ticketItems.Count > 0 ? _ticketItems.Count : 0);
+            _ticketItems.Insert(globalIndex, item);
+            StateHasChanged();
+            return;
+        }
 
         var oldStatusId = item.StatusId;
         item.StatusId = newStatusId;
