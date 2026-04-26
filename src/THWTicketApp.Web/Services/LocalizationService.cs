@@ -273,6 +273,14 @@ public class LocalizationService
         ["settings.passkey_remove"] = "Passkey entfernen",
         ["settings.passkey_desc"] = "Schnelle Anmeldung per Fingerabdruck, Gesicht oder Geräte-PIN",
         ["settings.passkey_not_supported"] = "Ihr Browser unterstützt keine Passkeys.",
+        ["settings.passkey_register_failed"] = "Passkey-Registrierung fehlgeschlagen.",
+        ["settings.passkey_removed"] = "Passkey entfernt.",
+        ["settings.timeout_invalid"] = "Timeout muss zwischen 5 und 300 Sekunden liegen.",
+        ["settings.connection_testing"] = "Teste Verbindung...",
+        ["settings.connection_success"] = "Verbindung erfolgreich!",
+        ["settings.connection_timeout"] = "Zeitüberschreitung. Server antwortet nicht.",
+        ["settings.connection_failed"] = "Verbindung fehlgeschlagen. Server nicht erreichbar.",
+        ["settings.cache_cleared"] = "Cache geleert.",
         ["settings.about"] = "Über",
 
         // Accessibility
@@ -518,6 +526,14 @@ public class LocalizationService
         ["settings.passkey_remove"] = "Remove Passkey",
         ["settings.passkey_desc"] = "Quick sign-in via fingerprint, face, or device PIN",
         ["settings.passkey_not_supported"] = "Your browser does not support passkeys.",
+        ["settings.passkey_register_failed"] = "Passkey registration failed.",
+        ["settings.passkey_removed"] = "Passkey removed.",
+        ["settings.timeout_invalid"] = "Timeout must be between 5 and 300 seconds.",
+        ["settings.connection_testing"] = "Testing connection...",
+        ["settings.connection_success"] = "Connection successful!",
+        ["settings.connection_timeout"] = "Timeout. Server is not responding.",
+        ["settings.connection_failed"] = "Connection failed. Server unreachable.",
+        ["settings.cache_cleared"] = "Cache cleared.",
         ["settings.about"] = "About",
 
         // Accessibility

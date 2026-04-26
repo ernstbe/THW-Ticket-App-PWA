@@ -286,7 +286,7 @@
     {
         if (_connectionTimeout < 5 || _connectionTimeout > 300)
         {
-            Snackbar.Add("Timeout muss zwischen 5 und 300 Sekunden liegen.", Severity.Warning);
+            Snackbar.Add(L.T("settings.timeout_invalid"), Severity.Warning);
             return;
         }
 
@@ -329,12 +329,12 @@
             }
             else
             {
-                Snackbar.Add("Passkey-Registrierung fehlgeschlagen.", Severity.Error);
+                Snackbar.Add(L.T("settings.passkey_register_failed"), Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+            Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error);
         }
     }
 
@@ -343,13 +343,13 @@
         if (_webauthnModule == null) return;
         await _webauthnModule.InvokeAsync<bool>("removePasskey");
         _passkeyRegistered = false;
-        Snackbar.Add("Passkey entfernt.", Severity.Info);
+        Snackbar.Add(L.T("settings.passkey_removed"), Severity.Info);
     }
 
     private async Task TestConnectionAsync()
     {
         _isTesting = true;
-        _connectionStatus = "Teste Verbindung...";
+        _connectionStatus = L.T("settings.connection_testing");
         _connectionSeverity = Severity.Info;
         StateHasChanged();
 
@@ -361,28 +361,28 @@
 
             if (response.IsSuccessStatusCode)
             {
-                _connectionStatus = "Verbindung erfolgreich!";
+                _connectionStatus = L.T("settings.connection_success");
                 _connectionSeverity = Severity.Success;
             }
             else
             {
-                _connectionStatus = $"Fehler: {(int)response.StatusCode} {response.ReasonPhrase}";
+                _connectionStatus = $"{L.T("common.error")}: {(int)response.StatusCode} {response.ReasonPhrase}";
                 _connectionSeverity = Severity.Error;
             }
         }
         catch (TaskCanceledException)
         {
-            _connectionStatus = "Zeitüberschreitung. Server antwortet nicht.";
+            _connectionStatus = L.T("settings.connection_timeout");
             _connectionSeverity = Severity.Warning;
         }
         catch (HttpRequestException)
         {
-            _connectionStatus = "Verbindung fehlgeschlagen. Server nicht erreichbar.";
+            _connectionStatus = L.T("settings.connection_failed");
             _connectionSeverity = Severity.Error;
         }
         catch (Exception ex)
         {
-            _connectionStatus = $"Fehler: {ex.Message}";
+            _connectionStatus = $"{L.T("common.error")}: {ex.Message}";
             _connectionSeverity = Severity.Error;
         }
         finally
@@ -395,7 +395,7 @@
     private async Task ClearCacheAsync()
     {
         await LocalStorage.RemoveItemAsync("ticket_cache");
-        Snackbar.Add("Cache geleert.", Severity.Success);
+        Snackbar.Add(L.T("settings.cache_cleared"), Severity.Success);
     }
 
     private async Task LogoutAsync()
