@@ -969,4 +969,40 @@ public class TrueDeskApiService : ITrueDeskApiService
         }
         catch { return (batchArray.Length, 0); }
     }
+
+    // -----------------------------------------------------------------
+    // Profile (v2)
+    // -----------------------------------------------------------------
+
+    public async Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber)
+    {
+        if (string.IsNullOrWhiteSpace(fullname)) return false;
+        var payload = new Dictionary<string, object?>
+        {
+            ["_id"] = CurrentUserId,
+            ["username"] = CurrentUsername,
+            ["fullname"] = fullname,
+            ["title"] = title ?? string.Empty,
+            ["workNumber"] = workNumber ?? string.Empty,
+            ["mobileNumber"] = mobileNumber ?? string.Empty
+        };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/accounts/profile", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword)
+    {
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+            return false;
+        var payload = new { currentPassword, newPassword, confirmPassword };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/accounts/profile/update-password", content));
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            LastError = body;
+        }
+        return response.IsSuccessStatusCode;
+    }
 }

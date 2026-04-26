@@ -111,4 +111,8 @@ public interface ITrueDeskApiService
     // Batch operations (v2)
     Task<(int Deleted, int Failed)> BatchDeleteTicketsAsync(IEnumerable<string> ticketIds);
     Task<(int Updated, int Failed)> BatchUpdateTicketsAsync(IEnumerable<Dictionary<string, object?>> batch);
+
+    // Profile (v2)
+    Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber);
+    Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword);
 }

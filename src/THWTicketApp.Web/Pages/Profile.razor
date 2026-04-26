@@ -1,0 +1,137 @@
+@page "/profile"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<PageTitle>@L.T("profile.title") - THW Ticket App</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">@L.T("profile.title")</MudText>
+
+<MudGrid>
+    @* Profile Info *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">@L.T("profile.info")</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTextField @bind-Value="_fullname" Label="@L.T("profile.fullname")"
+                              Variant="Variant.Outlined" Class="mb-3" />
+                <MudTextField @bind-Value="_jobTitle" Label="@L.T("profile.job_title")"
+                              Variant="Variant.Outlined" Class="mb-3" />
+                <MudTextField @bind-Value="_workNumber" Label="@L.T("profile.work_number")"
+                              Variant="Variant.Outlined" Class="mb-3" />
+                <MudTextField @bind-Value="_mobileNumber" Label="@L.T("profile.mobile_number")"
+                              Variant="Variant.Outlined" Class="mb-3" />
+
+                <MudTextField Value="@(ApiService.CurrentUsername ?? "")" Label="@L.T("profile.username")"
+                              Variant="Variant.Outlined" ReadOnly="true" Class="mb-3" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           OnClick="SaveProfileAsync" Disabled="_isSaving"
+                           StartIcon="@Icons.Material.Filled.Save">
+                    @L.T("common.save")
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* Change Password *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">@L.T("profile.change_password")</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudTextField @bind-Value="_currentPassword" Label="@L.T("profile.current_password")"
+                              Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3" />
+                <MudTextField @bind-Value="_newPassword" Label="@L.T("profile.new_password")"
+                              Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3" />
+                <MudTextField @bind-Value="_confirmPassword" Label="@L.T("profile.confirm_password")"
+                              Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-3" />
+
+                @if (!string.IsNullOrEmpty(_passwordError))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-3" Dense="true">@_passwordError</MudAlert>
+                }
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           OnClick="ChangePasswordAsync" Disabled="_isSaving"
+                           StartIcon="@Icons.Material.Filled.Lock">
+                    @L.T("profile.update_password")
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _fullname = string.Empty;
+    private string _jobTitle = string.Empty;
+    private string _workNumber = string.Empty;
+    private string _mobileNumber = string.Empty;
+    private string _currentPassword = string.Empty;
+    private string _newPassword = string.Empty;
+    private string _confirmPassword = string.Empty;
+    private string _passwordError = string.Empty;
+    private bool _isSaving;
+
+    protected override void OnInitialized()
+    {
+        _fullname = ApiService.CurrentUsername ?? string.Empty;
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_fullname)) return;
+        _isSaving = true;
+        try
+        {
+            if (await ApiService.UpdateProfileAsync(_fullname, _jobTitle, _workNumber, _mobileNumber))
+                Snackbar.Add(L.T("profile.saved"), Severity.Success);
+            else
+                Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+        finally { _isSaving = false; }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        _passwordError = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_currentPassword) || string.IsNullOrWhiteSpace(_newPassword))
+        {
+            _passwordError = L.T("profile.password_required");
+            return;
+        }
+        if (_newPassword != _confirmPassword)
+        {
+            _passwordError = L.T("profile.password_mismatch");
+            return;
+        }
+        if (_newPassword.Length < 6)
+        {
+            _passwordError = L.T("profile.password_too_short");
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            if (await ApiService.UpdatePasswordAsync(_currentPassword, _newPassword, _confirmPassword))
+            {
+                Snackbar.Add(L.T("profile.password_changed"), Severity.Success);
+                _currentPassword = _newPassword = _confirmPassword = string.Empty;
+            }
+            else
+            {
+                _passwordError = L.T("profile.password_failed");
+            }
+        }
+        catch (Exception ex) { _passwordError = $"{L.T("common.error")}: {ex.Message}"; }
+        finally { _isSaving = false; }
+    }
+}

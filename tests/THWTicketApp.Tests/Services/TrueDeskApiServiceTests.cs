@@ -557,4 +557,50 @@ public class TrueDeskApiServiceTests
         Assert.Equal(0, updated);
         Assert.Equal(1, failed);
     }
+
+    // -----------------------------------------------------------------
+    // Profile (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task UpdateProfileAsync_putsToV2ProfileEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.UpdateProfileAsync("Max Mustermann", "Helfer", "0123", "0170");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts/profile", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"fullname\":\"Max Mustermann\"", LastBody);
+        Assert.Contains("\"title\":\"Helfer\"", LastBody);
+    }
+
+    [Fact]
+    public async Task UpdateProfileAsync_returnsFalseOnEmptyName()
+    {
+        var ok = await _sut.UpdateProfileAsync("  ", null, null, null);
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
+
+    [Fact]
+    public async Task UpdatePasswordAsync_postsToV2PasswordEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.UpdatePasswordAsync("old123", "new456", "new456");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts/profile/update-password", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"currentPassword\":\"old123\"", LastBody);
+        Assert.Contains("\"newPassword\":\"new456\"", LastBody);
+    }
+
+    [Fact]
+    public async Task UpdatePasswordAsync_returnsFalseOnEmptyPassword()
+    {
+        var ok = await _sut.UpdatePasswordAsync("old", "", "");
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
 }
