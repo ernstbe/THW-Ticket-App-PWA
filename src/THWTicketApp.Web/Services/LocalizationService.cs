@@ -293,6 +293,12 @@ public class LocalizationService
         ["settings.synclog_action"] = "Aktion",
         ["settings.synclog_message"] = "Nachricht",
 
+        // Batch
+        ["batch.toggle"] = "Mehrfachauswahl",
+        ["batch.selected"] = "{0} Ticket(s) ausgewählt",
+        ["batch.deleted"] = "{0} gelöscht, {1} fehlgeschlagen",
+        ["batch.updated"] = "{0} aktualisiert, {1} fehlgeschlagen",
+
         // Kanban
         ["kanban.board"] = "Kanban-Board",
         ["kanban.tickets"] = "Tickets",
@@ -323,6 +329,8 @@ public class LocalizationService
         ["detail.tag_removed"] = "Tag entfernt.",
 
         // Tickets (additional)
+        ["tickets.assign_me"] = "Mir zuweisen",
+        ["tickets.actions"] = "Ticket-Aktionen",
         ["tickets.assign_failed"] = "Zuweisung fehlgeschlagen.",
         ["tickets.close_failed"] = "Schließen fehlgeschlagen.",
         ["tickets.filter_saved"] = "Filter gespeichert.",
@@ -704,6 +712,12 @@ public class LocalizationService
         ["settings.synclog_action"] = "Action",
         ["settings.synclog_message"] = "Message",
 
+        // Batch
+        ["batch.toggle"] = "Multi-select",
+        ["batch.selected"] = "{0} ticket(s) selected",
+        ["batch.deleted"] = "{0} deleted, {1} failed",
+        ["batch.updated"] = "{0} updated, {1} failed",
+
         // Kanban
         ["kanban.board"] = "Kanban board",
         ["kanban.tickets"] = "tickets",
@@ -734,6 +748,8 @@ public class LocalizationService
         ["detail.tag_removed"] = "Tag removed.",
 
         // Tickets (additional)
+        ["tickets.assign_me"] = "Assign to me",
+        ["tickets.actions"] = "Ticket actions",
         ["tickets.assign_failed"] = "Assignment failed.",
         ["tickets.close_failed"] = "Close failed.",
         ["tickets.filter_saved"] = "Filter saved.",
