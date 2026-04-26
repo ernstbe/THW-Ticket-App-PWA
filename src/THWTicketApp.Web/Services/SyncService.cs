@@ -167,6 +167,26 @@ public class SyncService : ISyncService
         });
     }
 
+    public Task EnqueueAddTagAsync(string ticketId, int ticketUid, string tagId, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
+        {
+            ActionType = "AddTag",
+            TicketId = ticketId,
+            TicketUid = ticketUid,
+            TagId = tagId,
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+
+    public Task EnqueueRemoveTagAsync(string ticketId, int ticketUid, string tagId, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
+        {
+            ActionType = "RemoveTag",
+            TicketId = ticketId,
+            TicketUid = ticketUid,
+            TagId = tagId,
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+
     private async Task EnqueueAsync(PendingActionDto action)
     {
         action.CreatedAt = DateTime.UtcNow.ToString("O");
@@ -301,6 +321,8 @@ public class SyncService : ISyncService
         "UpdateTicketFields" => await ApplyUpdateTicketFieldsAsync(action),
         "DeleteTicket" => await _apiService.DeleteTicketAsync(action.TicketId!),
         "UploadAttachment" => await ApplyUploadAttachmentAsync(action),
+        "AddTag" => await _apiService.AddTagToTicketAsync(action.TicketId!, action.TagId!),
+        "RemoveTag" => await _apiService.RemoveTagFromTicketAsync(action.TicketId!, action.TagId!),
         _ => false
     };
 

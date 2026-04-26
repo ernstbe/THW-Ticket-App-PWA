@@ -20,6 +20,7 @@ internal sealed class PendingActionDto
     public string? GroupId { get; set; }
     public string? TargetUserId { get; set; }
     public string? StatusId { get; set; }
+    public string? TagId { get; set; }
     public string? DueDate { get; set; }
     public string? FileName { get; set; }
     public string? FileContentBase64 { get; set; }

@@ -18,6 +18,8 @@ public interface ISyncService
     Task EnqueueUpdateTicketFieldsAsync(string ticketId, int ticketUid, string? subject, string? issue, string? priorityId, string? typeId, string? groupId, DateTime? dueDate, DateTime? ticketUpdatedAt = null);
     Task EnqueueDeleteTicketAsync(string ticketId, int ticketUid, DateTime? ticketUpdatedAt = null);
     Task EnqueueUploadAttachmentAsync(string ticketId, int ticketUid, string fileName, byte[] fileContent, string contentType, DateTime? ticketUpdatedAt = null);
+    Task EnqueueAddTagAsync(string ticketId, int ticketUid, string tagId, DateTime? ticketUpdatedAt = null);
+    Task EnqueueRemoveTagAsync(string ticketId, int ticketUid, string tagId, DateTime? ticketUpdatedAt = null);
 
     Task<bool> SyncPendingActionsAsync();
     Task<bool> ForceApplyAsync(int actionId);

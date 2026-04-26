@@ -318,6 +318,9 @@ public class LocalizationService
         ["detail.quickreply_templates"] = "Schnellantwort-Vorlagen",
         ["detail.new_template"] = "Neu",
         ["detail.link_ticket_num"] = "Ticket #",
+        ["detail.add_tag"] = "Tag hinzufügen",
+        ["detail.tag_added"] = "Tag hinzugefügt",
+        ["detail.tag_removed"] = "Tag entfernt.",
 
         // Tickets (additional)
         ["tickets.assign_failed"] = "Zuweisung fehlgeschlagen.",
@@ -726,6 +729,9 @@ public class LocalizationService
         ["detail.quickreply_templates"] = "Quick reply templates",
         ["detail.new_template"] = "New",
         ["detail.link_ticket_num"] = "Ticket #",
+        ["detail.add_tag"] = "Add tag",
+        ["detail.tag_added"] = "Tag added",
+        ["detail.tag_removed"] = "Tag removed.",
 
         // Tickets (additional)
         ["tickets.assign_failed"] = "Assignment failed.",
