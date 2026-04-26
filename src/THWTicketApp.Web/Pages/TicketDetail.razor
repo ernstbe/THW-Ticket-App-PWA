@@ -874,7 +874,7 @@ else
 
     private void InsertQuickReply(string template) => _newComment = template;
     private void InsertMention(User user) => _newComment += $" @{user.Fullname} ";
-    private static string TruncateTemplate(string t) => t.Length > 50 ? t[..47] + "..." : t;
+    internal static string TruncateTemplate(string t) => t.Length > 50 ? t[..47] + "..." : t;
     private void OpenQuickReplyEditor() => _showQuickReplyEditor = true;
     private void AddEmptyQuickReply() => _quickReplyTemplates.Add(string.Empty);
     private void RemoveQuickReply(int idx) { if (idx < _quickReplyTemplates.Count) _quickReplyTemplates.RemoveAt(idx); }
@@ -946,10 +946,10 @@ else
         await LocalStorage.SetItemAsync($"time_entries_{TicketUid}", json);
     }
 
-    private static string FormatElapsed(TimeSpan ts) =>
+    internal static string FormatElapsed(TimeSpan ts) =>
         $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
 
-    private static string FormatMinutes(int minutes)
+    internal static string FormatMinutes(int minutes)
     {
         if (minutes >= 60) return $"{minutes / 60}h {minutes % 60}m";
         return $"{minutes}m";
