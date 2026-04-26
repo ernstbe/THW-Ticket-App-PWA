@@ -275,6 +275,14 @@ public class LocalizationService
         ["settings.passkey_not_supported"] = "Ihr Browser unterstützt keine Passkeys.",
         ["settings.about"] = "Über",
 
+        // Kanban
+        ["kanban.board"] = "Kanban-Board",
+        ["kanban.tickets"] = "Tickets",
+        ["kanban.ticket_moved"] = "Ticket verschoben",
+        ["kanban.move_failed"] = "Status-Änderung fehlgeschlagen.",
+        ["kanban.no_subject"] = "(Kein Betreff)",
+        ["common.unknown"] = "Unbekannt",
+
         // Accessibility
         ["a11y.toggle_menu"] = "Menü umschalten",
         ["a11y.notifications"] = "Benachrichtigungen",
@@ -519,6 +527,14 @@ public class LocalizationService
         ["settings.passkey_desc"] = "Quick sign-in via fingerprint, face, or device PIN",
         ["settings.passkey_not_supported"] = "Your browser does not support passkeys.",
         ["settings.about"] = "About",
+
+        // Kanban
+        ["kanban.board"] = "Kanban board",
+        ["kanban.tickets"] = "tickets",
+        ["kanban.ticket_moved"] = "Ticket moved",
+        ["kanban.move_failed"] = "Status change failed.",
+        ["kanban.no_subject"] = "(No subject)",
+        ["common.unknown"] = "Unknown",
 
         // Accessibility
         ["a11y.toggle_menu"] = "Toggle menu",
