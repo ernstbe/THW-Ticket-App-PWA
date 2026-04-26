@@ -1,0 +1,217 @@
+@page "/documents"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using MudBlazor
+@using System.Text.Json
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<PageTitle>@L.T("nav.documents") - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">@L.T("nav.documents")</MudText>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => _showCreateDialog = true)">
+            @L.T("documents.new")
+        </MudButton>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadDocumentsAsync"
+                       Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
+    </div>
+</div>
+
+@if (_isLoading && _documents.Count == 0)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+else if (_documents.Count == 0)
+{
+    <MudAlert Severity="Severity.Normal">@L.T("documents.empty")</MudAlert>
+}
+else
+{
+    <MudTable Items="_filteredDocuments" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"
+              Filter="new Func<DocumentItem, bool>(FilterFunc)">
+        <ToolBarContent>
+            <MudTextField @bind-Value="_searchText" Placeholder="@L.T("common.search")"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" DebounceInterval="300" Clearable="true" />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="new Func<DocumentItem, object>(x => x.Name)">@L.T("documents.name")</MudTableSortLabel></MudTh>
+            <MudTh>@L.T("documents.category")</MudTh>
+            <MudTh>@L.T("documents.uploaded_by")</MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<DocumentItem, object>(x => x.CreatedAt)">@L.T("documents.date")</MudTableSortLabel></MudTh>
+            <MudTh>@L.T("documents.size")</MudTh>
+            <MudTh Style="width: 80px;"></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="@L.T("documents.name")">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@GetFileIcon(context.MimeType)" Size="Size.Small" />
+                    <MudText>@context.Name</MudText>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="@L.T("documents.category")">
+                @if (!string.IsNullOrEmpty(context.Category))
+                {
+                    <MudChip T="string" Size="Size.Small">@context.Category</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="@L.T("documents.uploaded_by")">@context.UploadedBy</MudTd>
+            <MudTd DataLabel="@L.T("documents.date")">@context.CreatedAt.ToString("dd.MM.yyyy")</MudTd>
+            <MudTd DataLabel="@L.T("documents.size")">@FormatSize(context.Size)</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                               OnClick="@(() => DeleteDocumentAsync(context.Id))"
+                               aria-label="@L.T("common.delete")" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@if (_showCreateDialog)
+{
+    <MudDialog @bind-Visible="_showCreateDialog">
+        <DialogContent>
+            <MudTextField @bind-Value="_newName" Label="@L.T("documents.name")" Variant="Variant.Outlined" Class="mb-3" />
+            <MudTextField @bind-Value="_newDescription" Label="@L.T("documents.description")" Variant="Variant.Outlined" Lines="3" Class="mb-3" />
+            <MudTextField @bind-Value="_newCategory" Label="@L.T("documents.category")" Variant="Variant.Outlined" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _showCreateDialog = false)">@L.T("common.cancel")</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateDocumentAsync"
+                       Disabled="@string.IsNullOrWhiteSpace(_newName)">@L.T("common.save")</MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+@code {
+    private bool _isLoading;
+    private string _searchText = string.Empty;
+    private List<DocumentItem> _documents = [];
+    private IEnumerable<DocumentItem> _filteredDocuments => _documents;
+
+    // Create dialog
+    private bool _showCreateDialog;
+    private string _newName = string.Empty;
+    private string _newDescription = string.Empty;
+    private string _newCategory = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDocumentsAsync();
+    }
+
+    private async Task LoadDocumentsAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var json = await ApiService.GetDocumentsAsync();
+            _documents = ParseDocuments(json);
+        }
+        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+        finally { _isLoading = false; StateHasChanged(); }
+    }
+
+    private async Task CreateDocumentAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+        try
+        {
+            if (await ApiService.CreateDocumentAsync(_newName, _newDescription, _newCategory))
+            {
+                _showCreateDialog = false;
+                _newName = _newDescription = _newCategory = string.Empty;
+                Snackbar.Add(L.T("documents.created"), Severity.Success);
+                await LoadDocumentsAsync();
+            }
+            else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+    }
+
+    private async Task DeleteDocumentAsync(string id)
+    {
+        try
+        {
+            if (await ApiService.DeleteDocumentAsync(id))
+            {
+                _documents.RemoveAll(d => d.Id == id);
+                Snackbar.Add(L.T("documents.deleted"), Severity.Success);
+            }
+            else Snackbar.Add(L.T("detail.delete_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+    }
+
+    private bool FilterFunc(DocumentItem doc) =>
+        string.IsNullOrWhiteSpace(_searchText) ||
+        (doc.Name?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (doc.Category?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+        (doc.UploadedBy?.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ?? false);
+
+    internal static List<DocumentItem> ParseDocuments(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("documents", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return new();
+            var list = new List<DocumentItem>();
+            foreach (var el in arr.EnumerateArray())
+            {
+                list.Add(new DocumentItem
+                {
+                    Id = el.TryGetProperty("_id", out var id) ? id.GetString() ?? "" : "",
+                    Name = el.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                    Description = el.TryGetProperty("description", out var d) ? d.GetString() : null,
+                    Category = el.TryGetProperty("category", out var c) ? c.GetString() : null,
+                    MimeType = el.TryGetProperty("mimetype", out var m) ? m.GetString() : null,
+                    Size = el.TryGetProperty("size", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt64() : 0,
+                    UploadedBy = el.TryGetProperty("uploadedBy", out var u) && u.ValueKind == JsonValueKind.Object
+                        ? (u.TryGetProperty("fullname", out var fn) ? fn.GetString() : null) ?? ""
+                        : "",
+                    CreatedAt = el.TryGetProperty("createdAt", out var ca) && ca.ValueKind == JsonValueKind.String
+                        ? DateTime.TryParse(ca.GetString(), out var dt) ? dt : DateTime.MinValue
+                        : DateTime.MinValue
+                });
+            }
+            return list;
+        }
+        catch { return new(); }
+    }
+
+    internal static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+
+    internal static string GetFileIcon(string? mimeType) => mimeType switch
+    {
+        var m when m?.StartsWith("image/") == true => Icons.Material.Filled.Image,
+        var m when m?.Contains("pdf") == true => Icons.Material.Filled.PictureAsPdf,
+        var m when m?.Contains("spreadsheet") == true || m?.Contains("excel") == true => Icons.Material.Filled.TableChart,
+        var m when m?.Contains("word") == true || m?.Contains("document") == true => Icons.Material.Filled.Article,
+        _ => Icons.Material.Filled.InsertDriveFile
+    };
+
+    internal sealed class DocumentItem
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? Category { get; set; }
+        public string? MimeType { get; set; }
+        public long Size { get; set; }
+        public string UploadedBy { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+}
