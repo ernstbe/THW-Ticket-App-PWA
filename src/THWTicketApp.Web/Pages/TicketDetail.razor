@@ -158,17 +158,29 @@ else
                         </div>
 
                         @* Tags *@
-                        @if (_ticket.Tags?.Count > 0)
-                        {
-                            <MudDivider Class="my-3" />
-                            <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.tags")</MudText>
-                            <div class="d-flex flex-wrap gap-1">
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.tags")</MudText>
+                        <div class="d-flex flex-wrap gap-1 align-center">
+                            @if (_ticket.Tags?.Count > 0)
+                            {
                                 @foreach (var tag in _ticket.Tags)
                                 {
-                                    <MudChip T="string" Size="Size.Small">@tag.Name</MudChip>
+                                    var tagId = tag.Id;
+                                    <MudChip T="string" Size="Size.Small" OnClose="@(_ => RemoveTagAsync(tagId!))"
+                                             Disabled="_isLoading">@tag.Name</MudChip>
                                 }
-                            </div>
-                        }
+                            }
+                            @if (_availableTags.Any(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+                            {
+                                <MudMenu Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                         Dense="true" aria-label="@L.T("detail.add_tag")">
+                                    @foreach (var tag in _availableTags.Where(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+                                    {
+                                        <MudMenuItem OnClick="@(() => AddTagAsync(tag.Id!, tag.Name!))">@tag.Name</MudMenuItem>
+                                    }
+                                </MudMenu>
+                            }
+                        </div>
 
                         @* Linked Tickets *@
                         <MudDivider Class="my-3" />
@@ -477,6 +489,9 @@ else
     private List<User> _users = [];
     private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
 
+    // Tags
+    private List<Tag> _availableTags = [];
+
     // Subscription
     private bool _isSubscribed;
 
@@ -576,7 +591,8 @@ else
             var statusTask = ApiService.GetStatusesAsync();
             var prioTask = ApiService.GetPrioritiesAsync();
             var usersTask = ApiService.GetAssigneesAsync();
-            await Task.WhenAll(statusTask, prioTask, usersTask);
+            var tagsTask = ApiService.GetTagsAsync();
+            await Task.WhenAll(statusTask, prioTask, usersTask, tagsTask);
 
             _statuses = JsonHelper.DeserializeWrappedArray<Status>(statusTask.Result, "status", options).ToList();
             foreach (var s in _statuses) s.Name = TrudeskTranslationHelper.TranslateStatus(s.Name);
@@ -590,6 +606,8 @@ else
 
             var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersTask.Result, options);
             _users = userResponse?.Users ?? [];
+
+            _availableTags = JsonHelper.DeserializeWrappedArray<Tag>(tagsTask.Result, "tags", options).ToList();
 
             if (_ticket != null)
             {
@@ -645,6 +663,40 @@ else
         {
             if (await ApiService.ClearTicketAssigneeAsync(_ticket.Id))
             { Snackbar.Add(L.T("detail.assign_removed"), Severity.Success); await LoadTicketAsync(); }
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task AddTagAsync(string tagId, string tagName)
+    {
+        if (_ticket == null) return;
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.AddTagToTicketAsync(_ticket.Id, tagId))
+            {
+                Snackbar.Add($"{L.T("detail.tag_added")}: {tagName}", Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task RemoveTagAsync(string tagId)
+    {
+        if (_ticket == null) return;
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.RemoveTagFromTicketAsync(_ticket.Id, tagId))
+            {
+                Snackbar.Add(L.T("detail.tag_removed"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.delete_failed"), Severity.Error);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }

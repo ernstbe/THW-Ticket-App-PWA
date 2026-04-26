@@ -467,4 +467,57 @@ public class SyncServiceTests
         var json = JsonSerializer.Serialize(dto, SyncService.JsonOptions);
         Assert.Contains("\"id\":42", json);
     }
+
+    // ---------------------------------------------------------------------
+    // R5.2 — Tag sync actions
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Sync_addTag_callsAddTagToTicketAsync()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 300, ActionType = "AddTag",
+            TicketId = "t1", TicketUid = 42, TagId = "tag-abc"
+        });
+        _api.AddTagToTicketAsync("t1", "tag-abc").Returns(true);
+
+        await _sut.SyncPendingActionsAsync();
+
+        await _api.Received(1).AddTagToTicketAsync("t1", "tag-abc");
+        await _db.Received(1).RemovePendingActionAsync(300);
+    }
+
+    [Fact]
+    public async Task Sync_removeTag_callsRemoveTagFromTicketAsync()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 301, ActionType = "RemoveTag",
+            TicketId = "t1", TicketUid = 42, TagId = "tag-xyz"
+        });
+        _api.RemoveTagFromTicketAsync("t1", "tag-xyz").Returns(true);
+
+        await _sut.SyncPendingActionsAsync();
+
+        await _api.Received(1).RemoveTagFromTicketAsync("t1", "tag-xyz");
+        await _db.Received(1).RemovePendingActionAsync(301);
+    }
+
+    [Fact]
+    public async Task Sync_addTag_failure_schedulesRetry()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 302, ActionType = "AddTag",
+            TicketId = "t1", TicketUid = 42, TagId = "tag-abc",
+            RetryCount = 0
+        });
+        _api.AddTagToTicketAsync("t1", "tag-abc").Returns(false);
+
+        await _sut.SyncPendingActionsAsync();
+
+        await _db.Received(1).UpdateRetryStateAsync(302, Arg.Any<string>(), 1, Arg.Any<string?>());
+        await _db.DidNotReceive().RemovePendingActionAsync(302);
+    }
 }
