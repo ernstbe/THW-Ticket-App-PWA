@@ -374,6 +374,50 @@ else
             </div>
         </MudTabPanel>
 
+        @* Checklist Tab *@
+        <MudTabPanel Text="@($"{L.T("checklist.title")} ({_ticket.Checklist?.Count ?? 0})")"
+                     Icon="@Icons.Material.Filled.CheckBox">
+            @if (_ticket.Checklist?.Count > 0)
+            {
+                <MudList T="string" Dense="true">
+                    @foreach (var item in _ticket.Checklist)
+                    {
+                        var itemRef = item;
+                        <MudListItem>
+                            <div class="d-flex align-center gap-2">
+                                <MudCheckBox T="bool" Value="@itemRef.Completed" Dense="true"
+                                             ValueChanged="@(v => ToggleChecklistItemAsync(itemRef.Id!, v))"
+                                             Disabled="_isLoading" />
+                                <MudText Style="@(itemRef.Completed ? "text-decoration: line-through; opacity: 0.6;" : "")">
+                                    @itemRef.Title
+                                </MudText>
+                                <MudSpacer />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                               OnClick="@(() => DeleteChecklistItemAsync(itemRef.Id!))"
+                                               Disabled="_isLoading" Color="Color.Error"
+                                               aria-label="@L.T("common.delete")" />
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+            else
+            {
+                <MudText Color="Color.Secondary" Class="my-3">@L.T("checklist.empty")</MudText>
+            }
+
+            <div class="d-flex gap-2 mt-3">
+                <MudTextField @bind-Value="_newChecklistTitle" Label="@L.T("checklist.new_item")"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1"
+                              OnKeyDown="@(async (e) => { if (e.Key == "Enter") await AddChecklistItemAsync(); })" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           OnClick="AddChecklistItemAsync" Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_newChecklistTitle))"
+                           StartIcon="@Icons.Material.Filled.Add">
+                    @L.T("common.add")
+                </MudButton>
+            </div>
+        </MudTabPanel>
+
         @* Time Tracking Tab *@
         <MudTabPanel Text="@L.T("time.title")" Icon="@Icons.Material.Filled.Timer">
             <MudGrid>
@@ -491,6 +535,9 @@ else
 
     // Tags
     private List<Tag> _availableTags = [];
+
+    // Checklist
+    private string _newChecklistTitle = string.Empty;
 
     // Subscription
     private bool _isSubscribed;
@@ -696,6 +743,51 @@ else
                 Snackbar.Add(L.T("detail.tag_removed"), Severity.Success);
                 await LoadTicketAsync();
             }
+            else Snackbar.Add(L.T("detail.delete_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task AddChecklistItemAsync()
+    {
+        if (_ticket == null || string.IsNullOrWhiteSpace(_newChecklistTitle)) return;
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.AddChecklistItemAsync(_ticket.Uid.ToString(), _newChecklistTitle))
+            {
+                _newChecklistTitle = string.Empty;
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task ToggleChecklistItemAsync(string itemId, bool completed)
+    {
+        if (_ticket == null) return;
+        _isLoading = true;
+        try
+        {
+            if (!await ApiService.UpdateChecklistItemAsync(_ticket.Uid.ToString(), itemId, completed: completed))
+                Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+            await LoadTicketAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task DeleteChecklistItemAsync(string itemId)
+    {
+        if (_ticket == null) return;
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.DeleteChecklistItemAsync(_ticket.Uid.ToString(), itemId))
+                await LoadTicketAsync();
             else Snackbar.Add(L.T("detail.delete_failed"), Severity.Error);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }

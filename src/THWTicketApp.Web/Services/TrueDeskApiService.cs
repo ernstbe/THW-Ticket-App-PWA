@@ -890,4 +890,38 @@ public class TrueDeskApiService : ITrueDeskApiService
             return null;
         }
     }
+
+    // -----------------------------------------------------------------
+    // Ticket Checklist (v2)
+    // -----------------------------------------------------------------
+
+    public async Task<bool> AddChecklistItemAsync(string ticketUid, string title)
+    {
+        if (string.IsNullOrWhiteSpace(ticketUid) || string.IsNullOrWhiteSpace(title))
+            return false;
+        var payload = new { title };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/tickets/{ticketUid}/checklist", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UpdateChecklistItemAsync(string ticketUid, string itemId, string? title = null, bool? completed = null)
+    {
+        if (string.IsNullOrWhiteSpace(ticketUid) || string.IsNullOrWhiteSpace(itemId))
+            return false;
+        var payload = new Dictionary<string, object?>();
+        if (title != null) payload["title"] = title;
+        if (completed != null) payload["completed"] = completed;
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/tickets/{ticketUid}/checklist/{itemId}", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteChecklistItemAsync(string ticketUid, string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(ticketUid) || string.IsNullOrWhiteSpace(itemId))
+            return false;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/tickets/{ticketUid}/checklist/{itemId}"));
+        return response.IsSuccessStatusCode;
+    }
 }

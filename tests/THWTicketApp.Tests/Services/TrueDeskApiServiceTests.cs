@@ -436,4 +436,69 @@ public class TrueDeskApiServiceTests
         Assert.Equal(HttpMethod.Get, LastRequest.Method);
         Assert.Equal("/api/v2/tickets/stats/user/usr1", LastRequest.RequestUri!.AbsolutePath);
     }
+
+    // -----------------------------------------------------------------
+    // Checklist (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task AddChecklistItemAsync_postsToV2ChecklistEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.AddChecklistItemAsync("42", "Buy milk");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/42/checklist", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"title\":\"Buy milk\"", LastBody);
+    }
+
+    [Fact]
+    public async Task AddChecklistItemAsync_returnsFalseOnEmptyTitle()
+    {
+        var ok = await _sut.AddChecklistItemAsync("42", "  ");
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
+
+    [Fact]
+    public async Task UpdateChecklistItemAsync_putsToV2ChecklistItemEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.UpdateChecklistItemAsync("42", "item1", completed: true);
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/42/checklist/item1", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"completed\":true", LastBody);
+    }
+
+    [Fact]
+    public async Task UpdateChecklistItemAsync_sendsOnlyProvidedFields()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await _sut.UpdateChecklistItemAsync("42", "item1", title: "Updated");
+
+        Assert.Contains("\"title\":\"Updated\"", LastBody);
+        Assert.DoesNotContain("completed", LastBody);
+    }
+
+    [Fact]
+    public async Task DeleteChecklistItemAsync_deletesV2ChecklistItem()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.DeleteChecklistItemAsync("42", "item1");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Delete, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/42/checklist/item1", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task DeleteChecklistItemAsync_returnsFalseOnEmptyId()
+    {
+        var ok = await _sut.DeleteChecklistItemAsync("42", "");
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
 }
