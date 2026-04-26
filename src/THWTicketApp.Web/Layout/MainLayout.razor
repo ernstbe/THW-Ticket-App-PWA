@@ -117,6 +117,30 @@
     </MudMainContent>
 </MudLayout>
 
+@if (_showShortcutHelp)
+{
+    <MudOverlay Visible="true" DarkBackground="true" OnClick="@(() => _showShortcutHelp = false)" ZIndex="9999">
+        <MudPaper Elevation="8" Class="pa-6" Style="max-width: 400px; margin: auto; margin-top: 15vh;">
+            <MudText Typo="Typo.h6" Class="mb-4">@L.T("shortcuts.title")</MudText>
+            <MudSimpleTable Dense="true" Hover="true">
+                <tbody>
+                    <tr><td><kbd>N</kbd></td><td>@L.T("shortcuts.new_ticket")</td></tr>
+                    <tr><td><kbd>T</kbd></td><td>@L.T("shortcuts.tickets")</td></tr>
+                    <tr><td><kbd>K</kbd></td><td>@L.T("shortcuts.kanban")</td></tr>
+                    <tr><td><kbd>D</kbd></td><td>@L.T("shortcuts.dashboard")</td></tr>
+                    <tr><td><kbd>R</kbd></td><td>@L.T("shortcuts.reports")</td></tr>
+                    <tr><td><kbd>S</kbd></td><td>@L.T("shortcuts.settings")</td></tr>
+                    <tr><td><kbd>/</kbd></td><td>@L.T("shortcuts.search")</td></tr>
+                    <tr><td><kbd>?</kbd></td><td>@L.T("shortcuts.help")</td></tr>
+                </tbody>
+            </MudSimpleTable>
+            <MudButton Class="mt-4" Variant="Variant.Text" OnClick="@(() => _showShortcutHelp = false)">
+                @L.T("common.close")
+            </MudButton>
+        </MudPaper>
+    </MudOverlay>
+}
+
 @code {
     private ErrorBoundary? _errorBoundary;
     private bool _drawerOpen = true;
@@ -126,7 +150,9 @@
     private bool _isInstalled;
     private int _unreadNotifications;
     private int _pendingActions;
+    private bool _showShortcutHelp;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
+    private IJSObjectReference? _shortcutModule;
 
     private string _primaryColor = "#003399";
     private string _primaryColorDark = "#4D7FCC";
@@ -195,6 +221,10 @@
             if (!_isInstalled)
                 await JsRuntime.InvokeVoidAsync("window.registerInstallHandler", _dotNetRef);
 
+            // Keyboard shortcuts
+            _shortcutModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/keyboard-shortcuts.js");
+            await _shortcutModule.InvokeVoidAsync("register", _dotNetRef);
+
             var darkMode = await LocalStorage.GetItemAsync("settings_darkmode");
             if (darkMode == "true") _isDarkMode = true;
 
@@ -253,6 +283,25 @@
 
     private void DismissInstallBanner() => _showInstallBanner = false;
 
+    [JSInvokable]
+    public void OnShortcut(string action)
+    {
+        InvokeAsync(() =>
+        {
+            switch (action)
+            {
+                case "new-ticket": Navigation.NavigateTo("tickets/add"); break;
+                case "kanban": Navigation.NavigateTo("kanban"); break;
+                case "tickets": Navigation.NavigateTo("tickets"); break;
+                case "dashboard": Navigation.NavigateTo("/"); break;
+                case "settings": Navigation.NavigateTo("settings"); break;
+                case "reports": Navigation.NavigateTo("reports"); break;
+                case "search": Navigation.NavigateTo("tickets"); break;
+                case "help": _showShortcutHelp = !_showShortcutHelp; StateHasChanged(); break;
+            }
+        });
+    }
+
     public void ApplyThemeColor(string color)
     {
         _primaryColor = color;
@@ -291,6 +340,8 @@
         RealtimeService.NotificationUpdate -= OnNotificationUpdate;
         SyncService.PendingCountChanged -= OnPendingCountChanged;
         L.LanguageChanged -= OnLanguageChanged;
+        if (_shortcutModule != null)
+            _ = _shortcutModule.InvokeVoidAsync("unregister");
         _dotNetRef?.Dispose();
     }
 
