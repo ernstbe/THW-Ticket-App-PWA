@@ -102,4 +102,8 @@ public interface ITrueDeskApiService
     Task<bool> UpdateTicketTagsAsync(string ticketId, IEnumerable<string> tagIds);
     Task<bool> AddTagToTicketAsync(string ticketId, string tagId);
     Task<bool> RemoveTagFromTicketAsync(string ticketId, string tagId);
+
+    // Profile (v2)
+    Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber);
+    Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword);
 }
