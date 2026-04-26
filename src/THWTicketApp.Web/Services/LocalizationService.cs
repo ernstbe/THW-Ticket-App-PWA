@@ -387,6 +387,7 @@ public class LocalizationService
         ["tickets.description_required"] = "Beschreibung ist erforderlich",
         ["tickets.group_required"] = "Gruppe ist erforderlich",
         ["tickets.create"] = "Ticket erstellen",
+        ["tickets.export_csv"] = "Als CSV exportieren",
         ["tickets.use_template"] = "Vorlage verwenden",
         ["tickets.form_load_error"] = "Fehler beim Laden der Formulardaten.",
         ["tickets.created"] = "Ticket erstellt!",
@@ -499,6 +500,17 @@ public class LocalizationService
         ["reports.priority_dist"] = "Prioritätsverteilung",
         ["reports.top_assignees"] = "Top Bearbeiter",
         ["reports.no_deadline_tickets"] = "Keine Tickets mit Fälligkeitsdatum",
+
+        // Keyboard Shortcuts
+        ["shortcuts.title"] = "Tastaturkürzel",
+        ["shortcuts.new_ticket"] = "Neues Ticket",
+        ["shortcuts.tickets"] = "Ticket-Liste",
+        ["shortcuts.kanban"] = "Kanban Board",
+        ["shortcuts.dashboard"] = "Dashboard",
+        ["shortcuts.reports"] = "Berichte",
+        ["shortcuts.settings"] = "Einstellungen",
+        ["shortcuts.search"] = "Suche fokussieren",
+        ["shortcuts.help"] = "Diese Hilfe anzeigen",
 
         // Advanced Search
         ["search.advanced"] = "Erweiterte Filter",
@@ -863,6 +875,7 @@ public class LocalizationService
         ["tickets.description_required"] = "Description is required",
         ["tickets.group_required"] = "Group is required",
         ["tickets.create"] = "Create ticket",
+        ["tickets.export_csv"] = "Export as CSV",
         ["tickets.use_template"] = "Use template",
         ["tickets.form_load_error"] = "Failed to load form data.",
         ["tickets.created"] = "Ticket created!",
@@ -975,6 +988,17 @@ public class LocalizationService
         ["reports.priority_dist"] = "Priority Distribution",
         ["reports.top_assignees"] = "Top Assignees",
         ["reports.no_deadline_tickets"] = "No tickets with due date",
+
+        // Keyboard Shortcuts
+        ["shortcuts.title"] = "Keyboard Shortcuts",
+        ["shortcuts.new_ticket"] = "New Ticket",
+        ["shortcuts.tickets"] = "Ticket List",
+        ["shortcuts.kanban"] = "Kanban Board",
+        ["shortcuts.dashboard"] = "Dashboard",
+        ["shortcuts.reports"] = "Reports",
+        ["shortcuts.settings"] = "Settings",
+        ["shortcuts.search"] = "Focus Search",
+        ["shortcuts.help"] = "Show this help",
 
         // Advanced Search
         ["search.advanced"] = "Advanced Filters",

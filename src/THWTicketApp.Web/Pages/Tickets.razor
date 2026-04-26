@@ -12,6 +12,7 @@
 @inject LocalStorageService LocalStorage
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
 @inject THWTicketApp.Web.Services.LocalizationService L
+@inject IJSRuntime JsRuntime
 @implements IDisposable
 
 <PageTitle>@L.T("tickets.title") - THW Ticket App</PageTitle>
@@ -108,6 +109,8 @@
                           ToggledIcon="@Icons.Material.Filled.CheckBox" Size="Size.Medium"
                           ToggledColor="Color.Primary"
                           aria-label="@L.T("batch.toggle")" />
+    <MudIconButton Icon="@Icons.Material.Filled.FileDownload" OnClick="ExportCsvAsync"
+                   Disabled="@(!_filteredTickets.Any())" aria-label="@L.T("tickets.export_csv")" />
     <MudText Typo="Typo.body2" Color="Color.Secondary">
         @_filteredTickets.Count Ticket(s)
     </MudText>
@@ -570,6 +573,22 @@ else
     {
         await LocalStorage.SetItemAsync("saved_filters", JsonSerializer.Serialize(_savedFilters));
     }
+
+    private async Task ExportCsvAsync()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("UID;Subject;Status;Priority;Assignee;Group;Created;Updated");
+        foreach (var t in _filteredTickets)
+        {
+            sb.AppendLine($"{t.Uid};\"{Escape(t.Subject)}\";\"{Escape(t.Status?.Name)}\";\"{Escape(t.Priority?.Name)}\";\"{Escape(t.Assignee?.Fullname)}\";\"{Escape(t.Group?.Name)}\";{t.Date:yyyy-MM-dd};{t.Updated:yyyy-MM-dd}");
+        }
+        var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        var base64 = Convert.ToBase64String(bytes);
+        await JsRuntime.InvokeVoidAsync("eval",
+            $"const a=document.createElement('a');a.href='data:text/csv;base64,{base64}';a.download='tickets-export.csv';a.click()");
+    }
+
+    private static string Escape(string? s) => s?.Replace("\"", "\"\"") ?? "";
 
     private class SavedFilterItem
     {
