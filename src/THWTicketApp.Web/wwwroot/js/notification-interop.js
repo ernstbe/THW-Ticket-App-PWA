@@ -14,14 +14,31 @@ export async function requestPermission() {
     return await Notification.requestPermission();
 }
 
-export function showNotification(title, body, tag, url) {
+export async function showNotification(title, body, tag, url) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return false;
 
+    // Prefer Service Worker notifications (work in background tabs)
+    if ('serviceWorker' in navigator) {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            await reg.showNotification(title, {
+                body: body,
+                tag: tag,
+                icon: '/app/icon-192.png',
+                badge: '/app/icon-192.png',
+                data: { url: url },
+                requireInteraction: false
+            });
+            return true;
+        } catch { /* fall through to legacy */ }
+    }
+
+    // Fallback: page-level notification (only works when tab is active)
     const notification = new Notification(title, {
         body: body,
         tag: tag,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/app/icon-192.png',
+        badge: '/app/icon-192.png',
         requireInteraction: false
     });
 
@@ -33,7 +50,6 @@ export function showNotification(title, body, tag, url) {
         };
     }
 
-    // Auto-close after 8 seconds
     setTimeout(() => notification.close(), 8000);
     return true;
 }

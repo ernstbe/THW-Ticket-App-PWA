@@ -7,14 +7,16 @@ public class BrowserNotificationService : IAsyncDisposable
     private readonly IJSRuntime _jsRuntime;
     private readonly LocalStorageService _localStorage;
     private readonly RealtimeService _realtimeService;
+    private readonly LocalizationService _localization;
     private IJSObjectReference? _module;
     private bool _initialized;
 
-    public BrowserNotificationService(IJSRuntime jsRuntime, LocalStorageService localStorage, RealtimeService realtimeService)
+    public BrowserNotificationService(IJSRuntime jsRuntime, LocalStorageService localStorage, RealtimeService realtimeService, LocalizationService localization)
     {
         _jsRuntime = jsRuntime;
         _localStorage = localStorage;
         _realtimeService = realtimeService;
+        _localization = localization;
     }
 
     private async Task<IJSObjectReference> GetModuleAsync()
@@ -60,15 +62,15 @@ public class BrowserNotificationService : IAsyncDisposable
 
             var (title, body) = eventName switch
             {
-                "ticketCreated" => ("Neues Ticket", $"Ticket #{ticketId} wurde erstellt."),
-                "ticketUpdated" => ("Ticket aktualisiert", $"Ticket #{ticketId} wurde geändert."),
-                "statusUpdated" => ("Status geändert", $"Status von Ticket #{ticketId} wurde geändert."),
-                "assigneeUpdated" => ("Zuweisung geändert", $"Zuweisung von Ticket #{ticketId} wurde geändert."),
-                "commentNoteAdded" => ("Neuer Kommentar", $"Neuer Kommentar bei Ticket #{ticketId}."),
-                _ => ("Ticket-Ereignis", $"Änderung bei Ticket #{ticketId}.")
+                "ticketCreated" => (_localization.T("notify.ticket_created"), string.Format(_localization.T("notify.ticket_created_body"), ticketId)),
+                "ticketUpdated" => (_localization.T("notify.ticket_updated"), string.Format(_localization.T("notify.ticket_updated_body"), ticketId)),
+                "statusUpdated" => (_localization.T("notify.status_changed"), string.Format(_localization.T("notify.status_changed_body"), ticketId)),
+                "assigneeUpdated" => (_localization.T("notify.assignee_changed"), string.Format(_localization.T("notify.assignee_changed_body"), ticketId)),
+                "commentNoteAdded" => (_localization.T("notify.comment_added"), string.Format(_localization.T("notify.comment_added_body"), ticketId)),
+                _ => (_localization.T("notify.ticket_event"), string.Format(_localization.T("notify.ticket_event_body"), ticketId))
             };
 
-            var url = string.IsNullOrEmpty(ticketId) ? null : $"/tickets/{ticketId}";
+            var url = string.IsNullOrEmpty(ticketId) ? null : $"/app/tickets/{ticketId}";
             var module = await GetModuleAsync();
             await module.InvokeAsync<bool>("showNotification", title, body, $"ticket-{ticketId}", url);
         }
