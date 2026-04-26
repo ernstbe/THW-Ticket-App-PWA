@@ -406,6 +406,9 @@ public class LocalizationService
         ["dashboard.open_suffix"] = "offen",
         ["dashboard.welcome"] = "Willkommen!",
         ["dashboard.welcome_user"] = "Willkommen",
+        ["dashboard.beschluesse"] = "Offene Beschlüsse",
+        ["dashboard.upcoming_tasks"] = "Nächste Aufgaben",
+        ["dashboard.assets_total"] = "Assets gesamt",
 
         // Login (additional)
         ["login.configure_server"] = "Bitte zuerst die Server-URL konfigurieren.",
@@ -872,6 +875,9 @@ public class LocalizationService
         ["dashboard.open_suffix"] = "open",
         ["dashboard.welcome"] = "Welcome!",
         ["dashboard.welcome_user"] = "Welcome",
+        ["dashboard.beschluesse"] = "Open Resolutions",
+        ["dashboard.upcoming_tasks"] = "Upcoming Tasks",
+        ["dashboard.assets_total"] = "Total Assets",
 
         // Login (additional)
         ["login.configure_server"] = "Please configure the server URL first.",
