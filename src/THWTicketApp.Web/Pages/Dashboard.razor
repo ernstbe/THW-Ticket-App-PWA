@@ -8,8 +8,9 @@
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
 
-<PageTitle>Dashboard - THW Ticket App</PageTitle>
+<PageTitle>@L.T("nav.dashboard") - THW Ticket App</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-2">@_welcomeMessage</MudText>
 
@@ -38,31 +39,31 @@ else
     <MudGrid Class="mb-6">
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.ConfirmationNumber" IconColor="Color.Primary"
-                      Value="_totalTickets" Label="Gesamt"
+                      Value="_totalTickets" Label="@L.T("dashboard.total")"
                       OnClick="@(() => Navigation.NavigateTo("tickets"))" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.FolderOpen" IconColor="Color.Info"
-                      Value="_openTickets" Label="Offen"
+                      Value="_openTickets" Label="@L.T("dashboard.open")"
                       OnClick="@(() => Navigation.NavigateTo("tickets?filter=open"))" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.HourglassTop" IconColor="Color.Warning"
-                      Value="_pendingTickets" Label="In Bearbeitung"
+                      Value="_pendingTickets" Label="@L.T("dashboard.in_progress")"
                       OnClick="@(() => Navigation.NavigateTo("tickets?filter=pending"))" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success"
-                      Value="_closedTickets" Label="Geschlossen"
+                      Value="_closedTickets" Label="@L.T("dashboard.closed")"
                       OnClick="@(() => Navigation.NavigateTo("tickets?filter=closed"))" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.PersonPin" IconColor="Color.Secondary"
-                      Value="_myTickets" Label="Meine" />
+                      Value="_myTickets" Label="@L.T("dashboard.mine")" />
         </MudItem>
         <MudItem xs="6" sm="4" md="2">
             <StatCard Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error"
-                      Value="_overdueTickets" Label="Überfällig" ValueColor="Color.Error" />
+                      Value="_overdueTickets" Label="@L.T("dashboard.overdue")" ValueColor="Color.Error" />
         </MudItem>
     </MudGrid>
 }
@@ -71,10 +72,10 @@ else
     <MudItem xs="12" md="8">
         <MudPaper Elevation="2" Class="pa-4">
             <div class="d-flex justify-space-between align-center mb-4">
-                <MudText Typo="Typo.h6">Letzte Tickets</MudText>
+                <MudText Typo="Typo.h6">@L.T("dashboard.recent")</MudText>
                 <MudButton Variant="Variant.Text" Color="Color.Primary"
                            OnClick="@(() => Navigation.NavigateTo("tickets"))">
-                    Alle anzeigen
+                    @L.T("dashboard.view_all")
                 </MudButton>
             </div>
             @if (_isLoading)
@@ -89,7 +90,7 @@ else
             }
             else if (_recentTickets.Count == 0)
             {
-                <MudText Color="Color.Secondary">Keine Tickets vorhanden.</MudText>
+                <MudText Color="Color.Secondary">@L.T("dashboard.no_tickets")</MudText>
             }
             else
             {
@@ -106,35 +107,35 @@ else
 
     <MudItem xs="12" md="4">
         <MudPaper Elevation="2" Class="pa-4 mb-4">
-            <MudText Typo="Typo.h6" Class="mb-3">Schnellaktionen</MudText>
+            <MudText Typo="Typo.h6" Class="mb-3">@L.T("dashboard.quick_actions")</MudText>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
                        StartIcon="@Icons.Material.Filled.Add" Class="mb-2"
                        OnClick="@(() => Navigation.NavigateTo("tickets/add"))">
-                Neues Ticket
+                @L.T("tickets.new")
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
                        StartIcon="@Icons.Material.Filled.ViewKanban" Class="mb-2"
                        OnClick="@(() => Navigation.NavigateTo("kanban"))">
-                Kanban Board
+                @L.T("nav.kanban")
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
                        StartIcon="@Icons.Material.Filled.BarChart"
                        OnClick="@(() => Navigation.NavigateTo("reports"))">
-                Berichte
+                @L.T("nav.reports")
             </MudButton>
         </MudPaper>
 
         @if (_ticketsPerGroup.Count > 0)
         {
             <MudPaper Elevation="2" Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-3">Tickets pro Gruppe</MudText>
+                <MudText Typo="Typo.h6" Class="mb-3">@L.T("dashboard.tickets_per_group")</MudText>
                 @foreach (var g in _ticketsPerGroup)
                 {
                     <div class="d-flex justify-space-between align-center mb-2">
                         <MudText Typo="Typo.body2">@g.GroupName</MudText>
                         <div class="d-flex align-center gap-2">
                             <MudChip T="string" Size="Size.Small" Color="Color.Primary">@g.Total</MudChip>
-                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">@g.Open offen</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">@g.Open @L.T("dashboard.open_suffix")</MudChip>
                         </div>
                     </div>
                 }
@@ -147,7 +148,7 @@ else
     private bool _isLoading;
     private bool _hasError;
     private string _errorMessage = string.Empty;
-    private string _welcomeMessage = "Willkommen!";
+    private string _welcomeMessage = string.Empty;
     private int _totalTickets, _openTickets, _pendingTickets, _closedTickets, _myTickets, _overdueTickets;
     private List<Ticket> _allTickets = [];
     private List<Ticket> _recentTickets = [];
@@ -156,8 +157,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         _welcomeMessage = string.IsNullOrEmpty(ApiService.CurrentUsername)
-            ? "Willkommen!"
-            : $"Willkommen, {ApiService.CurrentUsername}!";
+            ? L.T("dashboard.welcome")
+            : $"{L.T("dashboard.welcome_user")}, {ApiService.CurrentUsername}!";
         await LoadDashboardAsync();
     }
 
@@ -232,11 +233,11 @@ else
         {
             if (await ApiService.AssignTicketAsync(ticket.Id, userId))
             {
-                Snackbar.Add("Ticket zugewiesen.", Severity.Success);
+                Snackbar.Add(L.T("tickets.assigned"), Severity.Success);
                 await LoadDashboardAsync();
             }
         }
-        catch { Snackbar.Add("Zuweisung fehlgeschlagen.", Severity.Error); }
+        catch { Snackbar.Add(L.T("tickets.assign_failed"), Severity.Error); }
     }
 
     private async Task QuickCloseAsync(Ticket ticket)
@@ -249,11 +250,11 @@ else
             var closedStatus = statuses.FirstOrDefault(s => s.IsResolved);
             if (closedStatus != null && await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
             {
-                Snackbar.Add("Ticket geschlossen.", Severity.Success);
+                Snackbar.Add(L.T("tickets.closed_success"), Severity.Success);
                 await LoadDashboardAsync();
             }
         }
-        catch { Snackbar.Add("Schließen fehlgeschlagen.", Severity.Error); }
+        catch { Snackbar.Add(L.T("tickets.close_failed"), Severity.Error); }
     }
 
     private record GroupTicketCount(string GroupName, int Total, int Open);

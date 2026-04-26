@@ -8,6 +8,7 @@
 @inject THWTicketApp.Web.Services.AppSettingsInitializer SettingsInit
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
+@inject THWTicketApp.Web.Services.LocalizationService L
 @implements IAsyncDisposable
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="height: 100vh;">
@@ -27,11 +28,11 @@
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
                            OnClick="@LoginWithPasskeyAsync" Disabled="@_isLoading" Size="Size.Large"
                            StartIcon="@Icons.Material.Filled.Fingerprint" Class="mb-4">
-                    Mit Passkey anmelden
+                    @L.T("login.passkey")
                 </MudButton>
                 <div class="d-flex align-center gap-2 mb-4">
                     <MudDivider />
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">oder</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("common.or")</MudText>
                     <MudDivider />
                 </div>
             }
@@ -39,34 +40,34 @@
             @if (!_serverConfigured)
             {
                 <MudAlert Severity="Severity.Info" Class="mb-4">
-                    Bitte zuerst die Server-URL konfigurieren.
+                    @L.T("login.configure_server")
                 </MudAlert>
             }
 
             <MudExpansionPanels Class="mb-4" Elevation="0">
-                <MudExpansionPanel Text="Server-Konfiguration" Expanded="@(!_serverConfigured)"
+                <MudExpansionPanel Text="@L.T("login.server_config")" Expanded="@(!_serverConfigured)"
                                    Style="background: transparent;">
-                    <MudTextField @bind-Value="_serverUrl" Label="Server-URL"
+                    <MudTextField @bind-Value="_serverUrl" Label="@L.T("login.server_url")"
                                   Placeholder="https://trudesk.example.com/api/v2"
                                   Variant="Variant.Outlined" Margin="Margin.Dense"
                                   Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Dns"
                                   Disabled="@_isLoading" Class="mb-2" />
                     <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
                                OnClick="SaveServerUrlAsync" FullWidth="true">
-                        URL speichern
+                        @L.T("login.save_url")
                     </MudButton>
                 </MudExpansionPanel>
             </MudExpansionPanels>
 
             <MudForm @ref="_form">
-                <MudTextField @bind-Value="_username" Label="Benutzername" Variant="Variant.Outlined"
-                              Required="true" RequiredError="Benutzername ist erforderlich"
+                <MudTextField @bind-Value="_username" Label="@L.T("login.username")" Variant="Variant.Outlined"
+                              Required="true" RequiredError="@L.T("login.username_required")"
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Person"
                               Disabled="@(_isLoading || !_serverConfigured)" Class="mb-4"
                               OnKeyDown="@OnKeyDown" />
-                <MudTextField @bind-Value="_password" Label="Passwort" Variant="Variant.Outlined"
+                <MudTextField @bind-Value="_password" Label="@L.T("login.password")" Variant="Variant.Outlined"
                               InputType="InputType.Password"
-                              Required="true" RequiredError="Passwort ist erforderlich"
+                              Required="true" RequiredError="@L.T("login.password_required")"
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock"
                               Disabled="@(_isLoading || !_serverConfigured)"
                               OnKeyDown="@OnKeyDown" />
@@ -83,11 +84,11 @@
                 @if (_isLoading)
                 {
                     <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
-                    <MudText Class="ms-2">Anmelden...</MudText>
+                    <MudText Class="ms-2">@L.T("login.submitting")</MudText>
                 }
                 else
                 {
-                    <MudText>Anmelden</MudText>
+                    <MudText>@L.T("login.submit")</MudText>
                 }
             </MudButton>
         </MudCardActions>
@@ -132,7 +133,7 @@
     {
         if (string.IsNullOrWhiteSpace(_serverUrl))
         {
-            _errorMessage = "Bitte eine gültige Server-URL eingeben.";
+            _errorMessage = L.T("login.invalid_url");
             return;
         }
         await SettingsInit.SaveApiUrlAsync(_serverUrl);
@@ -166,12 +167,12 @@
             }
             else
             {
-                _errorMessage = "Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen.";
+                _errorMessage = L.T("login.failed");
             }
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Verbindungsfehler: {ex.Message}";
+            _errorMessage = $"{L.T("login.connection_error")}: {ex.Message}";
         }
         finally
         {
@@ -200,11 +201,11 @@
                     return;
                 }
             }
-            _errorMessage = "Passkey-Anmeldung fehlgeschlagen. Bitte mit Benutzername/Passwort anmelden.";
+            _errorMessage = L.T("login.passkey_failed");
         }
         catch
         {
-            _errorMessage = "Passkey-Anmeldung abgebrochen.";
+            _errorMessage = L.T("login.passkey_cancelled");
         }
         finally
         {

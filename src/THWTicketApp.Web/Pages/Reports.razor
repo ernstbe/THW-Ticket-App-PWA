@@ -36,7 +36,7 @@
     <MudItem xs="12">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">Ticket-Trend (letzte 8 Wochen)</MudText>
+                <MudText Typo="Typo.h6">@L.T("reports.weekly_trend")</MudText>
             </MudCardHeader>
             <MudCardContent>
                 @if (_weeklyTrend.Count > 0)
@@ -44,11 +44,11 @@
                     <div class="d-flex align-center gap-4 mb-3">
                         <div class="d-flex align-center gap-1">
                             <div style="width: 12px; height: 12px; background: var(--mud-palette-primary); border-radius: 2px;"></div>
-                            <MudText Typo="Typo.caption">Erstellt</MudText>
+                            <MudText Typo="Typo.caption">@L.T("reports.created")</MudText>
                         </div>
                         <div class="d-flex align-center gap-1">
                             <div style="width: 12px; height: 12px; background: #4CAF50; border-radius: 2px;"></div>
-                            <MudText Typo="Typo.caption">Geschlossen</MudText>
+                            <MudText Typo="Typo.caption">@L.T("reports.closed")</MudText>
                         </div>
                     </div>
                     @foreach (var week in _weeklyTrend)
@@ -70,7 +70,7 @@
                 }
                 else if (!_isLoading)
                 {
-                    <MudText Color="Color.Secondary">Keine Daten vorhanden.</MudText>
+                    <MudText Color="Color.Secondary">@L.T("reports.no_data")</MudText>
                 }
             </MudCardContent>
         </MudCard>
@@ -80,25 +80,25 @@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">Auflösungszeiten</MudText>
+                <MudText Typo="Typo.h6">@L.T("reports.resolution_times")</MudText>
             </MudCardHeader>
             <MudCardContent>
                 <MudSimpleTable Dense="true">
                     <tbody>
                         <tr>
-                            <td><MudText Typo="Typo.body2">Gelöste Tickets</MudText></td>
+                            <td><MudText Typo="Typo.body2">@L.T("reports.resolved")</MudText></td>
                             <td><MudText Typo="Typo.body2" Style="font-weight: 600;">@_resolvedCount</MudText></td>
                         </tr>
                         <tr>
-                            <td><MudText Typo="Typo.body2">Durchschnitt</MudText></td>
+                            <td><MudText Typo="Typo.body2">@L.T("reports.average")</MudText></td>
                             <td><MudText Typo="Typo.body2" Style="font-weight: 600;">@_avgResolutionTime</MudText></td>
                         </tr>
                         <tr>
-                            <td><MudText Typo="Typo.body2">Schnellste</MudText></td>
+                            <td><MudText Typo="Typo.body2">@L.T("reports.fastest")</MudText></td>
                             <td><MudText Typo="Typo.body2" Style="font-weight: 600; color: #4CAF50;">@_fastestResolution</MudText></td>
                         </tr>
                         <tr>
-                            <td><MudText Typo="Typo.body2">Langsamste</MudText></td>
+                            <td><MudText Typo="Typo.body2">@L.T("reports.slowest")</MudText></td>
                             <td><MudText Typo="Typo.body2" Style="font-weight: 600; color: #E74C3C;">@_slowestResolution</MudText></td>
                         </tr>
                     </tbody>
@@ -111,26 +111,26 @@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">SLA-Einhaltung</MudText>
+                <MudText Typo="Typo.h6">@L.T("reports.sla_compliance")</MudText>
             </MudCardHeader>
             <MudCardContent>
                 <MudText Typo="Typo.h4" Class="mb-2" Style="font-weight: 600;">@_slaComplianceText</MudText>
                 <MudSimpleTable Dense="true">
                     <tbody>
                         <tr>
-                            <td><MudChip T="string" Size="Size.Small" Style="background: #4CAF50; color: white;">Eingehalten</MudChip></td>
+                            <td><MudChip T="string" Size="Size.Small" Style="background: #4CAF50; color: white;">@L.T("reports.sla_met")</MudChip></td>
                             <td><MudText Typo="Typo.body2">@_slaMetCount</MudText></td>
                         </tr>
                         <tr>
-                            <td><MudChip T="string" Size="Size.Small" Style="background: #E74C3C; color: white;">Überschritten</MudChip></td>
+                            <td><MudChip T="string" Size="Size.Small" Style="background: #E74C3C; color: white;">@L.T("reports.sla_breached")</MudChip></td>
                             <td><MudText Typo="Typo.body2">@_slaBreachedCount</MudText></td>
                         </tr>
                         <tr>
-                            <td><MudChip T="string" Size="Size.Small" Style="background: #FF9800; color: white;">Gefährdet</MudChip></td>
+                            <td><MudChip T="string" Size="Size.Small" Style="background: #FF9800; color: white;">@L.T("reports.sla_at_risk")</MudChip></td>
                             <td><MudText Typo="Typo.body2">@_slaAtRiskCount</MudText></td>
                         </tr>
                         <tr>
-                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">Ohne Frist</MudText></td>
+                            <td><MudText Typo="Typo.body2" Color="Color.Secondary">@L.T("reports.no_deadline")</MudText></td>
                             <td><MudText Typo="Typo.body2">@_slaNoDeadlineCount</MudText></td>
                         </tr>
                     </tbody>
@@ -143,7 +143,7 @@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">Prioritätsverteilung</MudText>
+                <MudText Typo="Typo.h6">@L.T("reports.priority_dist")</MudText>
             </MudCardHeader>
             <MudCardContent>
                 @foreach (var p in _priorityDistribution)
@@ -185,7 +185,7 @@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">Top Bearbeiter</MudText>
+                <MudText Typo="Typo.h6">@L.T("reports.top_assignees")</MudText>
             </MudCardHeader>
             <MudCardContent>
                 @foreach (var a in _topAssignees)
@@ -193,18 +193,18 @@
                     <div class="mb-3">
                         <div class="d-flex justify-space-between mb-1">
                             <MudText Typo="Typo.body2" Style="font-weight: 600;">@a.Name</MudText>
-                            <MudText Typo="Typo.body2">@a.Total Tickets</MudText>
+                            <MudText Typo="Typo.body2">@a.Total @L.T("nav.tickets")</MudText>
                         </div>
                         <div class="d-flex" style="height: 16px; border-radius: 4px; overflow: hidden; background: var(--mud-palette-surface);">
                             @if (a.Total > 0)
                             {
-                                <div style="width: @(a.ClosedPercent)%; background: #4CAF50;" title="Geschlossen: @a.Closed"></div>
-                                <div style="width: @(a.OpenPercent)%; background: var(--mud-palette-primary);" title="Offen: @a.Open"></div>
+                                <div style="width: @(a.ClosedPercent)%; background: #4CAF50;" title="@L.T("reports.closed"): @a.Closed"></div>
+                                <div style="width: @(a.OpenPercent)%; background: var(--mud-palette-primary);" title="@L.T("tickets.open"): @a.Open"></div>
                             }
                         </div>
                         <div class="d-flex gap-3 mt-1">
-                            <MudText Typo="Typo.caption" Style="color: #4CAF50;">Geschlossen: @a.Closed</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Primary">Offen: @a.Open</MudText>
+                            <MudText Typo="Typo.caption" Style="color: #4CAF50;">@L.T("reports.closed"): @a.Closed</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Primary">@L.T("tickets.open"): @a.Open</MudText>
                         </div>
                     </div>
                 }
@@ -321,7 +321,7 @@
         {
             _slaMetCount = 0; _slaBreachedCount = 0; _slaAtRiskCount = 0;
             _slaCompliancePercent = 0;
-            _slaComplianceText = "Keine Tickets mit Fälligkeitsdatum";
+            _slaComplianceText = L.T("reports.no_deadline_tickets");
             return;
         }
 
@@ -344,7 +344,7 @@
         _slaMetCount = met; _slaBreachedCount = breached; _slaAtRiskCount = atRisk;
         var total = met + breached + atRisk;
         _slaCompliancePercent = total > 0 ? Math.Round(met * 100.0 / total, 1) : 0;
-        _slaComplianceText = $"{_slaCompliancePercent}% SLA-Einhaltung";
+        _slaComplianceText = $"{_slaCompliancePercent}% {L.T("reports.sla_compliance")}";
     }
 
     private void ComputePriorityDistribution(Ticket[] tickets)
@@ -361,7 +361,7 @@
         {
             _priorityDistribution.Add(new PriorityStatItem
             {
-                Name = g.Key.Name ?? "Unbekannt",
+                Name = g.Key.Name ?? L.T("common.unknown"),
                 Count = g.Count(),
                 Color = g.Key.HtmlColor ?? "#9E9E9E",
                 BarPercent = maxCount > 0 ? (int)(g.Count() * 100.0 / maxCount) : 0

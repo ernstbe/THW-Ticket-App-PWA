@@ -8,10 +8,11 @@
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
 
-<PageTitle>Neues Ticket - THW Ticket App</PageTitle>
+<PageTitle>@L.T("tickets.create_title") - THW Ticket App</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Neues Ticket erstellen</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">@L.T("tickets.create_title")</MudText>
 
 @if (_isLoading && _ticketTypes.Count == 0)
 {
@@ -31,17 +32,17 @@ else
 
 <MudPaper Elevation="2" Class="pa-6">
     <MudForm @ref="_form">
-        <MudTextField @bind-Value="_subject" Label="Betreff" Variant="Variant.Outlined"
-                      Required="true" RequiredError="Betreff ist erforderlich"
+        <MudTextField @bind-Value="_subject" Label="@L.T("detail.subject")" Variant="Variant.Outlined"
+                      Required="true" RequiredError="@L.T("tickets.subject_required")"
                       Counter="200" MaxLength="200" Immediate="true" Class="mb-4" />
 
-        <MudTextField @bind-Value="_issue" Label="Beschreibung" Variant="Variant.Outlined"
-                      Lines="5" Required="true" RequiredError="Beschreibung ist erforderlich"
+        <MudTextField @bind-Value="_issue" Label="@L.T("detail.description")" Variant="Variant.Outlined"
+                      Lines="5" Required="true" RequiredError="@L.T("tickets.description_required")"
                       Class="mb-4" />
 
         <MudGrid>
             <MudItem xs="12" sm="6">
-                <MudSelect T="TicketType" @bind-Value="_selectedType" Label="Typ" Variant="Variant.Outlined"
+                <MudSelect T="TicketType" @bind-Value="_selectedType" Label="@L.T("detail.type")" Variant="Variant.Outlined"
                            ToStringFunc="@(t => t?.TranslatedName ?? "")" Class="mb-4">
                     @foreach (var type in _ticketTypes)
                     {
@@ -50,7 +51,7 @@ else
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudSelect T="Priority" @bind-Value="_selectedPriority" Label="Priorität" Variant="Variant.Outlined"
+                <MudSelect T="Priority" @bind-Value="_selectedPriority" Label="@L.T("detail.priority")" Variant="Variant.Outlined"
                            ToStringFunc="@(p => p?.TranslatedName ?? "")" Class="mb-4">
                     @foreach (var priority in _priorities)
                     {
@@ -59,8 +60,8 @@ else
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudSelect T="Group" @bind-Value="_selectedGroup" Label="Gruppe" Variant="Variant.Outlined"
-                           Required="true" RequiredError="Gruppe ist erforderlich"
+                <MudSelect T="Group" @bind-Value="_selectedGroup" Label="@L.T("detail.group")" Variant="Variant.Outlined"
+                           Required="true" RequiredError="@L.T("tickets.group_required")"
                            ToStringFunc="@(g => g?.Name ?? "")" Class="mb-4">
                     @foreach (var group in _groups)
                     {
@@ -69,7 +70,7 @@ else
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudSelect T="User" @bind-Value="_selectedAssignee" Label="Zuständig" Variant="Variant.Outlined"
+                <MudSelect T="User" @bind-Value="_selectedAssignee" Label="@L.T("detail.assignee")" Variant="Variant.Outlined"
                            Clearable="true"
                            ToStringFunc="@(u => u?.Fullname ?? "")" Class="mb-4">
                     @foreach (var user in _users)
@@ -87,10 +88,10 @@ else
                 {
                     <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
                 }
-                Ticket erstellen
+                @L.T("tickets.create")
             </MudButton>
             <MudButton Variant="Variant.Outlined" OnClick="@(() => Navigation.NavigateTo("tickets"))">
-                Abbrechen
+                @L.T("common.cancel")
             </MudButton>
         </div>
     </MudForm>
@@ -155,7 +156,7 @@ else
             if (userResponse?.Users != null)
                 _users = userResponse.Users;
         }
-        catch { Snackbar.Add("Fehler beim Laden der Formulardaten.", Severity.Error); }
+        catch { Snackbar.Add(L.T("tickets.form_load_error"), Severity.Error); }
         finally
         {
             _isLoading = false;
@@ -180,17 +181,17 @@ else
 
             if (success)
             {
-                Snackbar.Add("Ticket erstellt!", Severity.Success);
+                Snackbar.Add(L.T("tickets.created"), Severity.Success);
                 Navigation.NavigateTo("tickets");
             }
             else
             {
-                Snackbar.Add($"Fehler: {ApiService.LastError ?? "Server hat das Ticket abgelehnt."}", Severity.Error);
+                Snackbar.Add($"{L.T("common.error")}: {ApiService.LastError ?? L.T("tickets.server_rejected")}", Severity.Error);
             }
         }
         catch
         {
-            Snackbar.Add("Netzwerkfehler. Bitte erneut versuchen.", Severity.Error);
+            Snackbar.Add(L.T("common.network_error"), Severity.Error);
         }
         finally
         {

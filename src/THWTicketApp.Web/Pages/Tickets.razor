@@ -11,23 +11,24 @@
 @inject ISnackbar Snackbar
 @inject LocalStorageService LocalStorage
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
+@inject THWTicketApp.Web.Services.LocalizationService L
 @implements IDisposable
 
-<PageTitle>Tickets - THW Ticket App</PageTitle>
+<PageTitle>@L.T("tickets.title") - THW Ticket App</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-4">
-    <MudText Typo="Typo.h4">Tickets</MudText>
+    <MudText Typo="Typo.h4">@L.T("tickets.title")</MudText>
     <div class="d-flex gap-2">
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.Add"
                    OnClick="@(() => Navigation.NavigateTo("tickets/add"))">
-            Neues Ticket
+            @L.T("tickets.new")
         </MudButton>
     </div>
 </div>
 
 @* Search bar *@
-<MudTextField @bind-Value="_searchText" Placeholder="Tickets suchen..." Variant="Variant.Outlined"
+<MudTextField @bind-Value="_searchText" Placeholder="@L.T("tickets.search")" Variant="Variant.Outlined"
               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
               Immediate="true" DebounceInterval="400" TextChanged="OnSearchChanged"
               Class="mb-3" Clearable="true" />
@@ -35,29 +36,29 @@
 @* Filter chips *@
 <div class="d-flex flex-wrap gap-2 mb-3">
     <MudChip T="string" Color="@(_activeFilter == "all" ? Color.Primary : Color.Default)"
-             Variant="Variant.Filled" OnClick="@(() => SetFilter("all"))">Alle</MudChip>
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("all"))">@L.T("common.all")</MudChip>
     <MudChip T="string" Color="@(_activeFilter == "open" ? Color.Info : Color.Default)"
-             Variant="Variant.Filled" OnClick="@(() => SetFilter("open"))">Offen</MudChip>
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("open"))">@L.T("tickets.open")</MudChip>
     <MudChip T="string" Color="@(_activeFilter == "pending" ? Color.Warning : Color.Default)"
-             Variant="Variant.Filled" OnClick="@(() => SetFilter("pending"))">In Bearbeitung</MudChip>
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("pending"))">@L.T("tickets.pending")</MudChip>
     <MudChip T="string" Color="@(_activeFilter == "closed" ? Color.Success : Color.Default)"
-             Variant="Variant.Filled" OnClick="@(() => SetFilter("closed"))">Geschlossen</MudChip>
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("closed"))">@L.T("tickets.closed")</MudChip>
     <MudChip T="string" Color="@(_showOnlyMyTickets ? Color.Secondary : Color.Default)"
-             Variant="Variant.Filled" OnClick="ToggleMyTickets">Meine Tickets</MudChip>
+             Variant="Variant.Filled" OnClick="ToggleMyTickets">@L.T("tickets.mytickets")</MudChip>
 </div>
 
 @* Sort selector *@
 <div class="d-flex align-center gap-2 mb-4">
-    <MudSelect T="string" @bind-Value="_activeSort" Label="Sortierung" Variant="Variant.Outlined"
+    <MudSelect T="string" @bind-Value="_activeSort" Label="@L.T("tickets.sort")" Variant="Variant.Outlined"
                Dense="true" Style="max-width: 250px;">
-        <MudSelectItem Value="@("date_desc")">Erstellt (neueste)</MudSelectItem>
-        <MudSelectItem Value="@("date_asc")">Erstellt (älteste)</MudSelectItem>
-        <MudSelectItem Value="@("updated")">Zuletzt aktualisiert</MudSelectItem>
-        <MudSelectItem Value="@("priority")">Priorität</MudSelectItem>
-        <MudSelectItem Value="@("subject")">Betreff (A-Z)</MudSelectItem>
+        <MudSelectItem Value="@("date_desc")">@L.T("tickets.sort.newest")</MudSelectItem>
+        <MudSelectItem Value="@("date_asc")">@L.T("tickets.sort.oldest")</MudSelectItem>
+        <MudSelectItem Value="@("updated")">@L.T("tickets.sort.updated")</MudSelectItem>
+        <MudSelectItem Value="@("priority")">@L.T("tickets.sort.priority")</MudSelectItem>
+        <MudSelectItem Value="@("subject")">@L.T("tickets.sort.subject")</MudSelectItem>
     </MudSelect>
     <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTicketsAsync"
-                   Disabled="_isLoading" aria-label="Aktualisieren" />
+                   Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
     <MudText Typo="Typo.body2" Color="Color.Secondary">
         @_filteredTickets.Count Ticket(s)
     </MudText>
@@ -65,7 +66,7 @@
     @* Saved Filters *@
     @if (_savedFilters.Count > 0)
     {
-        <MudMenu Label="Gespeicherte Filter" Variant="Variant.Outlined" Size="Size.Small"
+        <MudMenu Label="@L.T("tickets.loadfilter")" Variant="Variant.Outlined" Size="Size.Small"
                  StartIcon="@Icons.Material.Filled.FilterList" Dense="true">
             @foreach (var f in _savedFilters)
             {
@@ -86,14 +87,14 @@
 @if (_showSaveFilterDialog)
 {
     <MudPaper Elevation="2" Class="pa-3 mb-3 d-flex gap-2 align-center">
-        <MudTextField @bind-Value="_saveFilterName" Label="Filtername" Variant="Variant.Outlined"
+        <MudTextField @bind-Value="_saveFilterName" Label="@L.T("tickets.filtername")" Variant="Variant.Outlined"
                       Margin="Margin.Dense" Style="max-width: 250px;" T="string" />
         <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
                    OnClick="SaveCurrentFilterAsync" Disabled="@string.IsNullOrWhiteSpace(_saveFilterName)">
-            Speichern
+            @L.T("common.save")
         </MudButton>
         <MudButton Size="Size.Small" Variant="Variant.Text"
-                   OnClick="@(() => _showSaveFilterDialog = false)">Abbrechen</MudButton>
+                   OnClick="@(() => _showSaveFilterDialog = false)">@L.T("common.cancel")</MudButton>
     </MudPaper>
 }
 
@@ -121,7 +122,7 @@
 }
 else if (_filteredTickets.Count == 0)
 {
-    <MudAlert Severity="Severity.Normal">Keine Tickets gefunden.</MudAlert>
+    <MudAlert Severity="Severity.Normal">@L.T("tickets.none")</MudAlert>
 }
 else
 {
@@ -329,9 +330,9 @@ else
         try
         {
             if (await ApiService.AssignTicketAsync(ticket.Id, userId))
-            { Snackbar.Add("Ticket zugewiesen.", Severity.Success); await LoadTicketsAsync(); }
+            { Snackbar.Add(L.T("tickets.assigned"), Severity.Success); await LoadTicketsAsync(); }
         }
-        catch { Snackbar.Add("Zuweisung fehlgeschlagen.", Severity.Error); }
+        catch { Snackbar.Add(L.T("tickets.assign_failed"), Severity.Error); }
     }
 
     private async Task CloseTicketAsync(Ticket ticket)
@@ -343,9 +344,9 @@ else
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
             var closedStatus = statuses.FirstOrDefault(s => s.IsResolved);
             if (closedStatus != null && await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
-            { Snackbar.Add("Ticket geschlossen.", Severity.Success); await LoadTicketsAsync(); }
+            { Snackbar.Add(L.T("tickets.closed_success"), Severity.Success); await LoadTicketsAsync(); }
         }
-        catch { Snackbar.Add("Schließen fehlgeschlagen.", Severity.Error); }
+        catch { Snackbar.Add(L.T("tickets.close_failed"), Severity.Error); }
     }
 
     // Saved Filters
@@ -375,7 +376,7 @@ else
         await PersistSavedFiltersAsync();
         _saveFilterName = string.Empty;
         _showSaveFilterDialog = false;
-        Snackbar.Add("Filter gespeichert.", Severity.Success);
+        Snackbar.Add(L.T("tickets.filter_saved"), Severity.Success);
     }
 
     private void ApplySavedFilter(SavedFilterItem f)
@@ -391,7 +392,7 @@ else
     {
         _savedFilters.Remove(f);
         await PersistSavedFiltersAsync();
-        Snackbar.Add("Filter gelöscht.", Severity.Info);
+        Snackbar.Add(L.T("tickets.filter_deleted"), Severity.Info);
     }
 
     private async Task PersistSavedFiltersAsync()

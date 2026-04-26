@@ -7,13 +7,14 @@
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
 
-<PageTitle>Team - THW Ticket App</PageTitle>
+<PageTitle>@L.T("nav.team") - THW Ticket App</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-4">
-    <MudText Typo="Typo.h4">Team-Dashboard</MudText>
+    <MudText Typo="Typo.h4">@L.T("nav.team")</MudText>
     <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTeamDataAsync"
-                   Disabled="_isLoading" aria-label="Aktualisieren" />
+                   Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
 </div>
 
 @if (_isLoading)
@@ -26,37 +27,37 @@
     <MudItem xs="6" sm="4" md="2">
         <MudPaper Class="pa-4 text-center" Elevation="1">
             <MudText Typo="Typo.h4" Color="Color.Primary">@_totalTeamMembers</MudText>
-            <MudText Typo="Typo.caption">Mitglieder</MudText>
+            <MudText Typo="Typo.caption">@L.T("team.members")</MudText>
         </MudPaper>
     </MudItem>
     <MudItem xs="6" sm="4" md="2">
         <MudPaper Class="pa-4 text-center" Elevation="1">
             <MudText Typo="Typo.h4" Style="color: #FF9800;">@_averageWorkload.ToString("F1")</MudText>
-            <MudText Typo="Typo.caption">Tickets/Person</MudText>
+            <MudText Typo="Typo.caption">@L.T("team.tickets_per_person")</MudText>
         </MudPaper>
     </MudItem>
     <MudItem xs="6" sm="4" md="2">
         <MudPaper Class="pa-4 text-center" Elevation="1">
             <MudText Typo="Typo.h4" Color="Color.Primary">@_totalTickets</MudText>
-            <MudText Typo="Typo.caption">Tickets (30T)</MudText>
+            <MudText Typo="Typo.caption">@L.T("team.tickets_30d")</MudText>
         </MudPaper>
     </MudItem>
     <MudItem xs="6" sm="4" md="2">
         <MudPaper Class="pa-4 text-center" Elevation="1">
             <MudText Typo="Typo.h4" Style="color: #4CAF50;">@_closedTickets</MudText>
-            <MudText Typo="Typo.caption">Geschlossen</MudText>
+            <MudText Typo="Typo.caption">@L.T("team.closed")</MudText>
         </MudPaper>
     </MudItem>
     <MudItem xs="6" sm="4" md="2">
         <MudPaper Class="pa-4 text-center" Elevation="1">
             <MudText Typo="Typo.h4" Style="color: #FF9800;">@_avgResponseDisplay</MudText>
-            <MudText Typo="Typo.caption">Antwortzeit</MudText>
+            <MudText Typo="Typo.caption">@L.T("team.response_time")</MudText>
         </MudPaper>
     </MudItem>
     <MudItem xs="6" sm="4" md="2">
         <MudPaper Class="pa-4 text-center" Elevation="1">
             <MudText Typo="Typo.h4" Color="Color.Error">@_overdueCount</MudText>
-            <MudText Typo="Typo.caption">Überfällig</MudText>
+            <MudText Typo="Typo.caption">@L.T("team.overdue")</MudText>
         </MudPaper>
     </MudItem>
 </MudGrid>
@@ -67,11 +68,11 @@
     <MudPaper Class="pa-4 mb-4" Elevation="1">
         <MudGrid>
             <MudItem xs="6">
-                <MudText Typo="Typo.caption" Style="font-weight: 600;">Meiste Anfragen</MudText>
+                <MudText Typo="Typo.caption" Style="font-weight: 600;">@L.T("team.most_requests")</MudText>
                 <MudText Typo="Typo.body2">@(_topRequester ?? "-")</MudText>
             </MudItem>
             <MudItem xs="6">
-                <MudText Typo="Typo.caption" Style="font-weight: 600;">Meiste Zuweisungen</MudText>
+                <MudText Typo="Typo.caption" Style="font-weight: 600;">@L.T("team.most_assignments")</MudText>
                 <MudText Typo="Typo.body2">@(_topAssignee ?? "-")</MudText>
             </MudItem>
         </MudGrid>
@@ -81,12 +82,12 @@
 @* Team Members *@
 <MudCard>
     <MudCardHeader>
-        <MudText Typo="Typo.h6">Teamauslastung</MudText>
+        <MudText Typo="Typo.h6">@L.T("team.workload")</MudText>
     </MudCardHeader>
     <MudCardContent>
         @if (_teamMembers.Count == 0 && !_isLoading)
         {
-            <MudAlert Severity="Severity.Normal">Keine Teammitglieder gefunden.</MudAlert>
+            <MudAlert Severity="Severity.Normal">@L.T("team.no_members")</MudAlert>
         }
         else
         {
@@ -95,11 +96,11 @@
                     <tr>
                         <th></th>
                         <th>Name</th>
-                        <th>Zugewiesen</th>
-                        <th>Offen</th>
-                        <th>Geschlossen</th>
-                        <th>Antwortzeit</th>
-                        <th>Auslastung</th>
+                        <th>@L.T("team.assigned")</th>
+                        <th>@L.T("team.open")</th>
+                        <th>@L.T("team.closed")</th>
+                        <th>@L.T("team.response_time")</th>
+                        <th>@L.T("team.workload_col")</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -123,7 +124,7 @@
                             <td>
                                 <MudChip T="string" Size="Size.Small"
                                          Style="@($"background-color: {member.WorkloadColor}; color: white;")">
-                                    @member.WorkloadLabel
+                                    @GetWorkloadLabel(member.AssignedTickets)
                                 </MudChip>
                             </td>
                         </tr>
@@ -179,7 +180,7 @@
                     var userId = user.Id ?? user.InternalId;
                     var member = new TeamMemberStats
                     {
-                        Name = user.Fullname ?? user.Username ?? "Unbekannt",
+                        Name = user.Fullname ?? user.Username ?? L.T("common.unknown"),
                         Email = user.Email,
                         UserId = userId
                     };
@@ -264,6 +265,13 @@
         }
         catch { }
     }
+
+    private string GetWorkloadLabel(int assignedTickets) => assignedTickets switch
+    {
+        > 10 => L.T("team.workload_high"),
+        > 5 => L.T("team.workload_medium"),
+        _ => L.T("team.workload_normal")
+    };
 
     private class TeamMemberStats
     {
