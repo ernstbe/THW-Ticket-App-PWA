@@ -106,6 +106,13 @@ public interface ITrueDeskApiService
     Task<bool> CreateDocumentAsync(string name, string? description, string? category);
     Task<bool> DeleteDocumentAsync(string documentId);
 
+    // Notices (v2)
+    Task<string> GetNoticesAsync();
+    Task<bool> CreateNoticeAsync(string name, string message, string color, string fontColor);
+    Task<bool> ActivateNoticeAsync(string noticeId);
+    Task<bool> ClearNoticesAsync();
+    Task<bool> DeleteNoticeAsync(string noticeId);
+
     // Ticket tags — implemented on top of the existing ticket PUT endpoint
     Task<bool> UpdateTicketTagsAsync(string ticketId, IEnumerable<string> tagIds);
     Task<bool> AddTagToTicketAsync(string ticketId, string tagId);

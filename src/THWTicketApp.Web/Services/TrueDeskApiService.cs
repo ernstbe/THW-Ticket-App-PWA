@@ -579,6 +579,47 @@ public class TrueDeskApiService : ITrueDeskApiService
         return response.IsSuccessStatusCode;
     }
 
+    // -----------------------------------------------------------------
+    // Notices (v2)
+    // -----------------------------------------------------------------
+
+    public async Task<string> GetNoticesAsync()
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/notices"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<bool> CreateNoticeAsync(string name, string message, string color, string fontColor)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(message)) return false;
+        var payload = new { name, message, color, fontColor };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/notices", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> ActivateNoticeAsync(string noticeId)
+    {
+        if (string.IsNullOrWhiteSpace(noticeId)) return false;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/notices/{noticeId}/activate",
+            new StringContent("{}", Encoding.UTF8, "application/json")));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> ClearNoticesAsync()
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/notices/clear"));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteNoticeAsync(string noticeId)
+    {
+        if (string.IsNullOrWhiteSpace(noticeId)) return false;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/notices/{noticeId}"));
+        return response.IsSuccessStatusCode;
+    }
+
     // Dashboard (v2)
     public async Task<string> GetDashboardWidgetsAsync()
     {

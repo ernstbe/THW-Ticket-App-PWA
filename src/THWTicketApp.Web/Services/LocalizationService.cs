@@ -537,6 +537,21 @@ public class LocalizationService
         ["documents.created"] = "Dokument erstellt.",
         ["documents.deleted"] = "Dokument gelöscht.",
 
+        // Notices
+        ["nav.notices"] = "Ankündigungen",
+        ["notices.new"] = "Neue Ankündigung",
+        ["notices.empty"] = "Keine Ankündigungen vorhanden.",
+        ["notices.name"] = "Titel",
+        ["notices.message"] = "Nachricht",
+        ["notices.bg_color"] = "Hintergrundfarbe",
+        ["notices.active"] = "Aktiv",
+        ["notices.activate"] = "Aktivieren",
+        ["notices.clear_all"] = "Alle deaktivieren",
+        ["notices.created"] = "Ankündigung erstellt.",
+        ["notices.activated"] = "Ankündigung aktiviert.",
+        ["notices.cleared"] = "Alle Ankündigungen deaktiviert.",
+        ["notices.deleted"] = "Ankündigung gelöscht.",
+
         // Accessibility
         ["a11y.toggle_menu"] = "Menü umschalten",
         ["a11y.notifications"] = "Benachrichtigungen",
@@ -1043,6 +1058,21 @@ public class LocalizationService
         ["documents.size"] = "Size",
         ["documents.created"] = "Document created.",
         ["documents.deleted"] = "Document deleted.",
+
+        // Notices
+        ["nav.notices"] = "Notices",
+        ["notices.new"] = "New Notice",
+        ["notices.empty"] = "No notices yet.",
+        ["notices.name"] = "Title",
+        ["notices.message"] = "Message",
+        ["notices.bg_color"] = "Background Color",
+        ["notices.active"] = "Active",
+        ["notices.activate"] = "Activate",
+        ["notices.clear_all"] = "Clear All",
+        ["notices.created"] = "Notice created.",
+        ["notices.activated"] = "Notice activated.",
+        ["notices.cleared"] = "All notices deactivated.",
+        ["notices.deleted"] = "Notice deleted.",
 
         // Accessibility
         ["a11y.toggle_menu"] = "Toggle menu",
