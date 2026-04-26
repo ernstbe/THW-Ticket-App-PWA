@@ -55,3 +55,31 @@ public class SettingsTests
         Assert.Equal(Color.Default, Settings.GetLevelColor("debug"));
     }
 }
+
+// Added in R9.1
+
+public class MainLayoutTests
+{
+    [Fact]
+    public void LightenColor_standardHex_addsBrightness()
+    {
+        var result = THWTicketApp.Web.Layout.MainLayout.LightenColor("#003399");
+        Assert.StartsWith("#", result);
+        Assert.Equal(7, result.Length);
+        // #003399 → R=0+40=40(28), G=51+40=91(5B), B=153+40=193(C1)
+        Assert.Equal("#285BC1", result);
+    }
+
+    [Fact]
+    public void LightenColor_nearWhite_clampsto255()
+    {
+        var result = THWTicketApp.Web.Layout.MainLayout.LightenColor("#F0F0F0");
+        Assert.Equal("#FFFFFF", result);
+    }
+
+    [Fact]
+    public void LightenColor_shortHex_returnsAsIs()
+    {
+        Assert.Equal("#FFF", THWTicketApp.Web.Layout.MainLayout.LightenColor("#FFF"));
+    }
+}
