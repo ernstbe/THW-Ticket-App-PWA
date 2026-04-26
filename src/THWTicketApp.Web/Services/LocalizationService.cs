@@ -293,6 +293,12 @@ public class LocalizationService
         ["settings.synclog_action"] = "Aktion",
         ["settings.synclog_message"] = "Nachricht",
 
+        // Batch
+        ["batch.toggle"] = "Mehrfachauswahl",
+        ["batch.selected"] = "{0} Ticket(s) ausgewählt",
+        ["batch.deleted"] = "{0} gelöscht, {1} fehlgeschlagen",
+        ["batch.updated"] = "{0} aktualisiert, {1} fehlgeschlagen",
+
         // Profile
         ["nav.profile"] = "Profil",
         ["profile.title"] = "Profil",
@@ -339,11 +345,20 @@ public class LocalizationService
         ["detail.quickreply_templates"] = "Schnellantwort-Vorlagen",
         ["detail.new_template"] = "Neu",
         ["detail.link_ticket_num"] = "Ticket #",
+        ["common.add"] = "Hinzufügen",
+
+        // Checklist
+        ["checklist.title"] = "Checkliste",
+        ["checklist.empty"] = "Keine Einträge.",
+        ["checklist.new_item"] = "Neuer Eintrag",
+
         ["detail.add_tag"] = "Tag hinzufügen",
         ["detail.tag_added"] = "Tag hinzugefügt",
         ["detail.tag_removed"] = "Tag entfernt.",
 
         // Tickets (additional)
+        ["tickets.assign_me"] = "Mir zuweisen",
+        ["tickets.actions"] = "Ticket-Aktionen",
         ["tickets.assign_failed"] = "Zuweisung fehlgeschlagen.",
         ["tickets.close_failed"] = "Schließen fehlgeschlagen.",
         ["tickets.filter_saved"] = "Filter gespeichert.",
@@ -725,6 +740,12 @@ public class LocalizationService
         ["settings.synclog_action"] = "Action",
         ["settings.synclog_message"] = "Message",
 
+        // Batch
+        ["batch.toggle"] = "Multi-select",
+        ["batch.selected"] = "{0} ticket(s) selected",
+        ["batch.deleted"] = "{0} deleted, {1} failed",
+        ["batch.updated"] = "{0} updated, {1} failed",
+
         // Profile
         ["nav.profile"] = "Profile",
         ["profile.title"] = "Profile",
@@ -771,11 +792,20 @@ public class LocalizationService
         ["detail.quickreply_templates"] = "Quick reply templates",
         ["detail.new_template"] = "New",
         ["detail.link_ticket_num"] = "Ticket #",
+        ["common.add"] = "Add",
+
+        // Checklist
+        ["checklist.title"] = "Checklist",
+        ["checklist.empty"] = "No items.",
+        ["checklist.new_item"] = "New item",
+
         ["detail.add_tag"] = "Add tag",
         ["detail.tag_added"] = "Tag added",
         ["detail.tag_removed"] = "Tag removed.",
 
         // Tickets (additional)
+        ["tickets.assign_me"] = "Assign to me",
+        ["tickets.actions"] = "Ticket actions",
         ["tickets.assign_failed"] = "Assignment failed.",
         ["tickets.close_failed"] = "Close failed.",
         ["tickets.filter_saved"] = "Filter saved.",

@@ -40,6 +40,7 @@ public class Ticket
     public List<Note> Notes { get; set; } = new();
     public List<Attachment> Attachments { get; set; } = new();
     public List<HistoryItem> History { get; set; } = new();
+    public List<ChecklistItem> Checklist { get; set; } = new();
     public Status? Status { get; set; }
     public Owner? Owner { get; set; }
     public int Uid { get; set; }
