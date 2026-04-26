@@ -8,14 +8,15 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
+@inject THWTicketApp.Web.Services.LocalizationService L
 @implements IDisposable
 
-<PageTitle>Kanban Board - THW Ticket App</PageTitle>
+<PageTitle>@L.T("nav.kanban") - THW Ticket App</PageTitle>
 
 <div class="d-flex justify-space-between align-center mb-4">
-    <MudText Typo="Typo.h4">Kanban Board</MudText>
+    <MudText Typo="Typo.h4">@L.T("nav.kanban")</MudText>
     <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadBoardAsync"
-                   Disabled="_isLoading" aria-label="Aktualisieren" />
+                   Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
 </div>
 
 @if (_isLoading)
@@ -32,22 +33,26 @@ else
                       ItemsSelector="@((item, zone) => item.StatusId == zone)"
                       ItemDropped="OnItemDropped"
                       Class="d-flex flex-row overflow-auto gap-4 pa-2"
-                      Style="min-height: calc(100vh - 220px);">
+                      Style="min-height: calc(100vh - 220px);"
+                      role="region" aria-label="@L.T("kanban.board")">
         <ChildContent>
             @foreach (var column in _columns)
             {
-                <MudPaper Class="flex-shrink-0 rounded-lg" Style="width: 300px; background: var(--mud-palette-surface);" Elevation="1">
+                <MudPaper Class="flex-shrink-0 rounded-lg" Style="width: 300px; background: var(--mud-palette-surface);"
+                          Elevation="1" role="group"
+                          aria-label="@($"{column.StatusName} — {column.TicketCount} {L.T("kanban.tickets")}")">
                     @* Column Header *@
                     <div class="d-flex align-center pa-3 rounded-t-lg"
                          style="border-bottom: 3px solid @column.StatusColor;">
                         <div style="width: 4px; height: 24px; border-radius: 2px; background-color: @column.StatusColor;"
-                             class="mr-2"></div>
+                             class="mr-2" aria-hidden="true"></div>
                         <MudText Typo="Typo.subtitle1" Class="flex-grow-1" Style="font-weight: 600;">
                             @column.StatusName
                         </MudText>
                         <MudChip T="string" Size="Size.Small"
                                  Style="@($"background-color: {column.StatusColor}; color: white;")"
-                                 Text="@column.TicketCount.ToString()" />
+                                 Text="@column.TicketCount.ToString()"
+                                 aria-label="@($"{column.TicketCount} {L.T("kanban.tickets")}")" />
                     </div>
 
                     @* Drop Zone *@
@@ -59,20 +64,24 @@ else
         </ChildContent>
         <ItemRenderer>
             <MudPaper Class="pa-3 mb-2 rounded cursor-pointer kanban-card" Elevation="0"
-                      Outlined="true"
-                      @onclick="@(() => Navigation.NavigateTo($"/tickets/{context.Uid}"))">
+                      Outlined="true" tabindex="0"
+                      role="link"
+                      aria-label="@($"#{context.Uid} {context.Subject}")"
+                      @onclick="@(() => Navigation.NavigateTo($"/tickets/{context.Uid}"))"
+                      @onkeydown="@(e => { if (e.Key == "Enter" || e.Key == " ") Navigation.NavigateTo($"/tickets/{context.Uid}"); })">
                 <MudText Typo="Typo.body2" Style="font-weight: 600;" Class="mb-1">
                     @context.Subject
                 </MudText>
                 <div class="d-flex align-center gap-2 mb-1">
                     @if (!string.IsNullOrEmpty(context.PriorityName))
                     {
-                        <MudText Typo="Typo.caption" Style="@($"color: {context.PriorityColor};")">
+                        <MudText Typo="Typo.caption" Style="@($"color: {context.PriorityColor};")"
+                                 aria-label="@($"{L.T("detail.priority")}: {context.PriorityName}")">
                             @context.PriorityName
                         </MudText>
                     }
                     <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        @(context.AssigneeName ?? "Nicht zugewiesen")
+                        @(context.AssigneeName ?? L.T("detail.unassigned"))
                     </MudText>
                 </div>
                 <MudText Typo="Typo.caption" Color="Color.Tertiary">#@context.Uid</MudText>
@@ -149,7 +158,7 @@ else
             _columns = statuses.OrderBy(s => s.Order).Select(s => new KanbanColumn
             {
                 StatusId = s.Id ?? string.Empty,
-                StatusName = TrudeskTranslationHelper.TranslateStatus(s.Name) ?? s.Name ?? "Unbekannt",
+                StatusName = TrudeskTranslationHelper.TranslateStatus(s.Name) ?? s.Name ?? L.T("common.unknown"),
                 StatusColor = s.HtmlColor ?? "#9E9E9E"
             }).ToList();
 
@@ -157,7 +166,7 @@ else
             {
                 TicketId = t.Id ?? string.Empty,
                 Uid = t.Uid,
-                Subject = t.Subject ?? "(Kein Betreff)",
+                Subject = t.Subject ?? L.T("kanban.no_subject"),
                 StatusId = t.Status?.Id ?? string.Empty,
                 PriorityName = t.Priority?.TranslatedName ?? t.Priority?.Name,
                 PriorityColor = t.Priority?.HtmlColor ?? "#888",
@@ -203,7 +212,7 @@ else
             var success = await ApiService.UpdateTicketStatusAsync(item.TicketId, newStatusId);
             if (success)
             {
-                Snackbar.Add($"Ticket #{item.Uid} verschoben.", Severity.Success);
+                Snackbar.Add($"{L.T("kanban.ticket_moved")} #{item.Uid}", Severity.Success);
             }
             else
             {
@@ -211,7 +220,7 @@ else
                 item.StatusId = oldStatusId;
                 if (oldCol != null) oldCol.TicketCount++;
                 if (newCol != null) newCol.TicketCount--;
-                Snackbar.Add("Status-Änderung fehlgeschlagen.", Severity.Error);
+                Snackbar.Add(L.T("kanban.move_failed"), Severity.Error);
             }
         }
         catch
@@ -219,7 +228,7 @@ else
             item.StatusId = oldStatusId;
             if (oldCol != null) oldCol.TicketCount++;
             if (newCol != null) newCol.TicketCount--;
-            Snackbar.Add("Status-Änderung fehlgeschlagen.", Severity.Error);
+            Snackbar.Add(L.T("kanban.move_failed"), Severity.Error);
         }
         StateHasChanged();
     }
