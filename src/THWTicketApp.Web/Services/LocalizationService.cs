@@ -282,6 +282,16 @@ public class LocalizationService
         ["settings.connection_failed"] = "Verbindung fehlgeschlagen. Server nicht erreichbar.",
         ["settings.cache_cleared"] = "Cache geleert.",
         ["settings.about"] = "Über",
+        ["settings.synclog"] = "Sync-Log",
+        ["settings.synclog_desc"] = "Protokoll der Offline-Synchronisierung",
+        ["settings.synclog_empty"] = "Keine Log-Einträge vorhanden.",
+        ["settings.synclog_export"] = "Log exportieren",
+        ["settings.synclog_clear"] = "Log leeren",
+        ["settings.synclog_cleared"] = "Sync-Log geleert.",
+        ["settings.synclog_time"] = "Zeitpunkt",
+        ["settings.synclog_level"] = "Stufe",
+        ["settings.synclog_action"] = "Aktion",
+        ["settings.synclog_message"] = "Nachricht",
 
         // Kanban
         ["kanban.board"] = "Kanban-Board",
@@ -543,6 +553,16 @@ public class LocalizationService
         ["settings.connection_failed"] = "Connection failed. Server unreachable.",
         ["settings.cache_cleared"] = "Cache cleared.",
         ["settings.about"] = "About",
+        ["settings.synclog"] = "Sync Log",
+        ["settings.synclog_desc"] = "Offline synchronization activity log",
+        ["settings.synclog_empty"] = "No log entries.",
+        ["settings.synclog_export"] = "Export log",
+        ["settings.synclog_clear"] = "Clear log",
+        ["settings.synclog_cleared"] = "Sync log cleared.",
+        ["settings.synclog_time"] = "Time",
+        ["settings.synclog_level"] = "Level",
+        ["settings.synclog_action"] = "Action",
+        ["settings.synclog_message"] = "Message",
 
         // Kanban
         ["kanban.board"] = "Kanban board",

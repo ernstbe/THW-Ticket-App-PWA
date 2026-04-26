@@ -12,6 +12,7 @@
 @inject ISnackbar Snackbar
 @inject HttpClient HttpClient
 @inject IJSRuntime JsRuntime
+@inject IIndexedDbService IndexedDb
 @implements IAsyncDisposable
 
 <PageTitle>@L.T("settings.title") - THW Ticket App</PageTitle>
@@ -187,6 +188,70 @@
         </MudCard>
     </MudItem>
 
+    @* Sync Log *@
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">@L.T("settings.synclog")</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadSyncLogAsync"
+                                   aria-label="@L.T("common.refresh")" />
+                    <MudIconButton Icon="@Icons.Material.Filled.FileDownload" OnClick="ExportSyncLogAsync"
+                                   Disabled="!_syncLogEntries.Any()"
+                                   aria-label="@L.T("settings.synclog_export")" />
+                    <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearSyncLogAsync"
+                                   Disabled="!_syncLogEntries.Any()" Color="Color.Error"
+                                   aria-label="@L.T("settings.synclog_clear")" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    @L.T("settings.synclog_desc")
+                </MudText>
+
+                @if (_loadingSyncLog)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+                else if (!_syncLogEntries.Any())
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@L.T("settings.synclog_empty")</MudText>
+                }
+                else
+                {
+                    <MudTable Items="_syncLogEntries" Dense="true" Hover="true" Breakpoint="Breakpoint.Sm"
+                              FixedHeader="true" Height="300px">
+                        <HeaderContent>
+                            <MudTh>@L.T("settings.synclog_time")</MudTh>
+                            <MudTh>@L.T("settings.synclog_level")</MudTh>
+                            <MudTh>@L.T("settings.synclog_action")</MudTh>
+                            <MudTh>@L.T("settings.synclog_message")</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="@L.T("settings.synclog_time")">
+                                <MudText Typo="Typo.caption">@FormatTimestamp(context.Timestamp)</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="@L.T("settings.synclog_level")">
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@GetLevelColor(context.Level)">
+                                    @context.Level
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="@L.T("settings.synclog_action")">
+                                @(context.ActionType ?? "—")
+                            </MudTd>
+                            <MudTd DataLabel="@L.T("settings.synclog_message")">
+                                @context.Message
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
     @* About *@
     <MudItem xs="12" md="6">
         <MudCard>
@@ -238,6 +303,10 @@
     private bool _webauthnSupported;
     private bool _passkeyRegistered;
 
+    // Sync Log
+    private List<SyncLogDto> _syncLogEntries = new();
+    private bool _loadingSyncLog;
+
     protected override async Task OnInitializedAsync()
     {
         _apiBaseUrl = AppSettings.ApiBaseUrl;
@@ -258,6 +327,8 @@
 
         var savedTimeout = await LocalStorage.GetItemAsync("settings_timeout");
         if (int.TryParse(savedTimeout, out var t)) _connectionTimeout = t;
+
+        await LoadSyncLogAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -403,6 +474,65 @@
         await ApiService.LogoutAsync();
         AuthStateProvider.NotifyAuthStateChanged();
         Navigation.NavigateTo("login");
+    }
+
+    // -----------------------------------------------------------------
+    // Sync Log
+    // -----------------------------------------------------------------
+
+    private async Task LoadSyncLogAsync()
+    {
+        _loadingSyncLog = true;
+        try
+        {
+            var json = await IndexedDb.GetSyncLogAsync(200);
+            _syncLogEntries = System.Text.Json.JsonSerializer.Deserialize<List<SyncLogDto>>(json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+        }
+        catch { _syncLogEntries = new(); }
+        finally { _loadingSyncLog = false; }
+    }
+
+    private async Task ExportSyncLogAsync()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(_syncLogEntries,
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        var base64 = Convert.ToBase64String(bytes);
+        await JsRuntime.InvokeVoidAsync("eval",
+            $"const a=document.createElement('a');a.href='data:application/json;base64,{base64}';a.download='sync-log.json';a.click()");
+    }
+
+    private async Task ClearSyncLogAsync()
+    {
+        await IndexedDb.ClearSyncLogAsync();
+        _syncLogEntries = new();
+        Snackbar.Add(L.T("settings.synclog_cleared"), Severity.Success);
+    }
+
+    internal static string FormatTimestamp(string iso)
+    {
+        if (DateTime.TryParse(iso, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+            return dt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+        return iso;
+    }
+
+    internal static Color GetLevelColor(string level) => level switch
+    {
+        "error" => Color.Error,
+        "warn" => Color.Warning,
+        _ => Color.Default
+    };
+
+    internal sealed class SyncLogDto
+    {
+        public string Timestamp { get; set; } = string.Empty;
+        public string Level { get; set; } = string.Empty;
+        public int? ActionId { get; set; }
+        public string? ActionType { get; set; }
+        public string? TicketId { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string? Exception { get; set; }
     }
 
     public async ValueTask DisposeAsync()
