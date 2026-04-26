@@ -285,6 +285,14 @@ public class LocalizationService
         ["settings.synclog_action"] = "Aktion",
         ["settings.synclog_message"] = "Nachricht",
 
+        // Kanban
+        ["kanban.board"] = "Kanban-Board",
+        ["kanban.tickets"] = "Tickets",
+        ["kanban.ticket_moved"] = "Ticket verschoben",
+        ["kanban.move_failed"] = "Status-Änderung fehlgeschlagen.",
+        ["kanban.no_subject"] = "(Kein Betreff)",
+        ["common.unknown"] = "Unbekannt",
+
         // Accessibility
         ["a11y.toggle_menu"] = "Menü umschalten",
         ["a11y.notifications"] = "Benachrichtigungen",
@@ -539,6 +547,14 @@ public class LocalizationService
         ["settings.synclog_level"] = "Level",
         ["settings.synclog_action"] = "Action",
         ["settings.synclog_message"] = "Message",
+
+        // Kanban
+        ["kanban.board"] = "Kanban board",
+        ["kanban.tickets"] = "tickets",
+        ["kanban.ticket_moved"] = "Ticket moved",
+        ["kanban.move_failed"] = "Status change failed.",
+        ["kanban.no_subject"] = "(No subject)",
+        ["common.unknown"] = "Unknown",
 
         // Accessibility
         ["a11y.toggle_menu"] = "Toggle menu",
