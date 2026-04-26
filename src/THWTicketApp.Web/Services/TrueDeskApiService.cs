@@ -29,7 +29,7 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_authToken);
 
-    private string BaseUrl => _settings.ApiBaseUrl.TrimEnd('/');
+    private string BaseUrl => _settings.ApiBaseUrl.Trim().TrimEnd('/');
     private string ServerUrl => BaseUrl.Replace("/api/v2", "").Replace("/api/v1", "");
     private bool IsV2 => BaseUrl.Contains("/api/v2");
     // Some endpoints only exist in v1 - use this for those calls
