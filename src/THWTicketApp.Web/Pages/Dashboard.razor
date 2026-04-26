@@ -141,6 +141,57 @@ else
                 }
             </MudPaper>
         }
+
+        @* Widgets *@
+        @if (_widgetsLoaded)
+        {
+            @if (_widgetBeschluesse > 0)
+            {
+                <MudPaper Elevation="2" Class="pa-4">
+                    <div class="d-flex align-center gap-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="Color.Primary" Size="Size.Large" />
+                        <div>
+                            <MudText Typo="Typo.h4" Color="Color.Primary">@_widgetBeschluesse</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@L.T("dashboard.beschluesse")</MudText>
+                        </div>
+                    </div>
+                </MudPaper>
+            }
+
+            @if (_widgetRecurringTasks.Count > 0)
+            {
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">@L.T("dashboard.upcoming_tasks")</MudText>
+                    @foreach (var task in _widgetRecurringTasks)
+                    {
+                        <div class="d-flex justify-space-between align-center mb-2">
+                            <MudText Typo="Typo.body2">@task.Subject</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@task.NextRun?.ToString("dd.MM.yyyy")</MudText>
+                        </div>
+                    }
+                </MudPaper>
+            }
+
+            @if (_widgetAssetTotal > 0)
+            {
+                <MudPaper Elevation="2" Class="pa-4">
+                    <div class="d-flex align-center gap-3 mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Secondary" Size="Size.Large" />
+                        <div>
+                            <MudText Typo="Typo.h4">@_widgetAssetTotal</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@L.T("dashboard.assets_total")</MudText>
+                        </div>
+                    </div>
+                    @foreach (var cat in _widgetAssetCategories)
+                    {
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2">@cat.Key</MudText>
+                            <MudChip T="string" Size="Size.Small">@cat.Value</MudChip>
+                        </div>
+                    }
+                </MudPaper>
+            }
+        }
     </MudItem>
 </MudGrid>
 
@@ -153,6 +204,13 @@ else
     private List<Ticket> _allTickets = [];
     private List<Ticket> _recentTickets = [];
     private List<GroupTicketCount> _ticketsPerGroup = [];
+
+    // Widgets
+    private bool _widgetsLoaded;
+    private int _widgetBeschluesse;
+    private int _widgetAssetTotal;
+    private List<WidgetRecurringTask> _widgetRecurringTasks = [];
+    private Dictionary<string, int> _widgetAssetCategories = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -193,6 +251,48 @@ else
             _isLoading = false;
             StateHasChanged();
         }
+
+        // Load widgets separately (non-blocking)
+        _ = LoadWidgetsAsync();
+    }
+
+    private async Task LoadWidgetsAsync()
+    {
+        try
+        {
+            var json = await ApiService.GetDashboardWidgetsAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("widgets", out var w))
+            {
+                _widgetBeschluesse = w.TryGetProperty("beschluesse", out var b) ? b.GetInt32() : 0;
+                _widgetAssetTotal = w.TryGetProperty("assets", out var a) && a.TryGetProperty("total", out var at) ? at.GetInt32() : 0;
+
+                if (a.ValueKind != JsonValueKind.Undefined && a.TryGetProperty("byCategory", out var bc) && bc.ValueKind == JsonValueKind.Object)
+                {
+                    _widgetAssetCategories = new();
+                    foreach (var prop in bc.EnumerateObject())
+                        _widgetAssetCategories[prop.Name] = prop.Value.GetInt32();
+                }
+
+                if (w.TryGetProperty("recurringTasks", out var rt) && rt.ValueKind == JsonValueKind.Array)
+                {
+                    _widgetRecurringTasks = new();
+                    foreach (var el in rt.EnumerateArray())
+                    {
+                        _widgetRecurringTasks.Add(new WidgetRecurringTask
+                        {
+                            Subject = el.TryGetProperty("ticketSubject", out var ts) ? ts.GetString() ?? "" : "",
+                            NextRun = el.TryGetProperty("nextRun", out var nr) && nr.ValueKind == JsonValueKind.String
+                                ? DateTime.TryParse(nr.GetString(), out var d) ? d : null : null
+                        });
+                    }
+                }
+
+                _widgetsLoaded = true;
+                StateHasChanged();
+            }
+        }
+        catch { /* widgets are non-critical */ }
     }
 
     private void ComputeStatistics()
@@ -258,4 +358,10 @@ else
     }
 
     private record GroupTicketCount(string GroupName, int Total, int Open);
+
+    private sealed class WidgetRecurringTask
+    {
+        public string Subject { get; set; } = string.Empty;
+        public DateTime? NextRun { get; set; }
+    }
 }

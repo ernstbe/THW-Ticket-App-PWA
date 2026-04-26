@@ -553,6 +553,14 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
+    // Dashboard (v2)
+    public async Task<string> GetDashboardWidgetsAsync()
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/dashboard/widgets"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
     // Recurring Tasks (v2 only)
     public async Task<string> GetRecurringTasksAsync()
     {
