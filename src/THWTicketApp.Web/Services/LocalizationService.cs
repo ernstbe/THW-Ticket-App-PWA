@@ -324,6 +324,20 @@ public class LocalizationService
         ["pwa.install_hint"] = "App zum Startbildschirm hinzufügen für schnelleren Zugriff.",
         ["pwa.install"] = "Installieren",
 
+        // Notifications (browser)
+        ["notify.ticket_created"] = "Neues Ticket",
+        ["notify.ticket_created_body"] = "Ticket #{0} wurde erstellt.",
+        ["notify.ticket_updated"] = "Ticket aktualisiert",
+        ["notify.ticket_updated_body"] = "Ticket #{0} wurde geändert.",
+        ["notify.status_changed"] = "Status geändert",
+        ["notify.status_changed_body"] = "Status von Ticket #{0} wurde geändert.",
+        ["notify.assignee_changed"] = "Zuweisung geändert",
+        ["notify.assignee_changed_body"] = "Zuweisung von Ticket #{0} wurde geändert.",
+        ["notify.comment_added"] = "Neuer Kommentar",
+        ["notify.comment_added_body"] = "Neuer Kommentar bei Ticket #{0}.",
+        ["notify.ticket_event"] = "Ticket-Ereignis",
+        ["notify.ticket_event_body"] = "Änderung bei Ticket #{0}.",
+
         // Kanban
         ["kanban.board"] = "Kanban-Board",
         ["kanban.tickets"] = "Tickets",
@@ -774,6 +788,20 @@ public class LocalizationService
         // PWA
         ["pwa.install_hint"] = "Add app to home screen for faster access.",
         ["pwa.install"] = "Install",
+
+        // Notifications (browser)
+        ["notify.ticket_created"] = "New Ticket",
+        ["notify.ticket_created_body"] = "Ticket #{0} was created.",
+        ["notify.ticket_updated"] = "Ticket Updated",
+        ["notify.ticket_updated_body"] = "Ticket #{0} was changed.",
+        ["notify.status_changed"] = "Status Changed",
+        ["notify.status_changed_body"] = "Status of ticket #{0} was changed.",
+        ["notify.assignee_changed"] = "Assignment Changed",
+        ["notify.assignee_changed_body"] = "Assignment of ticket #{0} was changed.",
+        ["notify.comment_added"] = "New Comment",
+        ["notify.comment_added_body"] = "New comment on ticket #{0}.",
+        ["notify.ticket_event"] = "Ticket Event",
+        ["notify.ticket_event_body"] = "Change on ticket #{0}.",
 
         // Kanban
         ["kanban.board"] = "Kanban board",

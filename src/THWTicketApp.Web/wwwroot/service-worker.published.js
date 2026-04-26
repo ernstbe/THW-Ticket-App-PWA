@@ -8,6 +8,21 @@ self.addEventListener("activate", (event) =>
 );
 self.addEventListener("fetch", (event) => event.respondWith(onFetch(event)));
 
+// Handle notification clicks — navigate to the ticket URL
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url;
+  if (!url) return;
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(url) && "focus" in client) return client.focus();
+      }
+      return clients.openWindow(url);
+    })
+  );
+});
+
 const cacheNamePrefix = "offline-cache-";
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
 const offlineAssetsInclude = [
