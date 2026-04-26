@@ -87,6 +87,21 @@
                     <MudSelectItem Value="@("de")">Deutsch</MudSelectItem>
                     <MudSelectItem Value="@("en")">English</MudSelectItem>
                 </MudSelect>
+
+                <MudDivider Class="my-3" />
+
+                <MudText Class="mb-2">@L.T("settings.theme_color")</MudText>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var color in _themeColors)
+                    {
+                        var c = color;
+                        <MudIconButton Icon="@(_selectedColor == c.Value ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Circle)"
+                                       Style="@($"color: {c.Value};")"
+                                       Size="Size.Large"
+                                       OnClick="@(() => _selectedColor = c.Value)"
+                                       aria-label="@c.Name" />
+                    }
+                </div>
             </MudCardContent>
         </MudCard>
     </MudItem>
@@ -291,6 +306,20 @@
     private bool _notifyOnlyMyTickets;
     private bool _notifyOnlyHighPriority;
     private string _selectedLanguage = "de";
+    private string _selectedColor = "#003399";
+
+    private static readonly (string Name, string Value)[] _themeColors =
+    [
+        ("THW Blau", "#003399"),
+        ("Dunkelblau", "#1A237E"),
+        ("Indigo", "#3F51B5"),
+        ("Petrol", "#00695C"),
+        ("Grün", "#2E7D32"),
+        ("Rot", "#C62828"),
+        ("Orange", "#E65100"),
+        ("Lila", "#6A1B9A"),
+        ("Grau", "#455A64"),
+    ];
     private string _apiBaseUrl = string.Empty;
     private int _connectionTimeout = 30;
     private bool _isOfflineCacheEnabled;
@@ -321,6 +350,7 @@
         _notifyOnlyHighPriority = await GetBoolSetting("settings_notify_high_prio", false);
         _isOfflineCacheEnabled = await GetBoolSetting("settings_offline_cache", false);
         _selectedLanguage = await LocalStorage.GetItemAsync("settings_language") ?? "de";
+        _selectedColor = await LocalStorage.GetItemAsync("settings_primary_color") ?? "#003399";
 
         var savedUrl = await LocalStorage.GetItemAsync("settings_api_url");
         if (!string.IsNullOrEmpty(savedUrl)) _apiBaseUrl = savedUrl;
@@ -377,6 +407,9 @@
 
         // Update language via service
         await L.SetLanguageAsync(_selectedLanguage);
+
+        // Update theme color
+        await LocalStorage.SetItemAsync("settings_primary_color", _selectedColor);
 
         // Request notification permission if enabled
         if (_isNotificationsEnabled)
