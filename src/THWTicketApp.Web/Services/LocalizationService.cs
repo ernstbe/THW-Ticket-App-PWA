@@ -283,6 +283,14 @@ public class LocalizationService
         ["settings.cache_cleared"] = "Cache geleert.",
         ["settings.about"] = "Über",
 
+        // Kanban
+        ["kanban.board"] = "Kanban-Board",
+        ["kanban.tickets"] = "Tickets",
+        ["kanban.ticket_moved"] = "Ticket verschoben",
+        ["kanban.move_failed"] = "Status-Änderung fehlgeschlagen.",
+        ["kanban.no_subject"] = "(Kein Betreff)",
+        ["common.unknown"] = "Unbekannt",
+
         // Accessibility
         ["a11y.toggle_menu"] = "Menü umschalten",
         ["a11y.notifications"] = "Benachrichtigungen",
@@ -535,6 +543,14 @@ public class LocalizationService
         ["settings.connection_failed"] = "Connection failed. Server unreachable.",
         ["settings.cache_cleared"] = "Cache cleared.",
         ["settings.about"] = "About",
+
+        // Kanban
+        ["kanban.board"] = "Kanban board",
+        ["kanban.tickets"] = "tickets",
+        ["kanban.ticket_moved"] = "Ticket moved",
+        ["kanban.move_failed"] = "Status change failed.",
+        ["kanban.no_subject"] = "(No subject)",
+        ["common.unknown"] = "Unknown",
 
         // Accessibility
         ["a11y.toggle_menu"] = "Toggle menu",
