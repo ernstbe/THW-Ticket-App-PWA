@@ -45,7 +45,52 @@
              Variant="Variant.Filled" OnClick="@(() => SetFilter("closed"))">@L.T("tickets.closed")</MudChip>
     <MudChip T="string" Color="@(_showOnlyMyTickets ? Color.Secondary : Color.Default)"
              Variant="Variant.Filled" OnClick="ToggleMyTickets">@L.T("tickets.mytickets")</MudChip>
+    <MudSpacer />
+    <MudIconButton Icon="@(_showAdvancedFilter ? Icons.Material.Filled.FilterListOff : Icons.Material.Filled.Tune)"
+                   OnClick="@(() => { _showAdvancedFilter = !_showAdvancedFilter; StateHasChanged(); })"
+                   Size="Size.Small" Color="@(_hasAdvancedFilter ? Color.Primary : Color.Default)"
+                   aria-label="@L.T("search.advanced")" />
 </div>
+
+@if (_showAdvancedFilter)
+{
+    <MudPaper Elevation="1" Class="pa-4 mb-4">
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" @bind-Value="_filterPriority" Label="@L.T("detail.priority")"
+                           Variant="Variant.Outlined" Clearable="true" Margin="Margin.Dense">
+                    @foreach (var p in _allPriorities)
+                    {
+                        <MudSelectItem Value="@p">@p</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" @bind-Value="_filterGroup" Label="@L.T("detail.group")"
+                           Variant="Variant.Outlined" Clearable="true" Margin="Margin.Dense">
+                    @foreach (var g in _allGroups)
+                    {
+                        <MudSelectItem Value="@g">@g</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker @bind-Date="_filterDateFrom" Label="@L.T("search.date_from")"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudDatePicker @bind-Date="_filterDateTo" Label="@L.T("search.date_to")"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
+            </MudItem>
+        </MudGrid>
+        <div class="d-flex gap-2 mt-3">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       OnClick="ApplyAdvancedFilter">@L.T("common.filter")</MudButton>
+            <MudButton Variant="Variant.Text" Size="Size.Small"
+                       OnClick="ClearAdvancedFilter">@L.T("search.clear_filter")</MudButton>
+        </div>
+    </MudPaper>
+}
 
 @* Sort selector *@
 <div class="d-flex align-center gap-2 mb-4">
@@ -207,6 +252,16 @@ else
     private bool _batchMode;
     private HashSet<string> _selectedTicketIds = new();
 
+    // Advanced filter
+    private bool _showAdvancedFilter;
+    private string? _filterPriority;
+    private string? _filterGroup;
+    private DateTime? _filterDateFrom;
+    private DateTime? _filterDateTo;
+    private bool _hasAdvancedFilter => _filterPriority != null || _filterGroup != null || _filterDateFrom != null || _filterDateTo != null;
+    private List<string> _allPriorities = [];
+    private List<string> _allGroups = [];
+
     private CancellationTokenSource? _refreshDebounceCts;
 
     protected override async Task OnInitializedAsync()
@@ -261,6 +316,17 @@ else
                 TrudeskTranslationHelper.TranslateTicket(t);
                 _allTickets.Add(t);
             }
+
+            // Populate advanced filter options from data
+            _allPriorities = _allTickets
+                .Where(t => t.Priority?.Name != null)
+                .Select(t => t.Priority!.Name!)
+                .Distinct().OrderBy(n => n).ToList();
+            _allGroups = _allTickets
+                .Where(t => t.Group?.Name != null)
+                .Select(t => t.Group!.Name!)
+                .Distinct().OrderBy(n => n).ToList();
+
             ApplyFilters();
         }
         catch (Exception ex)
@@ -338,7 +404,30 @@ else
         };
         if (_showOnlyMyTickets && !string.IsNullOrEmpty(ApiService.CurrentUserId))
             source = source.Where(t => t.Assignee?.Id == ApiService.CurrentUserId);
+
+        // Advanced filters
+        if (!string.IsNullOrEmpty(_filterPriority))
+            source = source.Where(t => t.Priority?.Name == _filterPriority);
+        if (!string.IsNullOrEmpty(_filterGroup))
+            source = source.Where(t => t.Group?.Name == _filterGroup);
+        if (_filterDateFrom.HasValue)
+            source = source.Where(t => t.Date >= _filterDateFrom.Value);
+        if (_filterDateTo.HasValue)
+            source = source.Where(t => t.Date <= _filterDateTo.Value.AddDays(1));
+
         return source;
+    }
+
+    private void ApplyAdvancedFilter() { _currentPage = 1; ApplyFilters(); }
+
+    private void ClearAdvancedFilter()
+    {
+        _filterPriority = null;
+        _filterGroup = null;
+        _filterDateFrom = null;
+        _filterDateTo = null;
+        _currentPage = 1;
+        ApplyFilters();
     }
 
     private IOrderedEnumerable<Ticket> ApplySorting(IEnumerable<Ticket> source)

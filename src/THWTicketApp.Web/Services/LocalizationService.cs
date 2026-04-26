@@ -500,6 +500,12 @@ public class LocalizationService
         ["reports.top_assignees"] = "Top Bearbeiter",
         ["reports.no_deadline_tickets"] = "Keine Tickets mit Fälligkeitsdatum",
 
+        // Advanced Search
+        ["search.advanced"] = "Erweiterte Filter",
+        ["search.date_from"] = "Von Datum",
+        ["search.date_to"] = "Bis Datum",
+        ["search.clear_filter"] = "Filter zurücksetzen",
+
         // Accessibility
         ["a11y.toggle_menu"] = "Menü umschalten",
         ["a11y.notifications"] = "Benachrichtigungen",
@@ -969,6 +975,12 @@ public class LocalizationService
         ["reports.priority_dist"] = "Priority Distribution",
         ["reports.top_assignees"] = "Top Assignees",
         ["reports.no_deadline_tickets"] = "No tickets with due date",
+
+        // Advanced Search
+        ["search.advanced"] = "Advanced Filters",
+        ["search.date_from"] = "From Date",
+        ["search.date_to"] = "To Date",
+        ["search.clear_filter"] = "Clear Filters",
 
         // Accessibility
         ["a11y.toggle_menu"] = "Toggle menu",
