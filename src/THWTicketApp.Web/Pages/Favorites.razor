@@ -1,0 +1,135 @@
+@page "/favorites"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using MudBlazor
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject LocalStorageService LocalStorage
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<PageTitle>@L.T("nav.favorites") - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h4">@L.T("nav.favorites")</MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadFavoritesAsync"
+                   Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
+</div>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+else if (_favorites.Count == 0)
+{
+    <MudAlert Severity="Severity.Normal" Class="mb-4">
+        <MudText>@L.T("favorites.empty")</MudText>
+    </MudAlert>
+}
+else
+{
+    <MudStack Spacing="0">
+        @foreach (var ticket in _favorites)
+        {
+            <MudCard Elevation="1" Class="mb-2" Style="cursor: pointer;"
+                     @onclick="@(() => Navigation.NavigateTo($"tickets/{ticket.Uid}"))">
+                <MudCardContent Class="pa-3">
+                    <div class="d-flex justify-space-between align-start">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-center gap-2 mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Small" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">#@ticket.Uid</MudText>
+                                @if (ticket.Status != null)
+                                {
+                                    <MudChip T="string" Size="Size.Small"
+                                             Style="@($"background-color: {ticket.Status.HtmlColor ?? "#888"}; color: white;")">
+                                        @ticket.Status.Name
+                                    </MudChip>
+                                }
+                            </div>
+                            <MudText Typo="Typo.subtitle1" Class="mb-1">@ticket.Subject</MudText>
+                            <div class="d-flex align-center gap-3">
+                                @if (ticket.Assignee != null)
+                                {
+                                    <MudText Typo="Typo.caption">@ticket.Assignee.Fullname</MudText>
+                                }
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @ticket.Updated.ToString("dd.MM.yyyy HH:mm")
+                                </MudText>
+                            </div>
+                        </div>
+                        <div @onclick:stopPropagation="true" style="display:inline;">
+                            <MudIconButton Icon="@Icons.Material.Filled.StarOutline" Size="Size.Small"
+                                           Color="Color.Warning"
+                                           OnClick="@(() => RemoveFavoriteAsync(ticket.Uid))"
+                                           aria-label="@L.T("favorites.remove")" />
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+    </MudStack>
+}
+
+@code {
+    private bool _isLoading;
+    private List<Ticket> _favorites = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFavoritesAsync();
+    }
+
+    private async Task LoadFavoritesAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
+            var favUids = JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
+
+            if (favUids.Count == 0)
+            {
+                _favorites = [];
+                return;
+            }
+
+            var json = await ApiService.GetTicketsAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var allTickets = JsonHelper.DeserializeWrappedArray<Ticket>(json, "tickets", options);
+
+            _favorites = allTickets
+                .Where(t => favUids.Contains(t.Uid))
+                .OrderByDescending(t => t.Updated)
+                .ToList();
+
+            foreach (var t in _favorites)
+                TrudeskTranslationHelper.TranslateTicket(t);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"{L.T("common.error")}: {ErrorHelper.Categorize(ex).Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveFavoriteAsync(int uid)
+    {
+        var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
+        var favs = JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
+        favs.Remove(uid);
+        await LocalStorage.SetItemAsync("favorite_tickets", JsonSerializer.Serialize(favs));
+        _favorites.RemoveAll(t => t.Uid == uid);
+        Snackbar.Add(L.T("favorites.removed"), Severity.Info);
+        StateHasChanged();
+    }
+}
