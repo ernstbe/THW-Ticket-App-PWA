@@ -512,6 +512,12 @@ public class LocalizationService
         ["shortcuts.search"] = "Suche fokussieren",
         ["shortcuts.help"] = "Diese Hilfe anzeigen",
 
+        // Favorites
+        ["nav.favorites"] = "Favoriten",
+        ["favorites.empty"] = "Keine Favoriten. Markiere Tickets mit dem Stern-Symbol.",
+        ["favorites.remove"] = "Aus Favoriten entfernen",
+        ["favorites.removed"] = "Favorit entfernt.",
+
         // Advanced Search
         ["search.advanced"] = "Erweiterte Filter",
         ["search.date_from"] = "Von Datum",
@@ -999,6 +1005,12 @@ public class LocalizationService
         ["shortcuts.settings"] = "Settings",
         ["shortcuts.search"] = "Focus Search",
         ["shortcuts.help"] = "Show this help",
+
+        // Favorites
+        ["nav.favorites"] = "Favorites",
+        ["favorites.empty"] = "No favorites yet. Star tickets to add them here.",
+        ["favorites.remove"] = "Remove from favorites",
+        ["favorites.removed"] = "Favorite removed.",
 
         // Advanced Search
         ["search.advanced"] = "Advanced Filters",
