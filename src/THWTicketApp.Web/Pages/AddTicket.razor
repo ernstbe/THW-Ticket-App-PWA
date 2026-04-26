@@ -31,6 +31,19 @@ else
 {
 
 <MudPaper Elevation="2" Class="pa-6">
+    @if (_templates.Count > 0)
+    {
+        <MudSelect T="TemplateItem" Label="@L.T("tickets.use_template")" Variant="Variant.Outlined"
+                   Clearable="true" Class="mb-4"
+                   ToStringFunc="@(t => t?.Name ?? "")"
+                   ValueChanged="OnTemplateSelected">
+            @foreach (var tpl in _templates)
+            {
+                <MudSelectItem Value="tpl">@tpl.Name</MudSelectItem>
+            }
+        </MudSelect>
+    }
+
     <MudForm @ref="_form">
         <MudTextField @bind-Value="_subject" Label="@L.T("detail.subject")" Variant="Variant.Outlined"
                       Required="true" RequiredError="@L.T("tickets.subject_required")"
@@ -112,6 +125,7 @@ else
     private List<Priority> _priorities = [];
     private List<Group> _groups = [];
     private List<User> _users = [];
+    private List<TemplateItem> _templates = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -129,7 +143,8 @@ else
             var typesTask = ApiService.GetTicketTypesAsync();
             var groupsTask = ApiService.GetGroupsAsync();
             var usersTask = ApiService.GetAssigneesAsync();
-            await Task.WhenAll(typesTask, groupsTask, usersTask);
+            var templatesTask = ApiService.GetTicketTemplatesAsync();
+            await Task.WhenAll(typesTask, groupsTask, usersTask, templatesTask);
 
             // Types + Priorities
             var types = JsonSerializer.Deserialize<TicketType[]>(typesTask.Result, options);
@@ -155,6 +170,9 @@ else
             var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersTask.Result, options);
             if (userResponse?.Users != null)
                 _users = userResponse.Users;
+
+            // Templates
+            _templates = ParseTemplates(templatesTask.Result);
         }
         catch { Snackbar.Add(L.T("tickets.form_load_error"), Severity.Error); }
         finally
@@ -198,5 +216,42 @@ else
             _isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private void OnTemplateSelected(TemplateItem? template)
+    {
+        if (template == null) return;
+        _subject = template.Subject;
+        _issue = template.Issue ?? string.Empty;
+        StateHasChanged();
+    }
+
+    internal static List<TemplateItem> ParseTemplates(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("ticketTemplates", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return new();
+            var list = new List<TemplateItem>();
+            foreach (var el in arr.EnumerateArray())
+            {
+                list.Add(new TemplateItem
+                {
+                    Name = el.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                    Subject = el.TryGetProperty("subject", out var s) ? s.GetString() ?? "" : "",
+                    Issue = el.TryGetProperty("issue", out var i) ? i.GetString() : null
+                });
+            }
+            return list;
+        }
+        catch { return new(); }
+    }
+
+    internal sealed class TemplateItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Subject { get; set; } = string.Empty;
+        public string? Issue { get; set; }
     }
 }
