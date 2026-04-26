@@ -365,27 +365,25 @@ public class TrueDeskApiService : ITrueDeskApiService
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> AddCommentAsync(string id, string ownerId, string newComment)
+    public async Task<bool> AddCommentAsync(string ticketUid, string ownerId, string newComment)
     {
-        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(newComment))
+        if (string.IsNullOrWhiteSpace(ticketUid) || string.IsNullOrWhiteSpace(newComment))
             return false;
 
-        var payload = new { _id = id, ownerId, comment = newComment };
+        var payload = new { comment = newComment };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        // addcomment only exists in v1
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V1BaseUrl}/tickets/addcomment", content));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/tickets/{ticketUid}/comments", content));
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> AddNoteAsync(string ticketId, string ownerId, string note)
+    public async Task<bool> AddNoteAsync(string ticketUid, string ownerId, string note)
     {
-        if (string.IsNullOrWhiteSpace(ticketId) || string.IsNullOrWhiteSpace(note))
+        if (string.IsNullOrWhiteSpace(ticketUid) || string.IsNullOrWhiteSpace(note))
             return false;
 
-        var payload = new { ticketid = ticketId, owner = ownerId, note };
+        var payload = new { note };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        // addnote only exists in v1
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V1BaseUrl}/tickets/addnote", content));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/tickets/{ticketUid}/notes", content));
         return response.IsSuccessStatusCode;
     }
 
@@ -489,28 +487,25 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public async Task<string> GetOverdueTicketsAsync()
     {
-        // overdue only exists in v1
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/tickets/overdue"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/tickets/overdue"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<bool> SubscribeToTicketAsync(string ticketId, bool subscribe)
+    public async Task<bool> SubscribeToTicketAsync(string ticketUid, bool subscribe)
     {
-        if (string.IsNullOrWhiteSpace(ticketId) || string.IsNullOrEmpty(CurrentUserId))
+        if (string.IsNullOrWhiteSpace(ticketUid))
             return false;
 
-        var payload = new { user = CurrentUserId, subscribe };
+        var payload = new { subscribe };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        // subscribe only exists in v1
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V1BaseUrl}/tickets/{ticketId}/subscribe", content));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/tickets/{ticketUid}/subscribe", content));
         return response.IsSuccessStatusCode;
     }
 
     public async Task<string> GetNotificationsAsync()
     {
-        // notifications only in v1
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/users/notifications"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/users/notifications"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -522,8 +517,7 @@ public class TrueDeskApiService : ITrueDeskApiService
             if (!_settings.IsConfigured || !IsAuthenticated)
                 return 0;
 
-            // notificationCount only in v1
-            var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/users/notificationCount"));
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/users/notifications/count"));
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync();
             var doc = JsonDocument.Parse(json);
@@ -538,24 +532,23 @@ public class TrueDeskApiService : ITrueDeskApiService
         catch { return 0; }
     }
 
-    // Stats - these endpoints exist only in v1
     public async Task<string> GetTicketStatsAsync(int timespan = 30)
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/tickets/stats/{timespan}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/tickets/stats/{timespan}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetTicketStatsForGroupAsync(string groupId)
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/tickets/stats/group/{groupId}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/tickets/stats/group/{groupId}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetTicketStatsForUserAsync(string userId)
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/tickets/stats/user/{userId}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/tickets/stats/user/{userId}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }

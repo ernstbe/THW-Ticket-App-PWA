@@ -28,8 +28,8 @@ public interface ITrueDeskApiService
     Task<bool> AssignTicketAsync(string ticketId, string userId);
     Task<bool> ClearTicketAssigneeAsync(string ticketId);
 
-    Task<bool> AddCommentAsync(string id, string ownerId, string newComment);
-    Task<bool> AddNoteAsync(string ticketId, string ownerId, string note);
+    Task<bool> AddCommentAsync(string ticketUid, string ownerId, string newComment);
+    Task<bool> AddNoteAsync(string ticketUid, string ownerId, string note);
 
     Task<bool> UploadAttachmentAsync(string ticketId, Stream fileStream, string fileName);
     Task<Stream?> DownloadAttachmentAsync(string attachmentPath);
@@ -46,7 +46,7 @@ public interface ITrueDeskApiService
 
     Task<string> GetTicketsByGroupAsync(string groupId, int page = 0, int limit = 50);
     Task<string> GetOverdueTicketsAsync();
-    Task<bool> SubscribeToTicketAsync(string ticketId, bool subscribe);
+    Task<bool> SubscribeToTicketAsync(string ticketUid, bool subscribe);
 
     Task<string> GetNotificationsAsync();
     Task<int> GetNotificationCountAsync();

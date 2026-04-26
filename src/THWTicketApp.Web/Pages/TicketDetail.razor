@@ -656,7 +656,7 @@ else
         try
         {
             var ownerId = _ticket.Owner?.Id ?? string.Empty;
-            if (await ApiService.AddCommentAsync(_ticket.Id, ownerId, _newComment))
+            if (await ApiService.AddCommentAsync(_ticket.Uid.ToString(), ownerId, _newComment))
             {
                 _newComment = string.Empty;
                 Snackbar.Add("Kommentar hinzugefügt.", Severity.Success);
@@ -675,7 +675,7 @@ else
         try
         {
             var ownerId = _ticket.Owner?.Id ?? string.Empty;
-            if (await ApiService.AddNoteAsync(_ticket.Id, ownerId, _newNote))
+            if (await ApiService.AddNoteAsync(_ticket.Uid.ToString(), ownerId, _newNote))
             {
                 _newNote = string.Empty;
                 Snackbar.Add("Notiz hinzugefügt.", Severity.Success);
@@ -809,7 +809,7 @@ else
         if (_ticket == null) return;
         try
         {
-            var success = await ApiService.SubscribeToTicketAsync(_ticket.Id, !_isSubscribed);
+            var success = await ApiService.SubscribeToTicketAsync(_ticket.Uid.ToString(), !_isSubscribed);
             if (success)
             {
                 _isSubscribed = !_isSubscribed;

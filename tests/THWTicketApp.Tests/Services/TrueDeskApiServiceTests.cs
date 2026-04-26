@@ -258,4 +258,182 @@ public class TrueDeskApiServiceTests
 
         Assert.False(ok);
     }
+
+    // -----------------------------------------------------------------
+    // Comments (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task AddCommentAsync_postsToV2TicketUidComments()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.AddCommentAsync("42", "owner1", "Hello world");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/42/comments", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"comment\":\"Hello world\"", LastBody);
+        Assert.DoesNotContain("ownerId", LastBody);
+    }
+
+    [Fact]
+    public async Task AddCommentAsync_returnsFalseOnEmptyComment()
+    {
+        var ok = await _sut.AddCommentAsync("42", "owner1", "  ");
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
+
+    [Fact]
+    public async Task AddCommentAsync_returnsFalseOnServerError()
+    {
+        _handler.SetDefault(HttpStatusCode.InternalServerError);
+        var ok = await _sut.AddCommentAsync("42", "owner1", "test");
+        Assert.False(ok);
+    }
+
+    // -----------------------------------------------------------------
+    // Notes (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task AddNoteAsync_postsToV2TicketUidNotes()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.AddNoteAsync("42", "owner1", "Internal note");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/42/notes", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"note\":\"Internal note\"", LastBody);
+        Assert.DoesNotContain("owner", LastBody);
+        Assert.DoesNotContain("ticketid", LastBody);
+    }
+
+    [Fact]
+    public async Task AddNoteAsync_returnsFalseOnEmptyNote()
+    {
+        var ok = await _sut.AddNoteAsync("42", "owner1", "");
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
+
+    // -----------------------------------------------------------------
+    // Subscribe (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task SubscribeToTicketAsync_putsToV2TicketUidSubscribe()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.SubscribeToTicketAsync("42", true);
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/42/subscribe", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"subscribe\":true", LastBody);
+        Assert.DoesNotContain("user", LastBody);
+    }
+
+    [Fact]
+    public async Task SubscribeToTicketAsync_returnsFalseOnEmptyUid()
+    {
+        var ok = await _sut.SubscribeToTicketAsync("", true);
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
+
+    // -----------------------------------------------------------------
+    // Overdue (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task GetOverdueTicketsAsync_callsV2Endpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"tickets\":[]}");
+        await _sut.GetOverdueTicketsAsync();
+
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/overdue", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    // -----------------------------------------------------------------
+    // Notifications (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task GetNotificationsAsync_callsV2Endpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"notifications\":[]}");
+        await _sut.GetNotificationsAsync();
+
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/users/notifications", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetNotificationCountAsync_callsV2CountEndpoint()
+    {
+        // Set _authToken via reflection so the IsAuthenticated guard passes
+        typeof(TrueDeskApiService)
+            .GetField("_authToken", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .SetValue(_sut, "fake-token");
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"count\":5}");
+
+        var count = await _sut.GetNotificationCountAsync();
+
+        Assert.Equal(5, count);
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/users/notifications/count", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetNotificationCountAsync_returnsZeroWhenNotAuthenticated()
+    {
+        var count = await _sut.GetNotificationCountAsync();
+        Assert.Equal(0, count);
+        Assert.Empty(_handler.Requests);
+    }
+
+    // -----------------------------------------------------------------
+    // Stats (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task GetTicketStatsAsync_callsV2StatsWithTimespan()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"ticketCount\":10}");
+        await _sut.GetTicketStatsAsync(60);
+
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/stats/60", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetTicketStatsAsync_defaultsTo30Days()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{}");
+        await _sut.GetTicketStatsAsync();
+        Assert.Equal("/api/v2/tickets/stats/30", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetTicketStatsForGroupAsync_callsV2GroupStats()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"ticketCount\":3}");
+        await _sut.GetTicketStatsForGroupAsync("grp1");
+
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/stats/group/grp1", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetTicketStatsForUserAsync_callsV2UserStats()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"ticketCount\":7}");
+        await _sut.GetTicketStatsForUserAsync("usr1");
+
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/stats/user/usr1", LastRequest.RequestUri!.AbsolutePath);
+    }
 }
