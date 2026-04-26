@@ -553,6 +553,32 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
+    // Documents (v2)
+    public async Task<string> GetDocumentsAsync()
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/documents"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    public async Task<bool> CreateDocumentAsync(string name, string? description, string? category)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        var payload = new Dictionary<string, object?> { ["name"] = name };
+        if (!string.IsNullOrEmpty(description)) payload["description"] = description;
+        if (!string.IsNullOrEmpty(category)) payload["category"] = category;
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/documents", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteDocumentAsync(string documentId)
+    {
+        if (string.IsNullOrWhiteSpace(documentId)) return false;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/documents/{documentId}"));
+        return response.IsSuccessStatusCode;
+    }
+
     // Dashboard (v2)
     public async Task<string> GetDashboardWidgetsAsync()
     {

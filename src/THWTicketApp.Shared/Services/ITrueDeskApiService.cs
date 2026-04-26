@@ -101,6 +101,11 @@ public interface ITrueDeskApiService
     // Calendar (v2)
     Task<string> GetCalendarEventsAsync(DateTime start, DateTime end);
 
+    // Documents (v2)
+    Task<string> GetDocumentsAsync();
+    Task<bool> CreateDocumentAsync(string name, string? description, string? category);
+    Task<bool> DeleteDocumentAsync(string documentId);
+
     // Ticket tags — implemented on top of the existing ticket PUT endpoint
     Task<bool> UpdateTicketTagsAsync(string ticketId, IEnumerable<string> tagIds);
     Task<bool> AddTagToTicketAsync(string ticketId, string tagId);

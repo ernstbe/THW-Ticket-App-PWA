@@ -524,6 +524,19 @@ public class LocalizationService
         ["search.date_to"] = "Bis Datum",
         ["search.clear_filter"] = "Filter zurücksetzen",
 
+        // Documents
+        ["nav.documents"] = "Dokumente",
+        ["documents.new"] = "Neues Dokument",
+        ["documents.empty"] = "Keine Dokumente vorhanden.",
+        ["documents.name"] = "Name",
+        ["documents.description"] = "Beschreibung",
+        ["documents.category"] = "Kategorie",
+        ["documents.uploaded_by"] = "Hochgeladen von",
+        ["documents.date"] = "Datum",
+        ["documents.size"] = "Größe",
+        ["documents.created"] = "Dokument erstellt.",
+        ["documents.deleted"] = "Dokument gelöscht.",
+
         // Accessibility
         ["a11y.toggle_menu"] = "Menü umschalten",
         ["a11y.notifications"] = "Benachrichtigungen",
@@ -1017,6 +1030,19 @@ public class LocalizationService
         ["search.date_from"] = "From Date",
         ["search.date_to"] = "To Date",
         ["search.clear_filter"] = "Clear Filters",
+
+        // Documents
+        ["nav.documents"] = "Documents",
+        ["documents.new"] = "New Document",
+        ["documents.empty"] = "No documents yet.",
+        ["documents.name"] = "Name",
+        ["documents.description"] = "Description",
+        ["documents.category"] = "Category",
+        ["documents.uploaded_by"] = "Uploaded by",
+        ["documents.date"] = "Date",
+        ["documents.size"] = "Size",
+        ["documents.created"] = "Document created.",
+        ["documents.deleted"] = "Document deleted.",
 
         // Accessibility
         ["a11y.toggle_menu"] = "Toggle menu",
