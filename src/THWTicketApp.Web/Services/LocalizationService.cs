@@ -518,6 +518,12 @@ public class LocalizationService
         ["favorites.remove"] = "Aus Favoriten entfernen",
         ["favorites.removed"] = "Favorit entfernt.",
 
+        // Advanced Search
+        ["search.advanced"] = "Erweiterte Filter",
+        ["search.date_from"] = "Von Datum",
+        ["search.date_to"] = "Bis Datum",
+        ["search.clear_filter"] = "Filter zurücksetzen",
+
         // Accessibility
         ["a11y.toggle_menu"] = "Menü umschalten",
         ["a11y.notifications"] = "Benachrichtigungen",
@@ -1005,6 +1011,12 @@ public class LocalizationService
         ["favorites.empty"] = "No favorites yet. Star tickets to add them here.",
         ["favorites.remove"] = "Remove from favorites",
         ["favorites.removed"] = "Favorite removed.",
+
+        // Advanced Search
+        ["search.advanced"] = "Advanced Filters",
+        ["search.date_from"] = "From Date",
+        ["search.date_to"] = "To Date",
+        ["search.clear_filter"] = "Clear Filters",
 
         // Accessibility
         ["a11y.toggle_menu"] = "Toggle menu",
