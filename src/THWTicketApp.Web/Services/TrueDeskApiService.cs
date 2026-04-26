@@ -92,6 +92,36 @@ public class TrueDeskApiService : ITrueDeskApiService
                     CurrentUserId = idEl.GetString();
                 }
 
+                // v2: extract user info from JWT payload if not in response
+                if (CurrentUserId == null && !string.IsNullOrEmpty(_authToken))
+                {
+                    try
+                    {
+                        var parts = _authToken.Split('.');
+                        if (parts.Length == 3)
+                        {
+                            var payload64 = parts[1];
+                            // Fix base64 padding
+                            switch (payload64.Length % 4)
+                            {
+                                case 2: payload64 += "=="; break;
+                                case 3: payload64 += "="; break;
+                            }
+                            var payloadBytes = Convert.FromBase64String(payload64);
+                            var payloadJson = Encoding.UTF8.GetString(payloadBytes);
+                            using var jwtDoc = JsonDocument.Parse(payloadJson);
+                            if (jwtDoc.RootElement.TryGetProperty("user", out var jwtUser))
+                            {
+                                if (jwtUser.TryGetProperty("_id", out var jwtId))
+                                    CurrentUserId = jwtId.GetString();
+                                if (jwtUser.TryGetProperty("fullname", out var jwtName))
+                                    username = jwtName.GetString() ?? username;
+                            }
+                        }
+                    }
+                    catch { /* JWT parsing optional */ }
+                }
+
                 CurrentUsername = username;
                 await _localStorage.SetItemAsync("auth_token", _authToken ?? string.Empty);
                 await _localStorage.SetItemAsync("auth_refresh_token", _refreshToken ?? string.Empty);
