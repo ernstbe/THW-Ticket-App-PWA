@@ -501,4 +501,60 @@ public class TrueDeskApiServiceTests
         Assert.False(ok);
         Assert.Empty(_handler.Requests);
     }
+
+    // -----------------------------------------------------------------
+    // Batch operations (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task BatchDeleteTicketsAsync_sendsDeleteWithIds()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"deleted\":2,\"failed\":0}");
+        var (deleted, failed) = await _sut.BatchDeleteTicketsAsync(new[] { "id1", "id2" });
+
+        Assert.Equal(2, deleted);
+        Assert.Equal(0, failed);
+        Assert.Equal(HttpMethod.Delete, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/batch", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"ids\"", LastBody);
+        Assert.Contains("id1", LastBody);
+    }
+
+    [Fact]
+    public async Task BatchDeleteTicketsAsync_returnsZerosOnEmptyInput()
+    {
+        var (deleted, failed) = await _sut.BatchDeleteTicketsAsync(Array.Empty<string>());
+        Assert.Equal(0, deleted);
+        Assert.Equal(0, failed);
+        Assert.Empty(_handler.Requests);
+    }
+
+    [Fact]
+    public async Task BatchUpdateTicketsAsync_sendsPutWithBatch()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":3,\"failed\":0}");
+        var batch = new[]
+        {
+            new Dictionary<string, object?> { ["id"] = "t1", ["status"] = "s1" },
+            new Dictionary<string, object?> { ["id"] = "t2", ["assignee"] = "u1" }
+        };
+        var (updated, failed) = await _sut.BatchUpdateTicketsAsync(batch);
+
+        Assert.Equal(3, updated);
+        Assert.Equal(0, failed);
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/batch", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"batch\"", LastBody);
+    }
+
+    [Fact]
+    public async Task BatchUpdateTicketsAsync_returnsFailureOnServerError()
+    {
+        _handler.SetDefault(HttpStatusCode.InternalServerError);
+        var batch = new[] { new Dictionary<string, object?> { ["id"] = "t1" } };
+        var (updated, failed) = await _sut.BatchUpdateTicketsAsync(batch);
+
+        Assert.Equal(0, updated);
+        Assert.Equal(1, failed);
+    }
 }

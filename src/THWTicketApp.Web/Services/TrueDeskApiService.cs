@@ -924,4 +924,49 @@ public class TrueDeskApiService : ITrueDeskApiService
         var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/tickets/{ticketUid}/checklist/{itemId}"));
         return response.IsSuccessStatusCode;
     }
+
+    // -----------------------------------------------------------------
+    // Batch operations (v2)
+    // -----------------------------------------------------------------
+
+    public async Task<(int Deleted, int Failed)> BatchDeleteTicketsAsync(IEnumerable<string> ticketIds)
+    {
+        var ids = ticketIds.ToArray();
+        if (ids.Length == 0) return (0, 0);
+        var payload = new { ids };
+        var request = new HttpRequestMessage(HttpMethod.Delete, $"{V2BaseUrl}/tickets/batch")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+        };
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.SendAsync(request));
+        if (!response.IsSuccessStatusCode) return (0, ids.Length);
+        try
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var deleted = doc.RootElement.TryGetProperty("deleted", out var d) ? d.GetInt32() : 0;
+            var failed = doc.RootElement.TryGetProperty("failed", out var f) ? f.GetInt32() : 0;
+            return (deleted, failed);
+        }
+        catch { return (ids.Length, 0); }
+    }
+
+    public async Task<(int Updated, int Failed)> BatchUpdateTicketsAsync(IEnumerable<Dictionary<string, object?>> batch)
+    {
+        var batchArray = batch.ToArray();
+        if (batchArray.Length == 0) return (0, 0);
+        var payload = new { batch = batchArray };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/tickets/batch", content));
+        if (!response.IsSuccessStatusCode) return (0, batchArray.Length);
+        try
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var updated = doc.RootElement.TryGetProperty("success", out var s) ? s.GetInt32() : 0;
+            var failed = doc.RootElement.TryGetProperty("failed", out var f) ? f.GetInt32() : 0;
+            return (updated, failed);
+        }
+        catch { return (batchArray.Length, 0); }
+    }
 }

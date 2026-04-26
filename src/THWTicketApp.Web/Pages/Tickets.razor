@@ -59,6 +59,10 @@
     </MudSelect>
     <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadTicketsAsync"
                    Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
+    <MudToggleIconButton @bind-Toggled="_batchMode" Icon="@Icons.Material.Filled.CheckBoxOutlineBlank"
+                          ToggledIcon="@Icons.Material.Filled.CheckBox" Size="Size.Medium"
+                          ToggledColor="Color.Primary"
+                          aria-label="@L.T("batch.toggle")" />
     <MudText Typo="Typo.body2" Color="Color.Secondary">
         @_filteredTickets.Count Ticket(s)
     </MudText>
@@ -103,6 +107,29 @@
     <MudAlert Severity="Severity.Info" Class="mb-4">@_statusMessage</MudAlert>
 }
 
+@* Batch action bar *@
+@if (_batchMode && _selectedTicketIds.Count > 0)
+{
+    <MudPaper Elevation="3" Class="pa-3 mb-3 d-flex align-center gap-3">
+        <MudText Typo="Typo.body2">
+            @string.Format(L.T("batch.selected"), _selectedTicketIds.Count)
+        </MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Person"
+                   OnClick="BatchAssignToMeAsync" Disabled="_isLoading">
+            @L.T("tickets.assign_me")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Delete"
+                   OnClick="BatchDeleteAsync" Disabled="_isLoading">
+            @L.T("common.delete")
+        </MudButton>
+        <MudButton Variant="Variant.Text" Size="Size.Small"
+                   OnClick="ClearSelection">@L.T("common.cancel")</MudButton>
+    </MudPaper>
+}
+
 @* Ticket list *@
 @if (_isLoading && _filteredTickets.Count == 0)
 {
@@ -133,7 +160,11 @@ else
     <MudStack Spacing="0">
         @foreach (var ticket in PagedTickets)
         {
-            <TicketCard Ticket="ticket" ShowActions="true"
+            var t = ticket;
+            <TicketCard Ticket="t" ShowActions="true"
+                        IsSelectable="_batchMode"
+                        IsSelected="_selectedTicketIds.Contains(t.Id)"
+                        OnSelectedChanged="@(v => ToggleSelection(t.Id, v))"
                         OnClick="NavigateToDetail"
                         OnAssignToMe="AssignToMeAsync"
                         OnClose="CloseTicketAsync" />
@@ -171,6 +202,10 @@ else
     private List<SavedFilterItem> _savedFilters = [];
     private bool _showSaveFilterDialog;
     private string _saveFilterName = string.Empty;
+
+    // Batch selection
+    private bool _batchMode;
+    private HashSet<string> _selectedTicketIds = new();
 
     private CancellationTokenSource? _refreshDebounceCts;
 
@@ -347,6 +382,53 @@ else
             { Snackbar.Add(L.T("tickets.closed_success"), Severity.Success); await LoadTicketsAsync(); }
         }
         catch { Snackbar.Add(L.T("tickets.close_failed"), Severity.Error); }
+    }
+
+    // Batch operations
+    private void ToggleSelection(string ticketId, bool selected)
+    {
+        if (selected) _selectedTicketIds.Add(ticketId);
+        else _selectedTicketIds.Remove(ticketId);
+        StateHasChanged();
+    }
+
+    private void ClearSelection()
+    {
+        _selectedTicketIds.Clear();
+        _batchMode = false;
+        StateHasChanged();
+    }
+
+    private async Task BatchDeleteAsync()
+    {
+        if (_selectedTicketIds.Count == 0) return;
+        _isLoading = true;
+        try
+        {
+            var (deleted, failed) = await ApiService.BatchDeleteTicketsAsync(_selectedTicketIds);
+            Snackbar.Add(string.Format(L.T("batch.deleted"), deleted, failed), deleted > 0 ? Severity.Success : Severity.Error);
+            _selectedTicketIds.Clear();
+            await LoadTicketsAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private async Task BatchAssignToMeAsync()
+    {
+        var userId = ApiService.CurrentUserId;
+        if (string.IsNullOrEmpty(userId) || _selectedTicketIds.Count == 0) return;
+        _isLoading = true;
+        try
+        {
+            var batch = _selectedTicketIds.Select(id => new Dictionary<string, object?> { ["id"] = id, ["assignee"] = userId }).ToList();
+            var (updated, failed) = await ApiService.BatchUpdateTicketsAsync(batch);
+            Snackbar.Add(string.Format(L.T("batch.updated"), updated, failed), updated > 0 ? Severity.Success : Severity.Error);
+            _selectedTicketIds.Clear();
+            await LoadTicketsAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
     }
 
     // Saved Filters
