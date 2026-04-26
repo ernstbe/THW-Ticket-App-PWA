@@ -500,6 +500,12 @@ public class LocalizationService
         ["reports.top_assignees"] = "Top Bearbeiter",
         ["reports.no_deadline_tickets"] = "Keine Tickets mit Fälligkeitsdatum",
 
+        // Favorites
+        ["nav.favorites"] = "Favoriten",
+        ["favorites.empty"] = "Keine Favoriten. Markiere Tickets mit dem Stern-Symbol.",
+        ["favorites.remove"] = "Aus Favoriten entfernen",
+        ["favorites.removed"] = "Favorit entfernt.",
+
         // Accessibility
         ["a11y.toggle_menu"] = "Menü umschalten",
         ["a11y.notifications"] = "Benachrichtigungen",
@@ -969,6 +975,12 @@ public class LocalizationService
         ["reports.priority_dist"] = "Priority Distribution",
         ["reports.top_assignees"] = "Top Assignees",
         ["reports.no_deadline_tickets"] = "No tickets with due date",
+
+        // Favorites
+        ["nav.favorites"] = "Favorites",
+        ["favorites.empty"] = "No favorites yet. Star tickets to add them here.",
+        ["favorites.remove"] = "Remove from favorites",
+        ["favorites.removed"] = "Favorite removed.",
 
         // Accessibility
         ["a11y.toggle_menu"] = "Toggle menu",
