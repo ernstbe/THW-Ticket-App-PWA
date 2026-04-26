@@ -291,8 +291,8 @@ public class SyncService : ISyncService
 
     private async Task<bool> ApplyActionAsync(PendingActionDto action) => action.ActionType switch
     {
-        "AddComment" => await _apiService.AddCommentAsync(action.TicketId!, action.OwnerId!, action.Content!),
-        "AddNote" => await _apiService.AddNoteAsync(action.TicketId!, action.OwnerId!, action.Content!),
+        "AddComment" => await _apiService.AddCommentAsync(action.TicketUid.ToString(), action.OwnerId!, action.Content!),
+        "AddNote" => await _apiService.AddNoteAsync(action.TicketUid.ToString(), action.OwnerId!, action.Content!),
         "AssignTicket" => await _apiService.AssignTicketAsync(action.TicketId!, action.TargetUserId!),
         "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!),
         "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.StatusId!),

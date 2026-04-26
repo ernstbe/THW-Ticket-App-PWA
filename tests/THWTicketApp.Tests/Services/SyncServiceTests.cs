@@ -216,10 +216,10 @@ public class SyncServiceTests
         SetupQueuedActions(new PendingActionDto
         {
             Id = 10, ActionType = "AddComment",
-            TicketId = "t1", OwnerId = "u1", Content = "hi",
+            TicketId = "t1", TicketUid = 42, OwnerId = "u1", Content = "hi",
             RetryCount = 0
         });
-        _api.AddCommentAsync("t1", "u1", "hi").Returns(false);
+        _api.AddCommentAsync("42", "u1", "hi").Returns(false);
 
         var before = DateTime.UtcNow;
         await _sut.SyncPendingActionsAsync();
@@ -264,15 +264,15 @@ public class SyncServiceTests
         SetupQueuedActions(new PendingActionDto
         {
             Id = 12, ActionType = "AddComment",
-            TicketId = "t1", OwnerId = "u1", Content = "hi",
+            TicketId = "t1", TicketUid = 42, OwnerId = "u1", Content = "hi",
             RetryCount = 1,
             NextRetryAt = DateTime.UtcNow.AddSeconds(-5).ToString("O")
         });
-        _api.AddCommentAsync("t1", "u1", "hi").Returns(true);
+        _api.AddCommentAsync("42", "u1", "hi").Returns(true);
 
         await _sut.SyncPendingActionsAsync();
 
-        await _api.Received(1).AddCommentAsync("t1", "u1", "hi");
+        await _api.Received(1).AddCommentAsync("42", "u1", "hi");
         await _db.Received(1).RemovePendingActionAsync(12);
     }
 
@@ -283,10 +283,10 @@ public class SyncServiceTests
         SetupQueuedActions(new PendingActionDto
         {
             Id = 13, ActionType = "AddComment",
-            TicketId = "t1", OwnerId = "u1", Content = "hi",
+            TicketId = "t1", TicketUid = 42, OwnerId = "u1", Content = "hi",
             RetryCount = lastAttempt
         });
-        _api.AddCommentAsync("t1", "u1", "hi").Returns(false);
+        _api.AddCommentAsync("42", "u1", "hi").Returns(false);
 
         await _sut.SyncPendingActionsAsync();
 
