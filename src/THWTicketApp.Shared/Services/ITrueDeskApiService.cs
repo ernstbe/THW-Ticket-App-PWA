@@ -103,6 +103,11 @@ public interface ITrueDeskApiService
     Task<bool> AddTagToTicketAsync(string ticketId, string tagId);
     Task<bool> RemoveTagFromTicketAsync(string ticketId, string tagId);
 
+    // Ticket checklist (v2)
+    Task<bool> AddChecklistItemAsync(string ticketUid, string title);
+    Task<bool> UpdateChecklistItemAsync(string ticketUid, string itemId, string? title = null, bool? completed = null);
+    Task<bool> DeleteChecklistItemAsync(string ticketUid, string itemId);
+
     // Batch operations (v2)
     Task<(int Deleted, int Failed)> BatchDeleteTicketsAsync(IEnumerable<string> ticketIds);
     Task<(int Updated, int Failed)> BatchUpdateTicketsAsync(IEnumerable<Dictionary<string, object?>> batch);

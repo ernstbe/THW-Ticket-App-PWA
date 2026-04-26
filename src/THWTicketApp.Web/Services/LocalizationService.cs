@@ -324,6 +324,13 @@ public class LocalizationService
         ["detail.quickreply_templates"] = "Schnellantwort-Vorlagen",
         ["detail.new_template"] = "Neu",
         ["detail.link_ticket_num"] = "Ticket #",
+        ["common.add"] = "Hinzufügen",
+
+        // Checklist
+        ["checklist.title"] = "Checkliste",
+        ["checklist.empty"] = "Keine Einträge.",
+        ["checklist.new_item"] = "Neuer Eintrag",
+
         ["detail.add_tag"] = "Tag hinzufügen",
         ["detail.tag_added"] = "Tag hinzugefügt",
         ["detail.tag_removed"] = "Tag entfernt.",
@@ -743,6 +750,13 @@ public class LocalizationService
         ["detail.quickreply_templates"] = "Quick reply templates",
         ["detail.new_template"] = "New",
         ["detail.link_ticket_num"] = "Ticket #",
+        ["common.add"] = "Add",
+
+        // Checklist
+        ["checklist.title"] = "Checklist",
+        ["checklist.empty"] = "No items.",
+        ["checklist.new_item"] = "New item",
+
         ["detail.add_tag"] = "Add tag",
         ["detail.tag_added"] = "Tag added",
         ["detail.tag_removed"] = "Tag removed.",
