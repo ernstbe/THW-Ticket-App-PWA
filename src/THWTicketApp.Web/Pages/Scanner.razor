@@ -4,11 +4,12 @@
 @inject IJSRuntime JsRuntime
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
 @implements IAsyncDisposable
 
-<PageTitle>Scanner - THW Ticket App</PageTitle>
+<PageTitle>@L.T("nav.scanner") - THW Ticket App</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">QR-/Barcode-Scanner</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">@L.T("nav.scanner")</MudText>
 
 @if (!_cameraActive && !_scanComplete)
 {
@@ -17,19 +18,19 @@
             <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="Size.Large" Color="Color.Primary"
                      Style="font-size: 64px;" Class="mb-3" />
             <MudText Typo="Typo.body1" Class="mb-3">
-                Scannen Sie einen QR-Code oder Barcode, um ein Ticket zu öffnen.
+                @L.T("scanner.instruction")
             </MudText>
             @if (!_barcodeApiSupported)
             {
                 <MudAlert Severity="Severity.Warning" Class="mb-3">
-                    Ihr Browser unterstützt die BarcodeDetector API nicht. Bitte geben Sie die Ticket-Nummer manuell ein.
+                    @L.T("scanner.not_supported")
                 </MudAlert>
             }
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.CameraAlt"
                        OnClick="StartScannerAsync"
                        Disabled="!_barcodeApiSupported">
-                Kamera starten
+                @L.T("scanner.start_camera")
             </MudButton>
         </MudCardContent>
     </MudCard>
@@ -42,7 +43,7 @@
         <div class="mt-2">
             <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="StopScannerAsync"
                        StartIcon="@Icons.Material.Filled.Close">
-                Kamera stoppen
+                @L.T("scanner.stop_camera")
             </MudButton>
         </div>
     </MudPaper>
@@ -51,20 +52,20 @@
 @if (_scanComplete && !string.IsNullOrEmpty(_scannedValue))
 {
     <MudAlert Severity="Severity.Success" Class="mb-4">
-        Erkannt: <strong>@_scannedValue</strong>
+        @L.T("scanner.detected"): <strong>@_scannedValue</strong>
     </MudAlert>
 }
 
 @* Manual input fallback *@
 <MudCard>
     <MudCardContent>
-        <MudText Typo="Typo.h6" Class="mb-3">Manuelle Eingabe</MudText>
+        <MudText Typo="Typo.h6" Class="mb-3">@L.T("scanner.manual_input")</MudText>
         <div class="d-flex gap-2 align-center">
-            <MudTextField @bind-Value="_manualTicketUid" Label="Ticket-Nummer" Variant="Variant.Outlined"
+            <MudTextField @bind-Value="_manualTicketUid" Label="@L.T("scanner.ticket_number")" Variant="Variant.Outlined"
                           Placeholder="z.B. 1234" Immediate="true" T="string" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="NavigateToTicket"
                        Disabled="@string.IsNullOrWhiteSpace(_manualTicketUid)">
-                Öffnen
+                @L.T("scanner.open_ticket")
             </MudButton>
         </div>
     </MudCardContent>
@@ -105,7 +106,7 @@
         if (!started)
         {
             _cameraActive = false;
-            Snackbar.Add("Kamera konnte nicht gestartet werden.", Severity.Error);
+            Snackbar.Add(L.T("scanner.camera_failed"), Severity.Error);
             StateHasChanged();
         }
     }

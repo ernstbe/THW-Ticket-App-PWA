@@ -4,10 +4,11 @@
 @using THWTicketApp.Shared.Services
 @inject ISyncService SyncService
 @inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
 
-<PageTitle>Sync-Konflikte - THW Ticket App</PageTitle>
+<PageTitle>@L.T("nav.syncconflicts") - THW Ticket App</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Sync-Konflikte</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">@L.T("nav.syncconflicts")</MudText>
 
 @if (_loading)
 {
@@ -19,14 +20,13 @@
 else if (_conflicts.Count == 0)
 {
     <MudAlert Severity="Severity.Success" Class="mb-4">
-        Keine Sync-Konflikte vorhanden.
+        @L.T("sync.no_conflicts")
     </MudAlert>
 }
 else
 {
     <MudText Typo="Typo.body1" Class="mb-4">
-        @_conflicts.Count Konflikte gefunden. Bitte entscheiden Sie für jede Aktion, ob sie trotzdem
-        angewendet oder verworfen werden soll.
+        @string.Format(L.T("sync.conflicts_found"), _conflicts.Count)
     </MudText>
 
     @foreach (var conflict in _conflicts)
@@ -60,14 +60,14 @@ else
                                StartIcon="@Icons.Material.Filled.PublishedWithChanges"
                                OnClick="@(() => ForceApplyAsync(conflict))"
                                Disabled="_processing">
-                        Trotzdem anwenden
+                        @L.T("sync.force_apply")
                     </MudButton>
                 }
                 <MudButton Variant="Variant.Outlined" Color="Color.Error"
                            StartIcon="@Icons.Material.Filled.Delete"
                            OnClick="@(() => DiscardAsync(conflict))"
                            Disabled="_processing" Class="ml-2">
-                    Verwerfen
+                    @L.T("sync.discard")
                 </MudButton>
             </MudCardActions>
         </MudCard>
@@ -107,16 +107,16 @@ else
             if (success)
             {
                 _conflicts.Remove(conflict);
-                Snackbar.Add("Aktion erfolgreich angewendet.", Severity.Success);
+                Snackbar.Add(L.T("sync.applied"), Severity.Success);
             }
             else
             {
-                Snackbar.Add("Aktion konnte nicht angewendet werden.", Severity.Error);
+                Snackbar.Add(L.T("sync.apply_failed"), Severity.Error);
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+            Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error);
         }
         _processing = false;
     }
@@ -128,45 +128,45 @@ else
         {
             await SyncService.DiscardActionAsync(conflict.Id);
             _conflicts.Remove(conflict);
-            Snackbar.Add("Aktion verworfen.", Severity.Info);
+            Snackbar.Add(L.T("sync.discarded"), Severity.Info);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Fehler: {ex.Message}", Severity.Error);
+            Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error);
         }
         _processing = false;
     }
 
     internal record ConflictBranch(string Label, string Icon, Color IconColor, Severity AlertSeverity, bool AllowForceApply, string? Advice);
 
-    internal static ConflictBranch GetConflictBranch(ConflictType type) => type switch
+    internal ConflictBranch GetConflictBranch(ConflictType type) => type switch
     {
         ConflictType.TicketDeleted => new(
-            Label: "Ticket gelöscht",
+            Label: L.T("sync.type_deleted"),
             Icon: Icons.Material.Filled.DeleteForever,
             IconColor: Color.Error,
             AlertSeverity: Severity.Error,
             AllowForceApply: false,
-            Advice: "Da das Ticket serverseitig nicht mehr existiert, kann die Aktion nur verworfen werden."),
+            Advice: L.T("sync.advice_deleted")),
 
         ConflictType.PermissionRevoked => new(
-            Label: "Keine Berechtigung",
+            Label: L.T("sync.type_permission"),
             Icon: Icons.Material.Filled.Block,
             IconColor: Color.Error,
             AlertSeverity: Severity.Error,
             AllowForceApply: false,
-            Advice: "Deine Berechtigung für dieses Ticket wurde entzogen. Bitte wende dich an einen Administrator."),
+            Advice: L.T("sync.advice_permission")),
 
         ConflictType.StatusChanged => new(
-            Label: "Status bereits geändert",
+            Label: L.T("sync.type_status"),
             Icon: Icons.Material.Filled.SyncProblem,
             IconColor: Color.Warning,
             AlertSeverity: Severity.Warning,
             AllowForceApply: true,
-            Advice: "Jemand anderes hat den Status in der Zwischenzeit gesetzt. Erzwingen überschreibt diesen Wert."),
+            Advice: L.T("sync.advice_status")),
 
         ConflictType.TicketUpdated => new(
-            Label: "Ticket bearbeitet",
+            Label: L.T("sync.type_updated"),
             Icon: Icons.Material.Filled.Warning,
             IconColor: Color.Warning,
             AlertSeverity: Severity.Warning,
@@ -174,7 +174,7 @@ else
             Advice: null),
 
         _ => new(
-            Label: "Konflikt",
+            Label: L.T("sync.type_conflict"),
             Icon: Icons.Material.Filled.Warning,
             IconColor: Color.Warning,
             AlertSeverity: Severity.Warning,
@@ -182,17 +182,17 @@ else
             Advice: null)
     };
 
-    internal static string TranslateActionType(string actionType) => actionType switch
+    internal string TranslateActionType(string actionType) => actionType switch
     {
-        "AddComment" => "Kommentar hinzufügen",
-        "AddNote" => "Notiz hinzufügen",
-        "AssignTicket" => "Ticket zuweisen",
-        "UpdateStatus" => "Status ändern",
-        "CreateTicket" => "Neues Ticket erstellen",
-        "ClearAssignee" => "Zuweisung entfernen",
-        "UpdateTicketFields" => "Ticket-Felder aktualisieren",
-        "DeleteTicket" => "Ticket löschen",
-        "UploadAttachment" => "Anhang hochladen",
+        "AddComment" => L.T("sync.action_add_comment"),
+        "AddNote" => L.T("sync.action_add_note"),
+        "AssignTicket" => L.T("sync.action_assign"),
+        "UpdateStatus" => L.T("sync.action_update_status"),
+        "CreateTicket" => L.T("sync.action_create"),
+        "ClearAssignee" => L.T("sync.action_clear_assignee"),
+        "UpdateTicketFields" => L.T("sync.action_update_fields"),
+        "DeleteTicket" => L.T("sync.action_delete"),
+        "UploadAttachment" => L.T("sync.action_upload"),
         _ => actionType
     };
 }
