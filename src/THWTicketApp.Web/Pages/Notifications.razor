@@ -166,14 +166,19 @@ else
                     if (el.TryGetProperty("description", out var descEl))
                         item.Description ??= descEl.GetString();
                     if (el.TryGetProperty("type", out var typeEl))
-                        item.EventType = typeEl.GetString();
+                        item.EventType = typeEl.ValueKind == JsonValueKind.String
+                            ? typeEl.GetString()
+                            : typeEl.ToString();
                     if (el.TryGetProperty("unread", out var unreadEl))
-                        item.IsRead = !unreadEl.GetBoolean();
-                    if (el.TryGetProperty("date", out var dateEl) && dateEl.ValueKind == JsonValueKind.String)
-                    {
-                        if (DateTime.TryParse(dateEl.GetString(), out var dt))
-                            item.Date = dt;
-                    }
+                        item.IsRead = unreadEl.ValueKind == JsonValueKind.True ? false
+                            : unreadEl.ValueKind == JsonValueKind.False ? true
+                            : !unreadEl.GetBoolean();
+                    // API returns "created" not "date"
+                    var dateField = el.TryGetProperty("date", out var dateEl) ? dateEl
+                        : el.TryGetProperty("created", out var createdEl) ? createdEl
+                        : default;
+                    if (dateField.ValueKind == JsonValueKind.String && DateTime.TryParse(dateField.GetString(), out var dt))
+                        item.Date = dt;
                     if (el.TryGetProperty("data", out var dataEl))
                     {
                         if (dataEl.TryGetProperty("ticket", out var ticketEl))
