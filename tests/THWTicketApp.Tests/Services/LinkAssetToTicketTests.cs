@@ -35,7 +35,8 @@ public class LinkAssetToTicketTests
 
         Assert.True(ok);
         Assert.Equal(HttpMethod.Post, _handler.LastMethod);
-        Assert.Equal("/api/v1/assets/asset-1/link-ticket", _handler.LastPath);
+        // Assets are v2-only — always routed via V2BaseUrl regardless of configured base
+        Assert.Equal("/api/v2/assets/asset-1/link-ticket", _handler.LastPath);
 
         using var doc = JsonDocument.Parse(_handler.LastBody);
         Assert.True(doc.RootElement.TryGetProperty("ticketUid", out var uidEl),

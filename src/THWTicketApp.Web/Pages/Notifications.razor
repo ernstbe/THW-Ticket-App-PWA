@@ -208,9 +208,9 @@ else
         notification.IsRead = true;
 
         if (!string.IsNullOrEmpty(notification.TicketUid))
-            Navigation.NavigateTo($"/tickets/{notification.TicketUid}");
+            Navigation.NavigateTo($"tickets/{notification.TicketUid}");
         else if (!string.IsNullOrEmpty(notification.TicketId))
-            Navigation.NavigateTo($"/tickets/{notification.TicketId}");
+            Navigation.NavigateTo($"tickets/{notification.TicketId}");
     }
 
     private static string GetNotificationIcon(NotificationItem n) => n.EventType switch

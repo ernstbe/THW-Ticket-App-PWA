@@ -123,7 +123,7 @@ else
         }
     }
 
-    private void OpenTicket(string uid) => Nav.NavigateTo($"/ticket/{uid}");
+    private void OpenTicket(string uid) => Nav.NavigateTo($"tickets/{uid}");
 
     private static string IconFor(string type) => type switch
     {
