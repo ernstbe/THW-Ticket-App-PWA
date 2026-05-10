@@ -206,7 +206,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         try
         {
             if (IsAuthenticated)
-                await _httpClient.GetAsync($"{BaseUrl}/logout");
+                await _httpClient.GetAsync($"{V1BaseUrl}/logout");
         }
         catch { }
 
@@ -449,8 +449,9 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public async Task<bool> DeleteAttachmentAsync(string ticketId, string attachmentId)
     {
+        // /tickets/:tid/attachments/remove/:aid only exists in v1
         var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync(
-            $"{BaseUrl}/tickets/{ticketId}/attachments/remove/{attachmentId}"));
+            $"{V1BaseUrl}/tickets/{ticketId}/attachments/remove/{attachmentId}"));
         return response.IsSuccessStatusCode;
     }
 
@@ -495,8 +496,8 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public async Task<string> GetTagsAsync()
     {
-        // v1 has /tickets/tags (all tags) or /tags/limit (paginated)
-        var endpoint = IsV2 ? $"{BaseUrl}/tags" : $"{V1BaseUrl}/tickets/tags";
+        // Tags only exist in v1 — there is no v2 /tags endpoint
+        var endpoint = $"{V1BaseUrl}/tickets/tags";
         var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync(endpoint));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
@@ -511,8 +512,9 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public async Task<string> GetTicketsByGroupAsync(string groupId, int page = 0, int limit = 50)
     {
+        // /tickets/group/:id only exists in v1
         var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync(
-            $"{BaseUrl}/tickets/group/{groupId}?page={page}&limit={limit}"));
+            $"{V1BaseUrl}/tickets/group/{groupId}?page={page}&limit={limit}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -548,6 +550,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         {
             if (!_settings.IsConfigured || !IsAuthenticated)
                 return 0;
+            if (!CanCallV2) return 0;
 
             var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/users/notifications/count"));
             response.EnsureSuccessStatusCode();
@@ -655,6 +658,7 @@ public class TrueDeskApiService : ITrueDeskApiService
     // Dashboard (v2)
     public async Task<string> GetDashboardWidgetsAsync()
     {
+        if (!CanCallV2) return "{}";
         var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/dashboard/widgets"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
@@ -663,14 +667,14 @@ public class TrueDeskApiService : ITrueDeskApiService
     // Recurring Tasks (v2 only)
     public async Task<string> GetRecurringTasksAsync()
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/recurring-tasks"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/recurring-tasks"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetRecurringTaskAsync(string taskId)
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/recurring-tasks/{taskId}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/recurring-tasks/{taskId}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -678,34 +682,34 @@ public class TrueDeskApiService : ITrueDeskApiService
     public async Task<bool> CreateRecurringTaskAsync(Dictionary<string, object?> taskData)
     {
         var content = new StringContent(JsonSerializer.Serialize(taskData), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{BaseUrl}/recurring-tasks", content));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/recurring-tasks", content));
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> UpdateRecurringTaskAsync(string taskId, Dictionary<string, object?> taskData)
     {
         var content = new StringContent(JsonSerializer.Serialize(taskData), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/recurring-tasks/{taskId}", content));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/recurring-tasks/{taskId}", content));
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> DeleteRecurringTaskAsync(string taskId)
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{BaseUrl}/recurring-tasks/{taskId}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/recurring-tasks/{taskId}"));
         return response.IsSuccessStatusCode;
     }
 
     // Assets (v2 only)
     public async Task<string> GetAssetsAsync()
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/assets"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/assets"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetAssetAsync(string assetId)
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/assets/{assetId}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/assets/{assetId}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -713,20 +717,20 @@ public class TrueDeskApiService : ITrueDeskApiService
     public async Task<bool> CreateAssetAsync(Dictionary<string, object?> assetData)
     {
         var content = new StringContent(JsonSerializer.Serialize(assetData), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{BaseUrl}/assets", content));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/assets", content));
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> UpdateAssetAsync(string assetId, Dictionary<string, object?> assetData)
     {
         var content = new StringContent(JsonSerializer.Serialize(assetData), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/assets/{assetId}", content));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/assets/{assetId}", content));
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> DeleteAssetAsync(string assetId)
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{BaseUrl}/assets/{assetId}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/assets/{assetId}"));
         return response.IsSuccessStatusCode;
     }
 
@@ -737,21 +741,21 @@ public class TrueDeskApiService : ITrueDeskApiService
         // The backend expects { ticketUid: "<uid>" }, not { ticketId }.
         var payload = new { ticketUid };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{BaseUrl}/assets/{assetId}/link-ticket", content));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/assets/{assetId}/link-ticket", content));
         return response.IsSuccessStatusCode;
     }
 
     // Reports (v2)
     public async Task<string> GetHandoverReportAsync(string format = "json")
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/reports/handover?format={format}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/reports/handover?format={format}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
     public async Task<string> GetSitzungReportAsync(string format = "json")
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/reports/sitzung?format={format}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/reports/sitzung?format={format}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
@@ -769,6 +773,19 @@ public class TrueDeskApiService : ITrueDeskApiService
         }
         return response;
     }
+
+    /// <summary>
+    /// Checks whether v2 endpoints can be called. In v1 mode, v2 endpoints
+    /// require JWT auth which we don't have — calls would always return 401.
+    /// </summary>
+    private bool CanCallV2 => IsV2;
+
+    /// <summary>
+    /// Guard for v2-only endpoints. Throws HttpRequestException so callers'
+    /// existing try/catch handles it like any other failure.
+    /// </summary>
+    private static void ThrowV2Unavailable() =>
+        throw new HttpRequestException("v2 endpoint unavailable in v1 auth mode");
 
     private static string GetMimeType(string fileName)
     {
@@ -871,6 +888,7 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public async Task<string> GetTicketTemplatesAsync()
     {
+        if (!CanCallV2) return "[]";
         var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/ticket-templates"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();

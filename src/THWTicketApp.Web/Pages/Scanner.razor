@@ -134,7 +134,7 @@
             InvokeAsync(() =>
             {
                 StateHasChanged();
-                Navigation.NavigateTo($"/tickets/{ticketNum}");
+                Navigation.NavigateTo($"tickets/{ticketNum}");
             });
         }
         else
@@ -148,7 +148,7 @@
     {
         if (string.IsNullOrWhiteSpace(_manualTicketUid)) return;
         var uid = _manualTicketUid.Trim().TrimStart('#');
-        Navigation.NavigateTo($"/tickets/{uid}");
+        Navigation.NavigateTo($"tickets/{uid}");
     }
 
     private static string? ExtractTicketNumber(string value)

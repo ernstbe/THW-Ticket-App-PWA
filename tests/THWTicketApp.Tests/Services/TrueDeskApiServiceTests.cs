@@ -121,6 +121,11 @@ public class TrueDeskApiServiceTests
     [Fact]
     public async Task GetTicketTemplatesAsync_callsV2TicketTemplatesEndpoint()
     {
+        // Switch to v2 base URL so CanCallV2 guard passes
+        var settings = (AppSettings)typeof(TrueDeskApiService)
+            .GetField("_settings", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .GetValue(_sut)!;
+        settings.ApiBaseUrl = "https://host.test/api/v2";
         _handler.SetDefault(HttpStatusCode.OK, "[]");
         await _sut.GetTicketTemplatesAsync();
         Assert.Equal("/api/v2/ticket-templates", LastRequest.RequestUri!.AbsolutePath);
@@ -374,6 +379,11 @@ public class TrueDeskApiServiceTests
     [Fact]
     public async Task GetNotificationCountAsync_callsV2CountEndpoint()
     {
+        // Switch to v2 base URL so CanCallV2 guard passes
+        var settings = (AppSettings)typeof(TrueDeskApiService)
+            .GetField("_settings", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .GetValue(_sut)!;
+        settings.ApiBaseUrl = "https://host.test/api/v2";
         // Set _authToken via reflection so the IsAuthenticated guard passes
         typeof(TrueDeskApiService)
             .GetField("_authToken", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!

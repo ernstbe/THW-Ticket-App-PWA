@@ -67,8 +67,8 @@ else
                       Outlined="true" tabindex="0"
                       role="link"
                       aria-label="@($"#{context.Uid} {context.Subject}")"
-                      @onclick="@(() => Navigation.NavigateTo($"/tickets/{context.Uid}"))"
-                      @onkeydown="@(e => { if (e.Key == "Enter" || e.Key == " ") Navigation.NavigateTo($"/tickets/{context.Uid}"); })">
+                      @onclick="@(() => Navigation.NavigateTo($"tickets/{context.Uid}"))"
+                      @onkeydown="@(e => { if (e.Key == "Enter" || e.Key == " ") Navigation.NavigateTo($"tickets/{context.Uid}"); })">
                 <MudText Typo="Typo.body2" Style="font-weight: 600;" Class="mb-1">
                     @context.Subject
                 </MudText>
