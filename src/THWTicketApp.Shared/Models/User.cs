@@ -14,6 +14,9 @@ public class User
     public bool HasL2Auth { get; set; }
     public bool Deleted { get; set; }
     public DateTime LastOnline { get; set; }
-    public string Id { get; set; } = string.Empty;
+    // Trudesk's getassignees endpoint does NOT include the Mongoose "id" virtual,
+    // only "_id". Fall back to InternalId so callers don't get an empty string.
+    private string _id = string.Empty;
+    public string Id { get => _id.Length > 0 ? _id : InternalId ?? string.Empty; set => _id = value; }
     public List<Group> Groups { get; set; } = [];
 }
