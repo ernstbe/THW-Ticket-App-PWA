@@ -37,27 +37,30 @@
                 </div>
             }
 
+            @* Server-config panel only on first run. Once configured, the URL lives in
+               local storage and the panel becomes pointless visual noise. To change the
+               URL later, clear site data or use the dev console. *@
             @if (!_serverConfigured)
             {
                 <MudAlert Severity="Severity.Info" Class="mb-4">
                     @L.T("login.configure_server")
                 </MudAlert>
-            }
 
-            <MudExpansionPanels Class="mb-4" Elevation="0">
-                <MudExpansionPanel Text="@L.T("login.server_config")" Expanded="@(!_serverConfigured)"
-                                   Style="background: transparent;">
-                    <MudTextField @bind-Value="_serverUrl" Label="@L.T("login.server_url")"
-                                  Placeholder="https://trudesk.example.com/api/v2"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense"
-                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Dns"
-                                  Disabled="@_isLoading" Class="mb-2" />
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
-                               OnClick="SaveServerUrlAsync" FullWidth="true">
-                        @L.T("login.save_url")
-                    </MudButton>
-                </MudExpansionPanel>
-            </MudExpansionPanels>
+                <MudExpansionPanels Class="mb-4" Elevation="0">
+                    <MudExpansionPanel Text="@L.T("login.server_config")" Expanded="true"
+                                       Style="background: transparent;">
+                        <MudTextField @bind-Value="_serverUrl" Label="@L.T("login.server_url")"
+                                      Placeholder="https://trudesk.example.com/api/v2"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Dns"
+                                      Disabled="@_isLoading" Class="mb-2" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="SaveServerUrlAsync" FullWidth="true">
+                            @L.T("login.save_url")
+                        </MudButton>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
 
             <MudForm @ref="_form">
                 <MudTextField @bind-Value="_username" Label="@L.T("login.username")" Variant="Variant.Outlined"
