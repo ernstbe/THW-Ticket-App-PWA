@@ -143,31 +143,36 @@ public class TrueDeskApiService : ITrueDeskApiService
     {
         try
         {
-            // Read from preloaded globals set in index.html BEFORE Blazor started.
-            // This avoids the JSInterop module-import timing issue that caused
-            // localStorage reads via LocalStorageService to fail during early init.
-            var storedToken = await _jsRuntime.InvokeAsync<string?>("eval", "window.__preloadedAuth?.token || null");
-            if (!string.IsNullOrEmpty(storedToken))
+            // Use SYNCHRONOUS JS calls via IJSInProcessRuntime (Blazor WASM only).
+            // Async InvokeAsync and module imports both suffer from timing issues
+            // during early init — GetAuthenticationStateAsync races with the JS bridge.
+            // Synchronous calls bypass this entirely.
+            if (_jsRuntime is Microsoft.JSInterop.IJSInProcessRuntime jsSync)
             {
-                _authToken = storedToken;
-                _refreshToken = await _jsRuntime.InvokeAsync<string?>("eval", "window.__preloadedAuth?.refreshToken || null");
-                CurrentUsername = await _jsRuntime.InvokeAsync<string?>("eval", "window.__preloadedAuth?.username || null");
-                CurrentUserId = await _jsRuntime.InvokeAsync<string?>("eval", "window.__preloadedAuth?.userId || null");
-                SetAuthHeader(_authToken);
-                return true;
+                var storedToken = jsSync.Invoke<string?>("localStorage.getItem", "auth_token");
+                if (!string.IsNullOrEmpty(storedToken))
+                {
+                    _authToken = storedToken;
+                    _refreshToken = jsSync.Invoke<string?>("localStorage.getItem", "auth_refresh_token");
+                    CurrentUsername = jsSync.Invoke<string?>("localStorage.getItem", "auth_username");
+                    CurrentUserId = jsSync.Invoke<string?>("localStorage.getItem", "auth_userid");
+                    SetAuthHeader(_authToken);
+                    return true;
+                }
             }
-
-            // Fallback: try the regular localStorage service (for cases where
-            // preloaded globals were cleared or not available).
-            var fallbackToken = await _localStorage.GetItemAsync("auth_token");
-            if (!string.IsNullOrEmpty(fallbackToken))
+            else
             {
-                _authToken = fallbackToken;
-                _refreshToken = await _localStorage.GetItemAsync("auth_refresh_token");
-                CurrentUsername = await _localStorage.GetItemAsync("auth_username");
-                CurrentUserId = await _localStorage.GetItemAsync("auth_userid");
-                SetAuthHeader(_authToken);
-                return true;
+                // Fallback for non-WASM (shouldn't happen but just in case)
+                var storedToken = await _localStorage.GetItemAsync("auth_token");
+                if (!string.IsNullOrEmpty(storedToken))
+                {
+                    _authToken = storedToken;
+                    _refreshToken = await _localStorage.GetItemAsync("auth_refresh_token");
+                    CurrentUsername = await _localStorage.GetItemAsync("auth_username");
+                    CurrentUserId = await _localStorage.GetItemAsync("auth_userid");
+                    SetAuthHeader(_authToken);
+                    return true;
+                }
             }
         }
         catch { }
