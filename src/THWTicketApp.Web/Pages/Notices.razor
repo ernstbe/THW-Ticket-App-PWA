@@ -3,6 +3,7 @@
 @using MudBlazor
 @using MudBlazor.Utilities
 @using System.Text.Json
+@using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
@@ -117,7 +118,7 @@ else
             var json = await ApiService.GetNoticesAsync();
             _notices = ParseNotices(json);
         }
-        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; StateHasChanged(); }
     }
 

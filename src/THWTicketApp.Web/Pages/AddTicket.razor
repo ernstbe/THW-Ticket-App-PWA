@@ -140,11 +140,11 @@ else
         try
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            // Core data: types and groups are essential for ticket creation.
             var typesTask = ApiService.GetTicketTypesAsync();
             var groupsTask = ApiService.GetGroupsAsync();
-            var usersTask = ApiService.GetAssigneesAsync();
-            var templatesTask = ApiService.GetTicketTemplatesAsync();
-            await Task.WhenAll(typesTask, groupsTask, usersTask, templatesTask);
+            await Task.WhenAll(typesTask, groupsTask);
 
             // Types + Priorities
             var types = JsonSerializer.Deserialize<TicketType[]>(typesTask.Result, options);
@@ -166,13 +166,24 @@ else
                 if (_groups.Count > 0) _selectedGroup = _groups[0];
             }
 
-            // Users
-            var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersTask.Result, options);
-            if (userResponse?.Users != null)
-                _users = userResponse.Users;
+            // Optional data: assignees (requires Agent/Admin role) and templates
+            // (v2 endpoint, fails with v1 accesstoken). Fetched separately so a
+            // failure doesn't break the whole form — the dropdowns just stay empty.
+            try
+            {
+                var usersJson = await ApiService.GetAssigneesAsync();
+                var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersJson, options);
+                if (userResponse?.Users != null)
+                    _users = userResponse.Users;
+            }
+            catch { /* Assignees unavailable for this role — hide dropdown */ }
 
-            // Templates
-            _templates = ParseTemplates(templatesTask.Result);
+            try
+            {
+                var templatesJson = await ApiService.GetTicketTemplatesAsync();
+                _templates = ParseTemplates(templatesJson);
+            }
+            catch { /* Templates endpoint failed (v2 auth mismatch) — skip */ }
         }
         catch { Snackbar.Add(L.T("tickets.form_load_error"), Severity.Error); }
         finally

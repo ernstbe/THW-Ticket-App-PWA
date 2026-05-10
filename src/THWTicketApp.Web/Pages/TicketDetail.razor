@@ -635,11 +635,12 @@ else
         try
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            // Essential reference data (v1 — must succeed for the page to work)
             var statusTask = ApiService.GetStatusesAsync();
             var prioTask = ApiService.GetPrioritiesAsync();
-            var usersTask = ApiService.GetAssigneesAsync();
             var tagsTask = ApiService.GetTagsAsync();
-            await Task.WhenAll(statusTask, prioTask, usersTask, tagsTask);
+            await Task.WhenAll(statusTask, prioTask, tagsTask);
 
             _statuses = JsonHelper.DeserializeWrappedArray<Status>(statusTask.Result, "status", options).ToList();
             foreach (var s in _statuses) s.Name = TrudeskTranslationHelper.TranslateStatus(s.Name);
@@ -651,9 +652,6 @@ else
                 _priorities = JsonSerializer.Deserialize<List<Priority>>(prioTask.Result, options) ?? [];
             foreach (var p in _priorities) p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
 
-            var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersTask.Result, options);
-            _users = userResponse?.Users ?? [];
-
             _availableTags = JsonHelper.DeserializeWrappedArray<Tag>(tagsTask.Result, "tags", options).ToList();
 
             if (_ticket != null)
@@ -661,6 +659,16 @@ else
                 _selectedStatus = _statuses.FirstOrDefault(s => s.Id == _ticket.Status?.Id);
                 _selectedPriority = _priorities.FirstOrDefault(p => p.Id == _ticket.Priority?.Id);
             }
+
+            // Optional: assignees list (role-restricted — may fail for regular users)
+            try
+            {
+                var usersJson = await ApiService.GetAssigneesAsync();
+                var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersJson, options);
+                _users = userResponse?.Users ?? [];
+            }
+            catch { _users = []; }
+
             StateHasChanged();
         }
         catch { }

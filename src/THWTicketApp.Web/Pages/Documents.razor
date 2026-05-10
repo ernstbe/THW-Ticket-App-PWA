@@ -2,6 +2,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using MudBlazor
 @using System.Text.Json
+@using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
@@ -115,7 +116,7 @@ else
             var json = await ApiService.GetDocumentsAsync();
             _documents = ParseDocuments(json);
         }
-        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; StateHasChanged(); }
     }
 
@@ -133,7 +134,7 @@ else
             }
             else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
         }
-        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
     private async Task DeleteDocumentAsync(string id)
@@ -147,7 +148,7 @@ else
             }
             else Snackbar.Add(L.T("detail.delete_failed"), Severity.Error);
         }
-        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
     private bool FilterFunc(DocumentItem doc) =>
