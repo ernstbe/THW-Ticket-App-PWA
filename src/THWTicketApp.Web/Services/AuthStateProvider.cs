@@ -7,15 +7,11 @@ namespace THWTicketApp.Web.Services;
 public class AuthStateProvider : AuthenticationStateProvider
 {
     private readonly ITrueDeskApiService _apiService;
-    private readonly AppSettings _settings;
-    private readonly AppSettingsInitializer _settingsInit;
     private bool _initialized;
 
-    public AuthStateProvider(ITrueDeskApiService apiService, AppSettings settings, AppSettingsInitializer settingsInit)
+    public AuthStateProvider(ITrueDeskApiService apiService)
     {
         _apiService = apiService;
-        _settings = settings;
-        _settingsInit = settingsInit;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -24,19 +20,14 @@ public class AuthStateProvider : AuthenticationStateProvider
         {
             _initialized = true;
 
-            // Settings MUST be loaded before we can restore the session, because
-            // TryRestoreSessionAsync needs ApiBaseUrl to build the token-verify
-            // URL. Previously settings were only initialized in OnAfterRenderAsync
-            // of page components — too late, since the router evaluates auth state
-            // before any component renders. This race condition caused every page
-            // reload to lose the session.
-            await _settingsInit.InitializeAsync();
-
-            if (_settings.IsConfigured)
-            {
-                try { await _apiService.TryRestoreSessionAsync(); }
-                catch { /* API unreachable - stay unauthenticated */ }
-            }
+            // Always try to restore the session from localStorage.
+            // TryRestoreSessionAsync no longer needs ApiBaseUrl (the verify
+            // round-trip was removed in PR #56) — it just reads the stored
+            // token and trusts it. So we don't need settings to be initialized
+            // first, removing the race condition that caused session loss on
+            // every page reload.
+            try { await _apiService.TryRestoreSessionAsync(); }
+            catch { /* localStorage not ready or empty — stay unauthenticated */ }
         }
 
         if (_apiService.IsAuthenticated)
