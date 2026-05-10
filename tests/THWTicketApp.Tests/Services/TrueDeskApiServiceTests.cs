@@ -19,7 +19,7 @@ public class TrueDeskApiServiceTests
         var settings = new AppSettings { ApiBaseUrl = "https://host.test/api/v1", ConnectionTimeoutSeconds = 30 };
         var jsRuntime = Substitute.For<IJSRuntime>();
         var localStorage = new LocalStorageService(jsRuntime);
-        _sut = new TrueDeskApiService(httpClient, settings, localStorage);
+        _sut = new TrueDeskApiService(httpClient, settings, localStorage, Substitute.For<Microsoft.JSInterop.IJSRuntime>());
     }
 
     private HttpRequestMessage LastRequest => _handler.Requests[^1];

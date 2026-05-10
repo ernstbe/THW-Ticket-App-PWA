@@ -38,6 +38,16 @@
         <a class="dismiss" style="cursor:pointer;">Schließen</a>
     </div>
 
+    <script>
+        // Pre-load auth tokens BEFORE Blazor starts so the WASM auth provider
+        // can read them synchronously without JSInterop module imports.
+        window.__preloadedAuth = {
+            token: localStorage.getItem('auth_token'),
+            username: localStorage.getItem('auth_username'),
+            userId: localStorage.getItem('auth_userid'),
+            refreshToken: localStorage.getItem('auth_refresh_token')
+        };
+    </script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
