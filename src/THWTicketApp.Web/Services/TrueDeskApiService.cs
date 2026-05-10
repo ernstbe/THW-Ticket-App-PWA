@@ -1110,4 +1110,65 @@ public class TrueDeskApiService : ITrueDeskApiService
         }
         return response.IsSuccessStatusCode;
     }
+
+    // ── Public registration (v1, no auth required) ──────────────────────
+
+    public async Task<string?> GetCaptchaSvgAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"{ServerUrl}/captcha");
+            if (response.IsSuccessStatusCode)
+                return await response.Content.ReadAsStringAsync();
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<(bool Success, bool Exists, string? Error)> CheckEmailAsync(string email, string captcha)
+    {
+        try
+        {
+            var payload = new { email, captcha };
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync($"{V1BaseUrl}/public/users/checkemail", content);
+            var json = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(json);
+
+            var success = doc.RootElement.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
+            var exists = doc.RootElement.TryGetProperty("exist", out var eEl) && eEl.GetBoolean();
+            var error = doc.RootElement.TryGetProperty("error", out var errEl) ? errEl.GetString() : null;
+
+            return (success, exists, error);
+        }
+        catch (Exception ex)
+        {
+            return (false, false, ex.Message);
+        }
+    }
+
+    public async Task<(bool Success, string? Error)> RegisterAsync(string username, string fullname, string email, string password, string captcha)
+    {
+        try
+        {
+            var payload = new
+            {
+                user = new { username, fullname, email, password },
+                captcha
+            };
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync($"{V1BaseUrl}/public/account/create", content);
+            var json = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(json);
+
+            var success = doc.RootElement.TryGetProperty("success", out var sEl) && sEl.GetBoolean();
+            var error = doc.RootElement.TryGetProperty("error", out var errEl) ? errEl.GetString() : null;
+
+            return (success, error);
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
 }

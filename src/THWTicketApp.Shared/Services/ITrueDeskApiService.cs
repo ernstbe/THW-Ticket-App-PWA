@@ -130,4 +130,9 @@ public interface ITrueDeskApiService
     // Profile (v2)
     Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber);
     Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword);
+
+    // Public registration (v1)
+    Task<string?> GetCaptchaSvgAsync();
+    Task<(bool Success, bool Exists, string? Error)> CheckEmailAsync(string email, string captcha);
+    Task<(bool Success, string? Error)> RegisterAsync(string username, string fullname, string email, string password, string captcha);
 }
