@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.JSInterop;
 using THWTicketApp.Shared.Services;
 
 namespace THWTicketApp.Web.Services;
@@ -7,11 +8,13 @@ namespace THWTicketApp.Web.Services;
 public class AuthStateProvider : AuthenticationStateProvider
 {
     private readonly ITrueDeskApiService _apiService;
+    private readonly IJSRuntime _jsRuntime;
     private bool _initialized;
 
-    public AuthStateProvider(ITrueDeskApiService apiService)
+    public AuthStateProvider(ITrueDeskApiService apiService, IJSRuntime jsRuntime)
     {
         _apiService = apiService;
+        _jsRuntime = jsRuntime;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -20,18 +23,20 @@ public class AuthStateProvider : AuthenticationStateProvider
         {
             _initialized = true;
 
-            // Always try to restore the session from localStorage.
-            // TryRestoreSessionAsync no longer needs ApiBaseUrl (the verify
-            // round-trip was removed in PR #56) — it just reads the stored
-            // token and trusts it. So we don't need settings to be initialized
-            // first, removing the race condition that caused session loss on
-            // every page reload.
-            try { await _apiService.TryRestoreSessionAsync(); }
-            catch { /* localStorage not ready or empty — stay unauthenticated */ }
+            try
+            {
+                await _apiService.TryRestoreSessionAsync();
+                Log($"[AUTH] Restore done. IsAuthenticated={_apiService.IsAuthenticated}, User={_apiService.CurrentUsername}");
+            }
+            catch (Exception ex)
+            {
+                Log($"[AUTH] Restore FAILED: {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         if (_apiService.IsAuthenticated)
         {
+            Log($"[AUTH] Returning authenticated state for {_apiService.CurrentUsername}");
             var claims = new[]
             {
                 new Claim(ClaimTypes.Name, _apiService.CurrentUsername ?? ""),
@@ -41,11 +46,22 @@ public class AuthStateProvider : AuthenticationStateProvider
             return new AuthenticationState(new ClaimsPrincipal(identity));
         }
 
+        Log("[AUTH] Returning ANONYMOUS state");
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
     }
 
     public void NotifyAuthStateChanged()
     {
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+    }
+
+    private void Log(string message)
+    {
+        try
+        {
+            if (_jsRuntime is IJSInProcessRuntime js)
+                js.InvokeVoid("console.log", message);
+        }
+        catch { /* ignore logging failures */ }
     }
 }
