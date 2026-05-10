@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.JSInterop;
 using THWTicketApp.Shared.Models;
 using THWTicketApp.Shared.Services;
 
@@ -12,6 +13,7 @@ public class TrueDeskApiService : ITrueDeskApiService
     private readonly HttpClient _httpClient;
     private readonly AppSettings _settings;
     private readonly LocalStorageService _localStorage;
+    private readonly IJSRuntime _jsRuntime;
     private string? _authToken;
     private string? _refreshToken;
 
@@ -19,11 +21,12 @@ public class TrueDeskApiService : ITrueDeskApiService
     public string? CurrentUserId { get; private set; }
     public string? LastError { get; private set; }
 
-    public TrueDeskApiService(HttpClient httpClient, AppSettings settings, LocalStorageService localStorage)
+    public TrueDeskApiService(HttpClient httpClient, AppSettings settings, LocalStorageService localStorage, IJSRuntime jsRuntime)
     {
         _httpClient = httpClient;
         _settings = settings;
         _localStorage = localStorage;
+        _jsRuntime = jsRuntime;
         _httpClient.Timeout = TimeSpan.FromSeconds(_settings.ConnectionTimeoutSeconds);
     }
 
@@ -140,21 +143,30 @@ public class TrueDeskApiService : ITrueDeskApiService
     {
         try
         {
-            var storedToken = await _localStorage.GetItemAsync("auth_token");
+            // Read from preloaded globals set in index.html BEFORE Blazor started.
+            // This avoids the JSInterop module-import timing issue that caused
+            // localStorage reads via LocalStorageService to fail during early init.
+            var storedToken = await _jsRuntime.InvokeAsync<string?>("eval", "window.__preloadedAuth?.token || null");
             if (!string.IsNullOrEmpty(storedToken))
             {
                 _authToken = storedToken;
+                _refreshToken = await _jsRuntime.InvokeAsync<string?>("eval", "window.__preloadedAuth?.refreshToken || null");
+                CurrentUsername = await _jsRuntime.InvokeAsync<string?>("eval", "window.__preloadedAuth?.username || null");
+                CurrentUserId = await _jsRuntime.InvokeAsync<string?>("eval", "window.__preloadedAuth?.userId || null");
+                SetAuthHeader(_authToken);
+                return true;
+            }
+
+            // Fallback: try the regular localStorage service (for cases where
+            // preloaded globals were cleared or not available).
+            var fallbackToken = await _localStorage.GetItemAsync("auth_token");
+            if (!string.IsNullOrEmpty(fallbackToken))
+            {
+                _authToken = fallbackToken;
                 _refreshToken = await _localStorage.GetItemAsync("auth_refresh_token");
                 CurrentUsername = await _localStorage.GetItemAsync("auth_username");
                 CurrentUserId = await _localStorage.GetItemAsync("auth_userid");
                 SetAuthHeader(_authToken);
-
-                // Trust the stored token without a verify round-trip. v1 tokens
-                // don't expire, so there's no value in calling GET /api/v1/login
-                // just to confirm — and the call failed during early init because
-                // ApiBaseUrl wasn't loaded yet (race condition with settings init).
-                // If the token is somehow invalid, the first real API call will
-                // return 401 and the UI will redirect to login at that point.
                 return true;
             }
         }
