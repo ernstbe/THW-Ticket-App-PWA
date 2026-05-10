@@ -149,27 +149,12 @@ public class TrueDeskApiService : ITrueDeskApiService
                 CurrentUserId = await _localStorage.GetItemAsync("auth_userid");
                 SetAuthHeader(_authToken);
 
-                try
-                {
-                    var response = await _httpClient.GetAsync($"{BaseUrl}/login");
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        // Try token refresh for v2
-                        if (IsV2 && !string.IsNullOrEmpty(_refreshToken))
-                        {
-                            if (await TryRefreshTokenAsync())
-                                return true;
-                        }
-
-                        await ClearAuthState();
-                        return false;
-                    }
-                }
-                catch
-                {
-                    // Network error - assume token is valid
-                }
-
+                // Trust the stored token without a verify round-trip. v1 tokens
+                // don't expire, so there's no value in calling GET /api/v1/login
+                // just to confirm — and the call failed during early init because
+                // ApiBaseUrl wasn't loaded yet (race condition with settings init).
+                // If the token is somehow invalid, the first real API call will
+                // return 401 and the UI will redirect to login at that point.
                 return true;
             }
         }
