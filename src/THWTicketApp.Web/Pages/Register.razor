@@ -1,0 +1,263 @@
+@page "/register"
+@layout THWTicketApp.Web.Layout.LoginLayout
+@using MudBlazor
+@inject THWTicketApp.Shared.Services.ITrueDeskApiService ApiService
+@inject THWTicketApp.Shared.Services.AppSettings AppSettings
+@inject THWTicketApp.Web.Services.AppSettingsInitializer SettingsInit
+@inject NavigationManager Navigation
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="height: 100vh;">
+    <MudCard Elevation="4" Class="pa-8 mx-auto" Style="width: 100%; max-width: 480px;">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <div class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-2">THW</MudText>
+                    <MudText Typo="Typo.h5">@L.T("register.title")</MudText>
+                </div>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (_registered)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-4">
+                    @L.T("register.success")
+                </MudAlert>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           Href="login" Size="Size.Large">
+                    @L.T("register.login_link")
+                </MudButton>
+            }
+            else
+            {
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+                }
+
+                <MudForm @ref="_form">
+                    <MudTextField @bind-Value="_fullname" Label="@L.T("register.fullname")" Variant="Variant.Outlined"
+                                  Required="true" RequiredError="@L.T("register.fullname_required")"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Badge"
+                                  Disabled="@_isLoading" Class="mb-3" />
+
+                    <MudTextField @bind-Value="_username" Label="@L.T("register.username")" Variant="Variant.Outlined"
+                                  Required="true" RequiredError="@L.T("register.username_required")"
+                                  HelperText="@L.T("register.username_hint")"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AlternateEmail"
+                                  Disabled="@_isLoading" Class="mb-3" />
+
+                    <MudTextField @bind-Value="_email" Label="@L.T("register.email")" Variant="Variant.Outlined"
+                                  InputType="InputType.Email"
+                                  Required="true" RequiredError="@L.T("register.email_required")"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Email"
+                                  Disabled="@_isLoading" Class="mb-3" />
+
+                    <MudTextField @bind-Value="_password" Label="@L.T("register.password")" Variant="Variant.Outlined"
+                                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                  Required="true" RequiredError="@L.T("register.password_required")"
+                                  HelperText="@L.T("register.password_hint")"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                  OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                                  Disabled="@_isLoading" Class="mb-3" />
+
+                    <MudTextField @bind-Value="_confirmPassword" Label="@L.T("register.password_confirm")" Variant="Variant.Outlined"
+                                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                  Required="true" RequiredError="@L.T("register.password_mismatch")"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                  OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                                  Disabled="@_isLoading" Class="mb-3" />
+
+                    @* Captcha *@
+                    <div class="d-flex align-center gap-2 mb-2">
+                        <div style="border: 1px solid #ccc; border-radius: 4px; padding: 4px 8px; min-width: 120px; min-height: 40px;
+                                    display: flex; align-items: center; justify-content: center; background: #fafafa;">
+                            @if (!string.IsNullOrEmpty(_captchaSvg))
+                            {
+                                @((MarkupString)_captchaSvg)
+                            }
+                            else
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                        </div>
+                        <MudTooltip Text="@L.T("register.captcha_refresh")">
+                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Medium"
+                                           OnClick="LoadCaptchaAsync" Disabled="@_isLoading" />
+                        </MudTooltip>
+                    </div>
+                    <MudTextField @bind-Value="_captcha" Label="@L.T("register.captcha")" Variant="Variant.Outlined"
+                                  Required="true" RequiredError="@L.T("register.captcha_required")"
+                                  HelperText="@L.T("register.captcha_hint")"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Security"
+                                  Disabled="@_isLoading" />
+                </MudForm>
+            }
+
+            </MudCardContent>
+        @if (!_registered)
+        {
+            <MudCardActions Class="d-flex flex-column px-6 pb-6">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           OnClick="@RegisterAsync" Disabled="@_isLoading" Size="Size.Large">
+                    @if (_isLoading)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ms-2">@L.T("register.submitting")</MudText>
+                    }
+                    else
+                    {
+                        <MudText>@L.T("register.submit")</MudText>
+                    }
+                </MudButton>
+                <MudLink Href="login" Typo="Typo.body2" Color="Color.Primary" Class="mt-4 align-self-center">
+                    @L.T("register.login_link")
+                </MudLink>
+            </MudCardActions>
+        }
+    </MudCard>
+</MudContainer>
+
+@code {
+    private MudForm _form = null!;
+    private string _fullname = string.Empty;
+    private string _username = string.Empty;
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private string _confirmPassword = string.Empty;
+    private string _captcha = string.Empty;
+    private string? _captchaSvg;
+    private string? _errorMessage;
+    private bool _isLoading;
+    private bool _registered;
+    private bool _showPassword;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await SettingsInit.InitializeAsync();
+            if (AppSettings.IsConfigured)
+            {
+                await LoadCaptchaAsync();
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCaptchaAsync()
+    {
+        _captchaSvg = null;
+        StateHasChanged();
+
+        _captchaSvg = await ApiService.GetCaptchaSvgAsync();
+        if (_captchaSvg == null)
+        {
+            _errorMessage = L.T("register.captcha_error");
+        }
+        _captcha = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task RegisterAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_form.IsValid) return;
+
+        _errorMessage = null;
+
+        // Client-side validation
+        if (_fullname.Trim().Length < 5)
+        {
+            _errorMessage = L.T("register.fullname_required");
+            return;
+        }
+        if (_username.Trim().Length < 3 || _username.Trim().Length > 50)
+        {
+            _errorMessage = L.T("register.username_required");
+            return;
+        }
+        if (_password.Length < 8)
+        {
+            _errorMessage = L.T("register.password_required");
+            return;
+        }
+        if (_password != _confirmPassword)
+        {
+            _errorMessage = L.T("register.password_mismatch");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_captcha))
+        {
+            _errorMessage = L.T("register.captcha_required");
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Step 1: Check email uniqueness
+            var (checkSuccess, exists, checkError) = await ApiService.CheckEmailAsync(_email.Trim(), _captcha.Trim());
+            if (!checkSuccess)
+            {
+                _errorMessage = TranslateError(checkError);
+                await LoadCaptchaAsync();
+                return;
+            }
+            if (exists)
+            {
+                _errorMessage = L.T("register.email_exists");
+                await LoadCaptchaAsync();
+                return;
+            }
+
+            // Step 2: Create account
+            var (regSuccess, regError) = await ApiService.RegisterAsync(
+                _username.Trim(), _fullname.Trim(), _email.Trim(), _password, _captcha.Trim());
+
+            if (regSuccess)
+            {
+                _registered = true;
+            }
+            else
+            {
+                _errorMessage = TranslateError(regError);
+                await LoadCaptchaAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            await LoadCaptchaAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string TranslateError(string? error)
+    {
+        if (string.IsNullOrEmpty(error)) return L.T("register.failed");
+
+        return error switch
+        {
+            "Invalid Captcha" => L.T("register.invalid_captcha"),
+            "Public account creation is disabled." => L.T("register.disabled"),
+            "Username already exists." => L.T("register.username_exists"),
+            "Email already exists." => L.T("register.email_exists"),
+            var e when e.Contains("Username", StringComparison.OrdinalIgnoreCase) &&
+                       e.Contains("exist", StringComparison.OrdinalIgnoreCase) => L.T("register.username_exists"),
+            var e when e.Contains("email", StringComparison.OrdinalIgnoreCase) &&
+                       e.Contains("exist", StringComparison.OrdinalIgnoreCase) => L.T("register.email_exists"),
+            var e when e.Contains("Password", StringComparison.OrdinalIgnoreCase) &&
+                       e.Contains("requirement", StringComparison.OrdinalIgnoreCase) => L.T("register.password_hint"),
+            _ => error
+        };
+    }
+}
