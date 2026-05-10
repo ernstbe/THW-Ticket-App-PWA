@@ -5,6 +5,15 @@
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="routeData"
                                 DefaultLayout="typeof(Layout.MainLayout)">
+                <Authorizing>
+                    @* Show loading state while GetAuthenticationStateAsync completes.
+                       Without this, Blazor renders <NotAuthorized> immediately during
+                       the async token-restore and redirects to login before the check
+                       finishes — causing session loss on every page reload. *@
+                    <div style="display:flex;justify-content:center;align-items:center;height:100vh;">
+                        <MudBlazor.MudProgressCircular Indeterminate="true" Size="MudBlazor.Size.Large" />
+                    </div>
+                </Authorizing>
                 <NotAuthorized>
                     <RedirectToLogin />
                 </NotAuthorized>
