@@ -11,6 +11,9 @@ RUN dotnet publish src/THWTicketApp.Web/THWTicketApp.Web.csproj \
     --configuration Release \
     --output /app/publish
 
+# dotnet publish resets <base href> to "/" — restore the subpath for reverse-proxy deployment
+RUN sed -i 's|<base href="/" />|<base href="/app/" />|g' /app/publish/wwwroot/index.html
+
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html
