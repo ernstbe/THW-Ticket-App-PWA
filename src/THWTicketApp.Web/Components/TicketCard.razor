@@ -47,8 +47,25 @@
             {
                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
                          AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
-                         aria-label="@L.T("tickets.actions")">
+                         aria-label="@L.T("tickets.actions")"
+                         @onclick:stopPropagation="true">
                     <MudMenuItem OnClick="() => OnAssignToMe.InvokeAsync(Ticket)">@L.T("tickets.assign_me")</MudMenuItem>
+                    @if (AvailableStatuses?.Count > 0 && OnChangeStatus.HasDelegate)
+                    {
+                        <MudDivider />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="px-3 py-1">
+                            @L.T("tickets.change_status")
+                        </MudText>
+                        @foreach (var status in AvailableStatuses)
+                        {
+                            var s = status;
+                            <MudMenuItem Icon="@Icons.Material.Filled.SwapHoriz"
+                                         OnClick="@(() => OnChangeStatus.InvokeAsync((Ticket, s)))">
+                                @s.Name
+                            </MudMenuItem>
+                        }
+                        <MudDivider />
+                    }
                     <MudMenuItem OnClick="() => OnClose.InvokeAsync(Ticket)">@L.T("common.close")</MudMenuItem>
                 </MudMenu>
             }
@@ -65,6 +82,9 @@
     [Parameter] public EventCallback<Ticket> OnAssignToMe { get; set; }
     [Parameter] public EventCallback<Ticket> OnClose { get; set; }
     [Parameter] public EventCallback<bool> OnSelectedChanged { get; set; }
+    /// <summary>Statuses offered in the quick-change submenu. Empty/null hides the submenu.</summary>
+    [Parameter] public IReadOnlyList<Status>? AvailableStatuses { get; set; }
+    [Parameter] public EventCallback<(Ticket Ticket, Status Status)> OnChangeStatus { get; set; }
 
     private async Task HandleClick()
     {
