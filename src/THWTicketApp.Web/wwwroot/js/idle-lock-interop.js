@@ -8,6 +8,11 @@ let dotNetRef = null;
 let timeoutMs = 0;
 let listenersAttached = false;
 
+// Note: do NOT include 'visibilitychange' here. It fires both when the
+// tab becomes hidden AND when it becomes visible again, which means the
+// timer would be reset every time the user comes back to a long-idle
+// tab — defeating the entire purpose. We want the timeout to elapse
+// while the tab is in the background.
 const ACTIVITY_EVENTS = [
     'mousemove',
     'mousedown',
@@ -15,8 +20,7 @@ const ACTIVITY_EVENTS = [
     'touchstart',
     'scroll',
     'click',
-    'wheel',
-    'visibilitychange'
+    'wheel'
 ];
 
 function reset() {
