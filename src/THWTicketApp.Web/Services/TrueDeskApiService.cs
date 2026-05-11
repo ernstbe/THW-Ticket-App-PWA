@@ -64,7 +64,13 @@ public class TrueDeskApiService : ITrueDeskApiService
 
         try
         {
-            var payload = new { username, password };
+            // Per-install stable identifier. Trudesk's v1 login (PR #51)
+            // uses this to slot the freshly minted token into a per-device
+            // entry instead of stomping on other devices' sessions. Old
+            // server versions ignore the extra field — safe to send always.
+            var deviceId = await GetOrCreateDeviceIdAsync();
+
+            var payload = new { username, password, deviceId };
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync($"{BaseUrl}/login", content);
             if (response.IsSuccessStatusCode)
@@ -247,6 +253,25 @@ public class TrueDeskApiService : ITrueDeskApiService
         await _localStorage.RemoveItemAsync("locked_auth_refresh_token");
         await _localStorage.RemoveItemAsync("locked_auth_username");
         await _localStorage.RemoveItemAsync("locked_auth_userid");
+    }
+
+    /// <summary>
+    /// Returns this install's stable device identifier, creating one on
+    /// first use. Sent with every login so the server can rotate just
+    /// THIS device's token slot instead of stomping on other devices.
+    /// Persisted in localStorage under "device_id" — survives navigation
+    /// and reloads but is cleared with the browser's site data, which is
+    /// the right granularity (clearing site data ≈ "this is no longer
+    /// the same install").
+    /// </summary>
+    internal async Task<string> GetOrCreateDeviceIdAsync()
+    {
+        var existing = await _localStorage.GetItemAsync("device_id");
+        if (!string.IsNullOrWhiteSpace(existing)) return existing;
+
+        var fresh = Guid.NewGuid().ToString("N");
+        await _localStorage.SetItemAsync("device_id", fresh);
+        return fresh;
     }
 
     private async Task LockSessionAsync()
