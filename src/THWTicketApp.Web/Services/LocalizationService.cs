@@ -72,6 +72,21 @@ public class LocalizationService
         ["common.logout"] = "Abmelden",
         ["common.clear"] = "Leeren",
 
+        // Onboarding tour
+        ["onboarding.step"] = "Schritt",
+        ["onboarding.next"] = "Weiter",
+        ["onboarding.skip"] = "Überspringen",
+        ["onboarding.finish"] = "Los geht's!",
+        ["onboarding.step1_title"] = "Willkommen bei der THW Ticket App",
+        ["onboarding.step1_body"] = "In den nächsten Schritten zeigen wir dir, wie du Einsätze und Aufgaben in der App verwaltest. Dauert keine 30 Sekunden.",
+        ["onboarding.step2_title"] = "Deine Tickets im Blick",
+        ["onboarding.step2_body"] = "Im Menü links findest du Tickets, das Kanban-Board und das Dashboard. Auf dem Dashboard siehst du Zahlen auf einen Blick — Klick auf eine Kachel filtert die Liste.",
+        ["onboarding.step3_title"] = "Neue Tickets erstellen",
+        ["onboarding.step3_body"] = "Der blaue Plus-Button unten rechts öffnet das Formular zum Anlegen eines Tickets — von jeder Seite aus. Alternativ: Ctrl+K öffnet die Befehlspalette.",
+        ["onboarding.step4_title"] = "Schnell anmelden mit Passkey",
+        ["onboarding.step4_body"] = "In den Einstellungen kannst du einen Passkey registrieren. Dann meldest du dich künftig mit Fingerabdruck oder Gesichtserkennung an — kein Passwort mehr nötig.",
+        ["settings.show_onboarding"] = "Einführung erneut anzeigen",
+
         // Login
         ["login.title"] = "Anmelden",
         ["login.username"] = "Benutzername",
@@ -665,6 +680,21 @@ public class LocalizationService
         ["common.back"] = "Back",
         ["common.logout"] = "Logout",
         ["common.clear"] = "Clear",
+
+        // Onboarding tour
+        ["onboarding.step"] = "Step",
+        ["onboarding.next"] = "Next",
+        ["onboarding.skip"] = "Skip",
+        ["onboarding.finish"] = "Let's go!",
+        ["onboarding.step1_title"] = "Welcome to the THW Ticket App",
+        ["onboarding.step1_body"] = "The next steps show you how to manage operations and tasks in the app. Takes under 30 seconds.",
+        ["onboarding.step2_title"] = "Your tickets at a glance",
+        ["onboarding.step2_body"] = "The left menu has Tickets, Kanban and Dashboard. The Dashboard summarises everything — clicking a tile filters the list.",
+        ["onboarding.step3_title"] = "Create new tickets",
+        ["onboarding.step3_body"] = "The blue plus button bottom-right opens the new-ticket form from any page. Alternatively: Ctrl+K opens the command palette.",
+        ["onboarding.step4_title"] = "Quick sign-in with Passkey",
+        ["onboarding.step4_body"] = "In Settings you can register a passkey. Future sign-ins use your fingerprint or face recognition — no password needed.",
+        ["settings.show_onboarding"] = "Show intro again",
 
         // Login
         ["login.title"] = "Sign In",
