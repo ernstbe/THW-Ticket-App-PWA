@@ -133,6 +133,10 @@ public interface ITrueDeskApiService
     // Profile (v2)
     Task<UserProfile?> GetCurrentUserProfileAsync();
     Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber);
+
+    Task<List<SessionInfo>> GetSessionsAsync();
+    Task<bool> RevokeSessionAsync(string deviceId);
+    Task<bool> RevokeAllOtherSessionsAsync();
     Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword);
 
     // Public registration (v1)
