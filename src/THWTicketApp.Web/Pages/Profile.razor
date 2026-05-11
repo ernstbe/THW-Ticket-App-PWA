@@ -1,5 +1,6 @@
 @page "/profile"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
@@ -17,23 +18,38 @@
                 <MudText Typo="Typo.h6">@L.T("profile.info")</MudText>
             </MudCardHeader>
             <MudCardContent>
-                <MudTextField @bind-Value="_fullname" Label="@L.T("profile.fullname")"
-                              Variant="Variant.Outlined" Class="mb-3" />
-                <MudTextField @bind-Value="_jobTitle" Label="@L.T("profile.job_title")"
-                              Variant="Variant.Outlined" Class="mb-3" />
-                <MudTextField @bind-Value="_workNumber" Label="@L.T("profile.work_number")"
-                              Variant="Variant.Outlined" Class="mb-3" />
-                <MudTextField @bind-Value="_mobileNumber" Label="@L.T("profile.mobile_number")"
-                              Variant="Variant.Outlined" Class="mb-3" />
+                @if (_isLoading)
+                {
+                    <MudSkeleton Width="100%" Height="56px" Class="mb-3" />
+                    <MudSkeleton Width="100%" Height="56px" Class="mb-3" />
+                    <MudSkeleton Width="100%" Height="56px" Class="mb-3" />
+                    <MudSkeleton Width="100%" Height="56px" Class="mb-3" />
+                }
+                else
+                {
+                    <MudTextField @bind-Value="_fullname" Label="@L.T("profile.fullname")"
+                                  Variant="Variant.Outlined" Class="mb-3" />
+                    <MudTextField @bind-Value="_jobTitle" Label="@L.T("profile.job_title")"
+                                  Variant="Variant.Outlined" Class="mb-3" />
+                    <MudTextField @bind-Value="_workNumber" Label="@L.T("profile.work_number")"
+                                  Variant="Variant.Outlined" Class="mb-3" />
+                    <MudTextField @bind-Value="_mobileNumber" Label="@L.T("profile.mobile_number")"
+                                  Variant="Variant.Outlined" Class="mb-3" />
 
-                <MudTextField Value="@(ApiService.CurrentUsername ?? "")" Label="@L.T("profile.username")"
-                              Variant="Variant.Outlined" ReadOnly="true" Class="mb-3" />
+                    <MudTextField Value="@(_username ?? string.Empty)" Label="@L.T("profile.username")"
+                                  Variant="Variant.Outlined" ReadOnly="true" Class="mb-3" />
+                    @if (!string.IsNullOrEmpty(_email))
+                    {
+                        <MudTextField Value="@_email" Label="@L.T("profile.email")"
+                                      Variant="Variant.Outlined" ReadOnly="true" Class="mb-3" />
+                    }
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                           OnClick="SaveProfileAsync" Disabled="_isSaving"
-                           StartIcon="@Icons.Material.Filled.Save">
-                    @L.T("common.save")
-                </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               OnClick="SaveProfileAsync" Disabled="_isSaving"
+                               StartIcon="@Icons.Material.Filled.Save">
+                        @L.T("common.save")
+                    </MudButton>
+                }
             </MudCardContent>
         </MudCard>
     </MudItem>
@@ -72,15 +88,58 @@
     private string _jobTitle = string.Empty;
     private string _workNumber = string.Empty;
     private string _mobileNumber = string.Empty;
+    private string? _username;
+    private string? _email;
     private string _currentPassword = string.Empty;
     private string _newPassword = string.Empty;
     private string _confirmPassword = string.Empty;
     private string _passwordError = string.Empty;
     private bool _isSaving;
+    private bool _isLoading = true;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        _fullname = ApiService.CurrentUsername ?? string.Empty;
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            // Fetch the actual profile from the server. The cached
+            // ApiService.CurrentUsername only contains the display name and
+            // is missing job title, phone numbers, email — which is why the
+            // form used to look empty after saving (the save round-trip
+            // worked, the load never happened).
+            var profile = await ApiService.GetCurrentUserProfileAsync();
+            if (profile != null)
+            {
+                _fullname = profile.Fullname ?? string.Empty;
+                _jobTitle = profile.Title ?? string.Empty;
+                _workNumber = profile.WorkNumber ?? string.Empty;
+                _mobileNumber = profile.MobileNumber ?? string.Empty;
+                _username = profile.Username;
+                _email = profile.Email;
+            }
+            else
+            {
+                // Fall back to the cached values so the form isn't blank.
+                _fullname = ApiService.CurrentUsername ?? string.Empty;
+                _username = ApiService.CurrentUsername;
+                Snackbar.Add(L.T("profile.load_failed"), Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task SaveProfileAsync()
@@ -90,9 +149,17 @@
         try
         {
             if (await ApiService.UpdateProfileAsync(_fullname, _jobTitle, _workNumber, _mobileNumber))
+            {
                 Snackbar.Add(L.T("profile.saved"), Severity.Success);
+                // Re-fetch from the server to confirm what actually got
+                // persisted — and to catch any server-side normalization
+                // (e.g. phone number formatting).
+                await LoadProfileAsync();
+            }
             else
+            {
                 Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+            }
         }
         catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
         finally { _isSaving = false; }

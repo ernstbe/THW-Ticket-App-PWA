@@ -663,4 +663,82 @@ public class TrueDeskApiServiceTests
         var count = await _sut.MarkAllNotificationsReadAsync();
         Assert.Equal(0, count);
     }
+
+    // -----------------------------------------------------------------
+    // Profile load
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task GetCurrentUserProfileAsync_parsesSessionUserResponse()
+    {
+        // The sessionUser handler in trudesk returns the raw user
+        // document (no wrapper). The fields we care about:
+        var responseJson = """
+        {
+            "_id":"abc123",
+            "username":"hans.mueller",
+            "fullname":"Hans Müller",
+            "email":"hans@example.de",
+            "title":"OV-Helfer",
+            "workNumber":"030-12345",
+            "mobileNumber":"0170-9876543"
+        }
+        """;
+        _handler.SetDefault(HttpStatusCode.OK, responseJson);
+
+        var profile = await _sut.GetCurrentUserProfileAsync();
+
+        Assert.NotNull(profile);
+        Assert.Equal("abc123", profile!.Id);
+        Assert.Equal("hans.mueller", profile.Username);
+        Assert.Equal("Hans Müller", profile.Fullname);
+        Assert.Equal("hans@example.de", profile.Email);
+        Assert.Equal("OV-Helfer", profile.Title);
+        Assert.Equal("030-12345", profile.WorkNumber);
+        Assert.Equal("0170-9876543", profile.MobileNumber);
+        Assert.Equal("/api/v2/login", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserProfileAsync_unwrapsWrappedResponse()
+    {
+        // Defensive: also accept a {"user":{...}} wrapper just in case
+        // a future trudesk version changes the response shape.
+        _handler.SetDefault(HttpStatusCode.OK,
+            """{"success":true,"user":{"username":"x","fullname":"X User"}}""");
+
+        var profile = await _sut.GetCurrentUserProfileAsync();
+
+        Assert.NotNull(profile);
+        Assert.Equal("x", profile!.Username);
+        Assert.Equal("X User", profile.Fullname);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserProfileAsync_returnsNullOnError()
+    {
+        _handler.SetDefault(HttpStatusCode.Unauthorized);
+
+        var profile = await _sut.GetCurrentUserProfileAsync();
+
+        Assert.Null(profile);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserProfileAsync_handlesMissingFieldsGracefully()
+    {
+        // A barebones user record (e.g. freshly created via signup).
+        // No throws, optional fields come back null/empty.
+        _handler.SetDefault(HttpStatusCode.OK,
+            """{"_id":"new123","username":"newbie"}""");
+
+        var profile = await _sut.GetCurrentUserProfileAsync();
+
+        Assert.NotNull(profile);
+        Assert.Equal("newbie", profile!.Username);
+        Assert.Null(profile.Title);
+        Assert.Null(profile.WorkNumber);
+        Assert.Null(profile.MobileNumber);
+    }
 }

@@ -131,6 +131,7 @@ public interface ITrueDeskApiService
     Task<(int Updated, int Failed)> BatchUpdateTicketsAsync(IEnumerable<Dictionary<string, object?>> batch);
 
     // Profile (v2)
+    Task<UserProfile?> GetCurrentUserProfileAsync();
     Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber);
     Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword);
 
