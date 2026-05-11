@@ -10,6 +10,7 @@
 @inject THWTicketApp.Web.Services.BrowserNotificationService BrowserNotifications
 @inject THWTicketApp.Web.Services.AppSettingsInitializer SettingsInit
 @inject THWTicketApp.Shared.Services.ISyncService SyncService
+@inject THWTicketApp.Web.Services.IdleLockService IdleLock
 @inject IJSRuntime JsRuntime
 @implements IDisposable
 
@@ -241,6 +242,12 @@
                 _primaryColorDark = LightenColor(savedColor);
                 RebuildTheme();
             }
+
+            // Idle auto-lock: load setting and start the watcher if enabled.
+            // Service itself no-ops if no passkey is registered.
+            await IdleLock.LoadSettingsAsync();
+            await IdleLock.StartAsync();
+
             StateHasChanged();
         }
     }
@@ -353,6 +360,7 @@
 
     private async Task LogoutAsync()
     {
+        await IdleLock.StopAsync();
         await ApiService.LogoutAsync();
         AuthStateProvider.NotifyAuthStateChanged();
         Navigation.NavigateTo("login");

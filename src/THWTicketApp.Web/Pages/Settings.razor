@@ -13,6 +13,7 @@
 @inject HttpClient HttpClient
 @inject IJSRuntime JsRuntime
 @inject IIndexedDbService IndexedDb
+@inject IdleLockService IdleLock
 @implements IAsyncDisposable
 
 <PageTitle>@L.T("settings.title") - THW Ticket App</PageTitle>
@@ -177,6 +178,43 @@
         </MudCard>
     </MudItem>
 
+    @* Auto-Lock *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">@L.T("settings.idlelock")</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    @L.T("settings.idlelock_desc")
+                </MudText>
+
+                @if (!_passkeyRegistered)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                        @L.T("settings.idlelock_needs_passkey")
+                    </MudAlert>
+                }
+
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText>@L.T("settings.idlelock_enable")</MudText>
+                    <MudSwitch @bind-Value="_idleLockEnabled" Color="Color.Primary" T="bool"
+                               Disabled="@(!_passkeyRegistered)" />
+                </div>
+
+                <MudSelect T="int" @bind-Value="_idleLockMinutes" Label="@L.T("settings.idlelock_timeout")"
+                           Variant="Variant.Outlined" Dense="true"
+                           Disabled="@(!_idleLockEnabled || !_passkeyRegistered)">
+                    <MudSelectItem Value="5">5 Min</MudSelectItem>
+                    <MudSelectItem Value="10">10 Min</MudSelectItem>
+                    <MudSelectItem Value="15">15 Min</MudSelectItem>
+                    <MudSelectItem Value="30">30 Min</MudSelectItem>
+                    <MudSelectItem Value="60">60 Min</MudSelectItem>
+                </MudSelect>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
     @* Cache *@
     <MudItem xs="12" md="6">
         <MudCard>
@@ -332,6 +370,10 @@
     private bool _webauthnSupported;
     private bool _passkeyRegistered;
 
+    // Auto-Lock
+    private bool _idleLockEnabled;
+    private int _idleLockMinutes = IdleLockService.DefaultMinutes;
+
     // Sync Log
     private List<SyncLogDto> _syncLogEntries = new();
     private bool _loadingSyncLog;
@@ -357,6 +399,12 @@
 
         var savedTimeout = await LocalStorage.GetItemAsync("settings_timeout");
         if (int.TryParse(savedTimeout, out var t)) _connectionTimeout = t;
+
+        // Auto-Lock settings come from the IdleLockService (it owns the
+        // localStorage keys + valid-range logic).
+        await IdleLock.LoadSettingsAsync();
+        _idleLockEnabled = IdleLock.Enabled;
+        _idleLockMinutes = IdleLock.TimeoutMinutes;
 
         await LoadSyncLogAsync();
     }
@@ -415,6 +463,10 @@
         if (_isNotificationsEnabled)
             await BrowserNotifications.RequestPermissionAsync();
 
+        // Persist auto-lock preference. Service applies the new timeout
+        // (or stops the watcher) live, no reload needed.
+        await IdleLock.SaveSettingsAsync(_idleLockEnabled && _passkeyRegistered, _idleLockMinutes);
+
         Snackbar.Add(L.T("settings.saved"), Severity.Success);
     }
 
@@ -447,6 +499,13 @@
         if (_webauthnModule == null) return;
         await _webauthnModule.InvokeAsync<bool>("removePasskey");
         _passkeyRegistered = false;
+        // Auto-lock without a passkey is a one-way trip to the login screen —
+        // disable it implicitly when the passkey is gone.
+        if (_idleLockEnabled)
+        {
+            _idleLockEnabled = false;
+            await IdleLock.SaveSettingsAsync(false, _idleLockMinutes);
+        }
         Snackbar.Add(L.T("settings.passkey_removed"), Severity.Info);
     }
 
