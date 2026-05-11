@@ -1,8 +1,9 @@
 @*
-    Welcome tour shown once per device on first login. Four steps cover
-    the things a new OV member needs to know: where their tickets are,
-    how to create one, biometric login, and that more lives in Settings.
-    Skipped via X / Esc / Skip-button — either way we mark it complete.
+    Welcome tour shown once per device on first login. Eight steps walk
+    a new OV member through the parts of the app they actually need to
+    know about: ticket list, creating a ticket, detail-page editing,
+    Kanban, search/command-palette, biometric login, and where to find
+    more. Skipped via X / Esc / Skip — either way we mark it complete.
 *@
 
 @inject OnboardingService Onboarding
@@ -78,15 +79,19 @@
 }
 
 @code {
-    private const int StepCount = 4;
+    private const int StepCount = 8;
     private int _step;
 
     private string CurrentIcon => _step switch
     {
         0 => Icons.Material.Filled.WavingHand,
-        1 => Icons.Material.Filled.ConfirmationNumber,
+        1 => Icons.Material.Filled.Dashboard,
         2 => Icons.Material.Filled.AddCircle,
-        3 => Icons.Material.Filled.Fingerprint,
+        3 => Icons.Material.Filled.EditNote,
+        4 => Icons.Material.Filled.ViewKanban,
+        5 => Icons.Material.Filled.Keyboard,
+        6 => Icons.Material.Filled.Fingerprint,
+        7 => Icons.Material.Filled.TipsAndUpdates,
         _ => Icons.Material.Filled.CheckCircle
     };
 
