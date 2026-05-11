@@ -13,10 +13,43 @@
 
 <PageTitle>@L.T("nav.kanban") - THW Ticket App</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-4">
+@* ─── Header + filters ───────────────────────────────────────────── *@
+<div class="d-flex justify-space-between align-center mb-3 flex-wrap gap-2">
     <MudText Typo="Typo.h4">@L.T("nav.kanban")</MudText>
-    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadBoardAsync"
-                   Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
+    <div class="d-flex align-center gap-2">
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadBoardAsync"
+                       Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
+    </div>
+</div>
+
+<div class="d-flex align-center gap-2 mb-3 flex-wrap">
+    <MudTextField @bind-Value="_searchText" Placeholder="@L.T("tickets.search")"
+                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Immediate="true" DebounceInterval="200"
+                  Clearable="true" Style="min-width: 220px; flex: 1; max-width: 400px;" />
+    <MudChip T="string"
+             Color="@(_onlyMine ? Color.Secondary : Color.Default)"
+             Variant="Variant.Filled"
+             Icon="@Icons.Material.Filled.PersonPin"
+             OnClick="@ToggleOnlyMine">
+        @L.T("tickets.mytickets")
+    </MudChip>
+    @if (_allPriorities.Any())
+    {
+        <MudSelect T="string" @bind-Value="_priorityFilter" Placeholder="@L.T("detail.priority")"
+                   Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Clearable="true" Style="min-width: 140px;">
+            @foreach (var p in _allPriorities)
+            {
+                <MudSelectItem Value="@p">@p</MudSelectItem>
+            }
+        </MudSelect>
+    }
+    <MudSpacer />
+    <MudText Typo="Typo.body2" Color="Color.Secondary">
+        @_ticketItems.Count(MatchesFilter) / @_ticketItems.Count
+    </MudText>
 </div>
 
 @if (_isLoading)
@@ -29,71 +62,163 @@ else if (!string.IsNullOrEmpty(_errorMessage))
 }
 else
 {
-    <MudDropContainer T="KanbanTicketItem" Items="_ticketItems"
-                      ItemsSelector="@((item, zone) => item.StatusId == zone)"
-                      ItemDropped="OnItemDropped"
-                      Class="d-flex flex-row overflow-auto gap-4 pa-2"
-                      Style="min-height: calc(100vh - 220px);"
-                      role="region" aria-label="@L.T("kanban.board")">
-        <ChildContent>
-            @foreach (var column in _columns)
-            {
-                <MudPaper Class="flex-shrink-0 rounded-lg" Style="width: 300px; background: var(--mud-palette-surface);"
-                          Elevation="1" role="group"
-                          aria-label="@($"{column.StatusName} — {column.TicketCount} {L.T("kanban.tickets")}")">
-                    @* Column Header *@
-                    <div class="d-flex align-center pa-3 rounded-t-lg"
-                         style="border-bottom: 3px solid @column.StatusColor;">
-                        <div style="width: 4px; height: 24px; border-radius: 2px; background-color: @column.StatusColor;"
-                             class="mr-2" aria-hidden="true"></div>
-                        <MudText Typo="Typo.subtitle1" Class="flex-grow-1" Style="font-weight: 600;">
-                            @column.StatusName
-                        </MudText>
-                        <MudChip T="string" Size="Size.Small"
-                                 Style="@($"background-color: {column.StatusColor}; color: white;")"
-                                 Text="@column.TicketCount.ToString()"
-                                 aria-label="@($"{column.TicketCount} {L.T("kanban.tickets")}")" />
-                    </div>
+    @* ─── Mobile: status tabs + single column of cards ────────────── *@
+    <MudHidden Breakpoint="Breakpoint.MdAndUp">
+        <div role="region" aria-label="@L.T("kanban.board")">
+            <MudTabs ActivePanelIndex="_mobileTabIndex"
+                     ActivePanelIndexChanged="@((int i) => _mobileTabIndex = i)"
+                     Rounded="true" Border="false" Elevation="0"
+                     AlwaysShowScrollButtons="false" Color="Color.Primary">
+                @foreach (var column in _columns)
+                {
+                    var col = column;
+                    var visibleCount = FilteredItemsForColumn(col.StatusId).Count();
+                    <MudTabPanel>
+                        <TabContent>
+                            <div class="d-flex align-center gap-2">
+                                <span style="@($"width: 8px; height: 8px; border-radius: 50%; background: {col.StatusColor};")"></span>
+                                <span>@col.StatusName</span>
+                                @if (visibleCount > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small">@visibleCount</MudChip>
+                                }
+                            </div>
+                        </TabContent>
+                        <ChildContent>
+                            @{ var items = FilteredItemsForColumn(col.StatusId).ToList(); }
+                            @if (items.Count == 0)
+                            {
+                                <MudPaper Class="pa-4 my-2" Outlined="true"
+                                          Style="border-style: dashed; text-align: center;">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        @L.T("kanban.column_empty")
+                                    </MudText>
+                                </MudPaper>
+                            }
+                            else
+                            {
+                                <div class="d-flex flex-column gap-2 mt-2">
+                                    @foreach (var item in items)
+                                    {
+                                        @CardContent(item, mobileLayout: true)
+                                    }
+                                </div>
+                            }
+                        </ChildContent>
+                    </MudTabPanel>
+                }
+            </MudTabs>
+        </div>
+    </MudHidden>
 
-                    @* Drop Zone *@
-                    <MudDropZone T="KanbanTicketItem" Identifier="@column.StatusId"
-                                 Class="pa-2 mud-height-full" Style="min-height: 200px;"
-                                 AllowReorder="true" />
-                </MudPaper>
-            }
-        </ChildContent>
-        <ItemRenderer>
-            <MudPaper Class="pa-3 mb-2 rounded cursor-pointer kanban-card" Elevation="0"
-                      Outlined="true" tabindex="0"
-                      role="link"
-                      aria-label="@($"#{context.Uid} {context.Subject}")"
-                      @onclick="@(() => Navigation.NavigateTo($"tickets/{context.Uid}"))"
-                      @onkeydown="@(e => { if (e.Key == "Enter" || e.Key == " ") Navigation.NavigateTo($"tickets/{context.Uid}"); })">
-                <MudText Typo="Typo.body2" Style="font-weight: 600;" Class="mb-1">
-                    @context.Subject
-                </MudText>
-                <div class="d-flex align-center gap-2 mb-1">
-                    @if (!string.IsNullOrEmpty(context.PriorityName))
+    @* ─── Desktop: horizontal columns with drag-drop ───────────────── *@
+    <MudHidden Breakpoint="Breakpoint.SmAndDown">
+        <MudDropContainer T="KanbanTicketItem" @ref="_dropContainer"
+                          Items="_filteredItems"
+                          ItemsSelector="@((item, zone) => item.StatusId == zone)"
+                          ItemDropped="OnItemDropped"
+                          Class="d-flex flex-row overflow-auto gap-3 pa-1"
+                          Style="min-height: calc(100vh - 260px);"
+                          role="region" aria-label="@L.T("kanban.board")">
+                <ChildContent>
+                    @foreach (var column in _columns)
                     {
-                        <MudText Typo="Typo.caption" Style="@($"color: {context.PriorityColor};")"
-                                 aria-label="@($"{L.T("detail.priority")}: {context.PriorityName}")">
-                            @context.PriorityName
-                        </MudText>
+                        var col = column;
+                        var visibleCount = FilteredItemsForColumn(col.StatusId).Count();
+                        <MudPaper Class="flex-shrink-0 rounded-lg d-flex flex-column"
+                                  Style="width: 300px; background: var(--mud-palette-surface);"
+                                  Elevation="1" role="group"
+                                  aria-label="@($"{col.StatusName} — {visibleCount} {L.T("kanban.tickets")}")">
+                            <div class="d-flex align-center pa-3 rounded-t-lg"
+                                 style="@($"border-bottom: 3px solid {col.StatusColor};")">
+                                <div style="@($"width: 4px; height: 24px; border-radius: 2px; background-color: {col.StatusColor};")"
+                                     class="mr-2" aria-hidden="true"></div>
+                                <MudText Typo="Typo.subtitle1" Class="flex-grow-1" Style="font-weight: 600;">
+                                    @col.StatusName
+                                </MudText>
+                                <MudChip T="string" Size="Size.Small"
+                                         Style="@($"background-color: {col.StatusColor}; color: white;")">
+                                    @visibleCount
+                                </MudChip>
+                            </div>
+                            <MudDropZone T="KanbanTicketItem" Identifier="@col.StatusId"
+                                         Class="pa-2" Style="min-height: 200px; flex: 1;"
+                                         AllowReorder="true" />
+                            @if (visibleCount == 0)
+                            {
+                                <div class="pa-3 ma-2 mt-0" style="border: 1px dashed var(--mud-palette-lines-default);
+                                            border-radius: 6px; text-align: center; pointer-events: none;">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @L.T("kanban.column_empty")
+                                    </MudText>
+                                </div>
+                            }
+                        </MudPaper>
                     }
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        @(context.AssigneeName ?? L.T("detail.unassigned"))
-                    </MudText>
-                </div>
-                <MudText Typo="Typo.caption" Color="Color.Tertiary">#@context.Uid</MudText>
-            </MudPaper>
-        </ItemRenderer>
-    </MudDropContainer>
+                </ChildContent>
+                <ItemRenderer>
+                    @CardContent(context, mobileLayout: false)
+                </ItemRenderer>
+            </MudDropContainer>
+    </MudHidden>
+}
+
+@* Card renderer reused for mobile + desktop. mobileLayout=true shows
+   a "Status ändern" button instead of relying on drag-drop. *@
+@code {
+    private RenderFragment CardContent(KanbanTicketItem item, bool mobileLayout) => __builder =>
+    {
+        <MudPaper Class="pa-3 rounded kanban-card" Elevation="0" Outlined="true" tabindex="0"
+                  role="link"
+                  aria-label="@($"#{item.Uid} {item.Subject}")"
+                  @onclick="@(() => Navigation.NavigateTo($"tickets/{item.Uid}"))"
+                  @onkeydown="@(e => { if (e.Key == "Enter" || e.Key == " ") Navigation.NavigateTo($"tickets/{item.Uid}"); })">
+            <div class="d-flex align-center gap-2 mb-1">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">#@item.Uid</MudText>
+                @if (item.PriorityRef != null)
+                {
+                    <PriorityBadge Priority="item.PriorityRef" />
+                }
+            </div>
+            <MudText Typo="Typo.body2" Style="font-weight: 600;" Class="mb-2">@item.Subject</MudText>
+            <div class="d-flex align-center gap-2">
+                <UserAvatar Name="@item.AssigneeName" Size="Size.Small"
+                            Style="width: 20px; height: 20px; font-size: 10px;" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="flex-grow-1"
+                         Style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    @(item.AssigneeName ?? L.T("detail.unassigned"))
+                </MudText>
+                @if (mobileLayout)
+                {
+                    <MudMenu Icon="@Icons.Material.Filled.SwapHoriz" Size="Size.Small" Dense="true"
+                             AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                             @onclick:stopPropagation="true"
+                             aria-label="@L.T("kanban.move_to")">
+                        @foreach (var target in _columns.Where(c => c.StatusId != item.StatusId))
+                        {
+                            var t = target;
+                            <MudMenuItem OnClick="@(() => MoveCardAsync(item, t.StatusId))">
+                                <div class="d-flex align-center gap-2">
+                                    <span style="@($"width:8px;height:8px;border-radius:50%;background:{t.StatusColor};")"></span>
+                                    @t.StatusName
+                                </div>
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                }
+            </div>
+        </MudPaper>
+    };
 }
 
 <style>
+    .kanban-card {
+        cursor: pointer;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
     .kanban-card:hover {
         border-color: var(--mud-palette-primary) !important;
-        transition: border-color 0.2s ease;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
     }
 </style>
 
@@ -102,6 +227,15 @@ else
     private string? _errorMessage;
     private List<KanbanColumn> _columns = [];
     private List<KanbanTicketItem> _ticketItems = [];
+    private List<KanbanTicketItem> _filteredItems = [];
+    private MudDropContainer<KanbanTicketItem>? _dropContainer;
+
+    // Filters
+    private string _searchText = string.Empty;
+    private bool _onlyMine;
+    private string? _priorityFilter;
+    private List<string> _allPriorities = [];
+    private int _mobileTabIndex;
 
     private CancellationTokenSource? _refreshDebounceCts;
 
@@ -145,15 +279,13 @@ else
         try
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
             var statusJson = await ApiService.GetStatusesAsync();
             var ticketJson = await ApiService.GetTicketsAsync();
 
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
             var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(ticketJson, "tickets", options);
 
-            foreach (var t in tickets)
-                TrudeskTranslationHelper.TranslateTicket(t);
+            foreach (var t in tickets) TrudeskTranslationHelper.TranslateTicket(t);
 
             _columns = statuses.OrderBy(s => s.Order).Select(s => new KanbanColumn
             {
@@ -168,14 +300,23 @@ else
                 Uid = t.Uid,
                 Subject = t.Subject ?? L.T("kanban.no_subject"),
                 StatusId = t.Status?.Id ?? string.Empty,
+                PriorityRef = t.Priority,
                 PriorityName = t.Priority?.TranslatedName ?? t.Priority?.Name,
                 PriorityColor = t.Priority?.HtmlColor ?? "#888",
                 PrioritySortOrder = t.Priority?.OverdueIn ?? 0,
+                AssigneeId = t.Assignee?.Id,
                 AssigneeName = t.Assignee?.Fullname
             }).OrderByDescending(t => t.PrioritySortOrder).ToList();
 
-            foreach (var col in _columns)
-                col.TicketCount = _ticketItems.Count(t => t.StatusId == col.StatusId);
+            _allPriorities = _ticketItems
+                .Select(t => t.PriorityName)
+                .Where(p => !string.IsNullOrEmpty(p))
+                .Distinct()
+                .Cast<string>()
+                .OrderBy(p => p)
+                .ToList();
+
+            RecomputeFiltered();
         }
         catch (Exception ex)
         {
@@ -189,69 +330,104 @@ else
         }
     }
 
+    // ─── Filters ─────────────────────────────────────────────────────────
+
+    private bool MatchesFilter(KanbanTicketItem item)
+    {
+        if (_onlyMine && item.AssigneeId != ApiService.CurrentUserId) return false;
+        if (!string.IsNullOrEmpty(_priorityFilter) && item.PriorityName != _priorityFilter) return false;
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            var q = _searchText.Trim();
+            if (!(item.Subject.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                  item.Uid.ToString().Contains(q)))
+                return false;
+        }
+        return true;
+    }
+
+    private IEnumerable<KanbanTicketItem> FilteredItemsForColumn(string statusId)
+        => _filteredItems.Where(t => t.StatusId == statusId);
+
+    private void RecomputeFiltered()
+    {
+        _filteredItems = _ticketItems.Where(MatchesFilter).ToList();
+        // Notify the MudDropContainer that its source list has changed,
+        // otherwise it keeps showing the previous filter view.
+        _dropContainer?.Refresh();
+    }
+
+    private void ToggleOnlyMine()
+    {
+        _onlyMine = !_onlyMine;
+        RecomputeFiltered();
+        StateHasChanged();
+    }
+
+    // Live re-filter as the user types or toggles select.
+    protected override void OnParametersSet() => RecomputeFiltered();
+
+    // ─── Drag-drop (desktop) + tap-menu (mobile) ────────────────────────
+
     private async Task OnItemDropped(MudItemDropInfo<KanbanTicketItem> dropInfo)
     {
         var item = dropInfo.Item;
         if (item == null) return;
-
         var newStatusId = dropInfo.DropzoneIdentifier;
 
-        // Reorder within same column
         if (item.StatusId == newStatusId)
         {
+            // Reorder within column — purely visual, no API change.
             _ticketItems.Remove(item);
             var zoneItems = _ticketItems.Where(t => t.StatusId == newStatusId).ToList();
             var insertIndex = Math.Min(dropInfo.IndexInZone, zoneItems.Count);
             var globalIndex = insertIndex < zoneItems.Count
                 ? _ticketItems.IndexOf(zoneItems[insertIndex])
-                : (_ticketItems.Count > 0 ? _ticketItems.Count : 0);
+                : _ticketItems.Count;
             _ticketItems.Insert(globalIndex, item);
-            StateHasChanged();
+            RecomputeFiltered();
             return;
         }
 
+        await MoveCardAsync(item, newStatusId);
+    }
+
+    private async Task MoveCardAsync(KanbanTicketItem item, string newStatusId)
+    {
         var oldStatusId = item.StatusId;
         item.StatusId = newStatusId;
-
-        // Update counts
-        var oldCol = _columns.FirstOrDefault(c => c.StatusId == oldStatusId);
-        var newCol = _columns.FirstOrDefault(c => c.StatusId == newStatusId);
-        if (oldCol != null) oldCol.TicketCount--;
-        if (newCol != null) newCol.TicketCount++;
-        StateHasChanged();
+        RecomputeFiltered();
 
         try
         {
             var success = await ApiService.UpdateTicketStatusAsync(item.TicketId, newStatusId);
             if (success)
             {
-                Snackbar.Add($"{L.T("kanban.ticket_moved")} #{item.Uid}", Severity.Success);
+                var targetName = _columns.FirstOrDefault(c => c.StatusId == newStatusId)?.StatusName ?? "?";
+                Snackbar.Add($"#{item.Uid} → {targetName}", Severity.Success);
             }
             else
             {
-                // Revert on failure
                 item.StatusId = oldStatusId;
-                if (oldCol != null) oldCol.TicketCount++;
-                if (newCol != null) newCol.TicketCount--;
+                RecomputeFiltered();
                 Snackbar.Add(L.T("kanban.move_failed"), Severity.Error);
             }
         }
         catch
         {
             item.StatusId = oldStatusId;
-            if (oldCol != null) oldCol.TicketCount++;
-            if (newCol != null) newCol.TicketCount--;
+            RecomputeFiltered();
             Snackbar.Add(L.T("kanban.move_failed"), Severity.Error);
         }
-        StateHasChanged();
     }
+
+    // ─── DTOs ───────────────────────────────────────────────────────────
 
     private class KanbanColumn
     {
         public string StatusId { get; set; } = string.Empty;
         public string StatusName { get; set; } = string.Empty;
         public string StatusColor { get; set; } = "#9E9E9E";
-        public int TicketCount { get; set; }
     }
 
     private class KanbanTicketItem
@@ -260,9 +436,11 @@ else
         public int Uid { get; set; }
         public string Subject { get; set; } = string.Empty;
         public string StatusId { get; set; } = string.Empty;
+        public Priority? PriorityRef { get; set; }
         public string? PriorityName { get; set; }
         public string PriorityColor { get; set; } = "#888";
         public int PrioritySortOrder { get; set; }
+        public string? AssigneeId { get; set; }
         public string? AssigneeName { get; set; }
     }
 }
