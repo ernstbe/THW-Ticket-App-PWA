@@ -11,6 +11,7 @@ public interface ITrueDeskApiService
 
     Task<bool> AuthenticateAsync(string username, string password);
     Task<bool> TryRestoreSessionAsync();
+    Task<bool> TryUnlockSessionAsync();
     Task LogoutAsync();
 
     Task<string> GetTicketsAsync();
