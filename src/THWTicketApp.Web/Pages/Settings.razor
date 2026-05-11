@@ -14,6 +14,7 @@
 @inject IJSRuntime JsRuntime
 @inject IIndexedDbService IndexedDb
 @inject IdleLockService IdleLock
+@inject OnboardingService Onboarding
 @implements IAsyncDisposable
 
 <PageTitle>@L.T("settings.title") - THW Ticket App</PageTitle>
@@ -324,11 +325,16 @@
     </MudItem>
 </MudGrid>
 
-<div class="d-flex gap-3 mt-4 mb-6">
+<div class="d-flex gap-3 mt-4 mb-6 flex-wrap">
     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync"
                StartIcon="@Icons.Material.Filled.Save">
         @L.T("common.save")
     </MudButton>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => Onboarding.ShowNow())"
+               StartIcon="@Icons.Material.Filled.HelpOutline">
+        @L.T("settings.show_onboarding")
+    </MudButton>
+    <MudSpacer />
     <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="LogoutAsync"
                StartIcon="@Icons.Material.Filled.Logout">
         @L.T("common.logout")

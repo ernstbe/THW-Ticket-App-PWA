@@ -12,6 +12,7 @@
 @inject THWTicketApp.Shared.Services.ISyncService SyncService
 @inject THWTicketApp.Web.Services.IdleLockService IdleLock
 @inject THWTicketApp.Web.Services.CommandPaletteService Palette
+@inject THWTicketApp.Web.Services.OnboardingService Onboarding
 @inject IJSRuntime JsRuntime
 @implements IDisposable
 
@@ -129,6 +130,9 @@
    says so. Each page can call Palette.Register(...) to expose its own
    actions. *@
 <CommandPalette />
+
+@* Welcome tour shown once per device on first login. *@
+<OnboardingTour />
 
 @* Floating "+" Quick-Create button. Hidden on the AddTicket page itself
    to avoid covering the form submit button. *@
@@ -328,6 +332,16 @@
             // Service itself no-ops if no passkey is registered.
             await IdleLock.LoadSettingsAsync();
             await IdleLock.StartAsync();
+
+            // First-run onboarding tour. Service no-ops if the user has
+            // already completed/skipped it on this device. Delay slightly
+            // so it doesn't fight the install banner or initial layout
+            // settling.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(500);
+                await Onboarding.ShowIfFirstRunAsync();
+            });
 
             StateHasChanged();
         }

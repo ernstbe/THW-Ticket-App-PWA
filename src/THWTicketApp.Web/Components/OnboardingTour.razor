@@ -1,0 +1,113 @@
+@*
+    Welcome tour shown once per device on first login. Four steps cover
+    the things a new OV member needs to know: where their tickets are,
+    how to create one, biometric login, and that more lives in Settings.
+    Skipped via X / Esc / Skip-button — either way we mark it complete.
+*@
+
+@inject OnboardingService Onboarding
+@inject LocalizationService L
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (Onboarding.IsVisible)
+{
+    <MudOverlay Visible="true" DarkBackground="true" ZIndex="10500" AutoClose="false">
+        <div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:90%; max-width:560px;">
+            <MudPaper Elevation="16" Class="pa-6" Style="border-radius:12px;">
+                <div class="d-flex justify-space-between align-center mb-4">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @L.T("onboarding.step") @( _step + 1) / @StepCount
+                    </MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                   Size="Size.Small"
+                                   aria-label="@L.T("common.close")"
+                                   OnClick="SkipAsync" />
+                </div>
+
+                <div class="d-flex flex-column align-center text-center mb-4">
+                    <MudIcon Icon="@CurrentIcon" Size="Size.Large" Color="Color.Primary"
+                             Style="font-size:4rem; margin-bottom:16px;" />
+                    <MudText Typo="Typo.h5" Class="mb-2">@L.T($"onboarding.step{_step + 1}_title")</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Style="max-width:400px;">
+                        @L.T($"onboarding.step{_step + 1}_body")
+                    </MudText>
+                </div>
+
+                @* Progress dots — visual stepper without taking space *@
+                <div class="d-flex justify-center gap-1 mb-4">
+                    @for (var i = 0; i < StepCount; i++)
+                    {
+                        var idx = i;
+                        <span style="@($"width:8px;height:8px;border-radius:50%;background:{(idx == _step ? "var(--mud-palette-primary)" : "var(--mud-palette-action-disabled)")}")" />
+                    }
+                </div>
+
+                <div class="d-flex justify-space-between gap-2">
+                    <MudButton Variant="Variant.Text" OnClick="SkipAsync">
+                        @L.T("onboarding.skip")
+                    </MudButton>
+                    <div class="d-flex gap-2">
+                        @if (_step > 0)
+                        {
+                            <MudButton Variant="Variant.Outlined" OnClick="PrevStep">
+                                @L.T("common.back")
+                            </MudButton>
+                        }
+                        @if (_step < StepCount - 1)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       EndIcon="@Icons.Material.Filled.ArrowForward"
+                                       OnClick="NextStep">
+                                @L.T("onboarding.next")
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Check"
+                                       OnClick="FinishAsync">
+                                @L.T("onboarding.finish")
+                            </MudButton>
+                        }
+                    </div>
+                </div>
+            </MudPaper>
+        </div>
+    </MudOverlay>
+}
+
+@code {
+    private const int StepCount = 4;
+    private int _step;
+
+    private string CurrentIcon => _step switch
+    {
+        0 => Icons.Material.Filled.WavingHand,
+        1 => Icons.Material.Filled.ConfirmationNumber,
+        2 => Icons.Material.Filled.AddCircle,
+        3 => Icons.Material.Filled.Fingerprint,
+        _ => Icons.Material.Filled.CheckCircle
+    };
+
+    protected override void OnInitialized()
+    {
+        Onboarding.StateChanged += OnStateChanged;
+    }
+
+    private void OnStateChanged()
+    {
+        // Reset to first step every time the tour is opened — re-runs from
+        // Settings always start at step 0.
+        if (Onboarding.IsVisible) _step = 0;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void NextStep() => _step = Math.Min(StepCount - 1, _step + 1);
+    private void PrevStep() => _step = Math.Max(0, _step - 1);
+
+    private async Task SkipAsync() => await Onboarding.SkipAsync();
+    private async Task FinishAsync() => await Onboarding.CompleteAsync();
+
+    public void Dispose() => Onboarding.StateChanged -= OnStateChanged;
+}
