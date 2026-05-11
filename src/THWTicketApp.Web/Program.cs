@@ -34,6 +34,7 @@ builder.Services.AddScoped<LocalizationService>();
 builder.Services.AddScoped<BrowserNotificationService>();
 builder.Services.AddScoped<IdleLockService>();
 builder.Services.AddScoped<RecentTicketsService>();
+builder.Services.AddScoped<CommandPaletteService>();
 
 // Auth
 builder.Services.AddScoped<AuthStateProvider>();
