@@ -1,0 +1,71 @@
+@*
+    A small clickable chip that opens a menu of options on click. Replaces
+    the "open dropdown -> select -> click save" sequence with a single
+    click. Used in the ticket detail header for status/priority/assignee/
+    group changes.
+
+    Usage:
+        <ChipWithMenu Label="@_ticket.Status?.Name"
+                      Icon="@Icons.Material.Filled.Circle"
+                      Color="@StatusColor(...)"
+                      Items="_statuses"
+                      ItemTitle="@(s => s.Name)"
+                      OnSelected="OnStatusChanged" />
+*@
+
+@typeparam T
+
+<MudMenu Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+    <ActivatorContent>
+        <MudChip T="string" Size="Size.Small" Color="@Color" Variant="Variant.Filled"
+                 Icon="@Icon" Style="cursor:pointer;">
+            @if (string.IsNullOrEmpty(Label))
+            {
+                <em style="opacity:0.7;">@(EmptyLabel ?? "—")</em>
+            }
+            else
+            {
+                @Label
+            }
+        </MudChip>
+    </ActivatorContent>
+    <ChildContent>
+        @if (Items != null && Items.Any())
+        {
+            @foreach (var item in Items)
+            {
+                var local = item;
+                <MudMenuItem OnClick="@(() => OnSelected.InvokeAsync(local))">
+                    @ItemTitle(local)
+                </MudMenuItem>
+            }
+        }
+        else
+        {
+            <MudMenuItem Disabled="true">
+                <em>@(EmptyMenuLabel ?? "—")</em>
+            </MudMenuItem>
+        }
+        @if (OnClear.HasDelegate && !string.IsNullOrEmpty(Label))
+        {
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Filled.Close"
+                         OnClick="@(() => OnClear.InvokeAsync())">
+                @(ClearLabel ?? "Entfernen")
+            </MudMenuItem>
+        }
+    </ChildContent>
+</MudMenu>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? EmptyLabel { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public Color Color { get; set; } = Color.Default;
+    [Parameter] public IEnumerable<T>? Items { get; set; }
+    [Parameter, EditorRequired] public Func<T, string> ItemTitle { get; set; } = _ => "";
+    [Parameter] public EventCallback<T> OnSelected { get; set; }
+    [Parameter] public EventCallback OnClear { get; set; }
+    [Parameter] public string? ClearLabel { get; set; }
+    [Parameter] public string? EmptyMenuLabel { get; set; }
+}
