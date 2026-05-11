@@ -9,6 +9,7 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.LocalizationService L
+@inject THWTicketApp.Web.Services.RecentTicketsService RecentTickets
 
 <PageTitle>@L.T("nav.dashboard") - THW Ticket App</PageTitle>
 
@@ -125,6 +126,28 @@ else
             </MudButton>
         </MudPaper>
 
+        @* Recently visited tickets — local-only, no API call. Empty on first
+           use and after explicit clear. *@
+        @if (_recentlyVisited.Count > 0)
+        {
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <div class="d-flex align-center justify-space-between mb-3">
+                    <MudText Typo="Typo.h6">@L.T("dashboard.recently_visited")</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.ClearAll" Size="Size.Small"
+                                   aria-label="@L.T("common.clear")"
+                                   OnClick="ClearRecentlyVisitedAsync" />
+                </div>
+                @foreach (var rt in _recentlyVisited)
+                {
+                    <MudPaper Elevation="0" Class="pa-2 mb-1" Style="cursor: pointer; border: 1px solid var(--mud-palette-lines-default);"
+                              @onclick="@(() => Navigation.NavigateTo($"tickets/{rt.Uid}"))">
+                        <MudText Typo="Typo.body2" Style="font-weight:500;">#@rt.Uid &mdash; @rt.Subject</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatRelative(rt.VisitedAt)</MudText>
+                    </MudPaper>
+                }
+            </MudPaper>
+        }
+
         @if (_ticketsPerGroup.Count > 0)
         {
             <MudPaper Elevation="2" Class="pa-4">
@@ -204,6 +227,7 @@ else
     private List<Ticket> _allTickets = [];
     private List<Ticket> _recentTickets = [];
     private List<GroupTicketCount> _ticketsPerGroup = [];
+    private List<RecentTicket> _recentlyVisited = [];
 
     // Widgets
     private bool _widgetsLoaded;
@@ -217,7 +241,25 @@ else
         _welcomeMessage = string.IsNullOrEmpty(ApiService.CurrentUsername)
             ? L.T("dashboard.welcome")
             : $"{L.T("dashboard.welcome_user")}, {ApiService.CurrentUsername}!";
+        _recentlyVisited = await RecentTickets.GetAsync();
         await LoadDashboardAsync();
+    }
+
+    private async Task ClearRecentlyVisitedAsync()
+    {
+        await RecentTickets.ClearAsync();
+        _recentlyVisited = [];
+        StateHasChanged();
+    }
+
+    private string FormatRelative(DateTimeOffset when)
+    {
+        var diff = DateTimeOffset.UtcNow - when;
+        if (diff.TotalMinutes < 1) return L.T("time.just_now");
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes} {L.T("time.minutes_ago")}";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours} {L.T("time.hours_ago")}";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays} {L.T("time.days_ago")}";
+        return when.LocalDateTime.ToString("dd.MM.yyyy");
     }
 
     private async Task LoadDashboardAsync()

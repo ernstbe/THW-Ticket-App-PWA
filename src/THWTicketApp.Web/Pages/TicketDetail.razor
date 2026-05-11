@@ -15,6 +15,7 @@
 @inject LocalizationService L
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
 @inject IJSRuntime JsRuntime
+@inject THWTicketApp.Web.Services.RecentTicketsService RecentTickets
 @implements IAsyncDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
@@ -740,6 +741,14 @@ else
                 TrudeskTranslationHelper.TranslateTicket(_ticket);
                 _editSubject = _ticket.Subject ?? string.Empty;
                 _editIssue = _ticket.Issue ?? string.Empty;
+
+                // Record the visit for the dashboard "Recently visited" card.
+                // Fire-and-forget — a localStorage failure here is irrelevant
+                // to the user's ability to view this ticket.
+                _ = RecentTickets.RecordAsync(
+                    _ticket.Uid.ToString(),
+                    _ticket.Subject ?? string.Empty,
+                    _ticket.Status?.Uid);
             }
         }
         catch (Exception ex)

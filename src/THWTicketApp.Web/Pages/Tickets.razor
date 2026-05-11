@@ -228,7 +228,11 @@
 }
 else if (_filteredTickets.Count == 0)
 {
-    <MudAlert Severity="Severity.Normal">@L.T("tickets.none")</MudAlert>
+    <EmptyState Icon="@Icons.Material.Outlined.ConfirmationNumber"
+                Title="@L.T("tickets.none")"
+                Description="@L.T("tickets.empty_description")"
+                ActionLabel="@L.T("tickets.new")"
+                ActionHref="tickets/add" />
 }
 else
 {
@@ -300,6 +304,8 @@ else
     private List<string> _allGroups = [];
 
     private CancellationTokenSource? _refreshDebounceCts;
+    private IJSObjectReference? _ptrModule;
+    private DotNetObjectReference<Tickets>? _ptrRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -324,6 +330,30 @@ else
         catch { /* status dropdowns just stay empty — bulk close fallback still works */ }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _ptrModule = await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./js/pull-to-refresh-interop.js");
+            _ptrRef = DotNetObjectReference.Create(this);
+            await _ptrModule.InvokeVoidAsync("register", _ptrRef);
+        }
+        catch
+        {
+            // Non-fatal — pull-to-refresh is a nice-to-have, not a hard
+            // dependency. Manual refresh button continues to work.
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPullRefresh()
+    {
+        await LoadTicketsAsync();
+        StateHasChanged();
+    }
+
     private void OnRealtimeChange(string ticketId)
     {
         _refreshDebounceCts?.Cancel();
@@ -346,6 +376,14 @@ else
         Realtime.AnyTicketChanged -= OnRealtimeChange;
         _refreshDebounceCts?.Cancel();
         _refreshDebounceCts?.Dispose();
+        // Detach pull-to-refresh — the JS module attaches global touch
+        // listeners that would survive page navigation otherwise.
+        if (_ptrModule != null)
+        {
+            try { _ = _ptrModule.InvokeVoidAsync("unregister"); } catch { }
+            _ = _ptrModule.DisposeAsync();
+        }
+        _ptrRef?.Dispose();
     }
 
     private async Task LoadTicketsAsync()

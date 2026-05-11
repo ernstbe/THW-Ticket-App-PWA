@@ -35,7 +35,9 @@
 
 @if (!_isLoading && _events.Count == 0)
 {
-    <MudAlert Severity="Severity.Info">@L.T("calendar.none")</MudAlert>
+    <EmptyState Icon="@Icons.Material.Outlined.CalendarMonth"
+                Title="@L.T("calendar.none")"
+                Description="@L.T("calendar.empty_description")" />
 }
 else
 {
