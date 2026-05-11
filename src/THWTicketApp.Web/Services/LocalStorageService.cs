@@ -19,19 +19,21 @@ public class LocalStorageService : IAsyncDisposable
         return _module;
     }
 
-    public async Task<string?> GetItemAsync(string key)
+    // virtual so unit tests can subclass with an in-memory fake.
+    // Don't reach into the JS interop layer from xUnit.
+    public virtual async Task<string?> GetItemAsync(string key)
     {
         var module = await GetModuleAsync();
         return await module.InvokeAsync<string?>("getItem", key);
     }
 
-    public async Task SetItemAsync(string key, string value)
+    public virtual async Task SetItemAsync(string key, string value)
     {
         var module = await GetModuleAsync();
         await module.InvokeVoidAsync("setItem", key, value);
     }
 
-    public async Task RemoveItemAsync(string key)
+    public virtual async Task RemoveItemAsync(string key)
     {
         var module = await GetModuleAsync();
         await module.InvokeVoidAsync("removeItem", key);
