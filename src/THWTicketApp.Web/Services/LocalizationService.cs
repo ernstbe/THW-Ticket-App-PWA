@@ -278,6 +278,12 @@ public class LocalizationService
         // Reports
         ["reports.handover"] = "Übergabebericht",
         ["reports.sitzung"] = "OV-Sitzungsbericht",
+        ["reports.generate"] = "Bericht erstellen",
+        ["reports.copy"] = "In Zwischenablage kopieren",
+        ["reports.copied"] = "Bericht kopiert.",
+        ["reports.copy_failed"] = "Kopieren fehlgeschlagen.",
+        ["reports.download_md"] = "Als Markdown herunterladen",
+        ["reports.print"] = "Drucken / Als PDF speichern",
 
         // Settings
         ["settings.title"] = "Einstellungen",
@@ -910,6 +916,12 @@ public class LocalizationService
         // Reports
         ["reports.handover"] = "Handover Report",
         ["reports.sitzung"] = "Meeting Report",
+        ["reports.generate"] = "Generate report",
+        ["reports.copy"] = "Copy to clipboard",
+        ["reports.copied"] = "Report copied.",
+        ["reports.copy_failed"] = "Copy failed.",
+        ["reports.download_md"] = "Download as Markdown",
+        ["reports.print"] = "Print / Save as PDF",
 
         // Settings
         ["settings.title"] = "Settings",

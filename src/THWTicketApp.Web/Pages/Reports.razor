@@ -4,23 +4,34 @@
 @using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
+@using Markdig
+@using Microsoft.JSInterop
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JsRuntime
 @inject THWTicketApp.Web.Services.LocalizationService L
 
 <PageTitle>@L.T("nav.reports") - THW Ticket App</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-4">
+<div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
     <MudText Typo="Typo.h4">@L.T("nav.reports")</MudText>
-    <div class="d-flex gap-2">
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapHoriz"
-                   OnClick="GenerateHandoverReportAsync" Disabled="_isGenerating">
-            @L.T("reports.handover")
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Groups"
-                   OnClick="GenerateSitzungReportAsync" Disabled="_isGenerating">
-            @L.T("reports.sitzung")
-        </MudButton>
+    <div class="d-flex gap-2 align-center">
+        @* Both report types behind one menu — fixes mobile wrap and
+           scales to future report types. *@
+        <MudMenu Label="@L.T("reports.generate")"
+                 Variant="Variant.Outlined" Color="Color.Primary"
+                 StartIcon="@Icons.Material.Filled.Description"
+                 EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                 Disabled="_isGenerating" Dense="true">
+            <MudMenuItem Icon="@Icons.Material.Filled.SwapHoriz"
+                         OnClick="GenerateHandoverReportAsync">
+                @L.T("reports.handover")
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Filled.Groups"
+                         OnClick="GenerateSitzungReportAsync">
+                @L.T("reports.sitzung")
+            </MudMenuItem>
+        </MudMenu>
         <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadReportAsync"
                        Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
     </div>
@@ -160,7 +171,7 @@
         </MudCard>
     </MudItem>
 
-    @* Generated Report *@
+    @* Generated Report — rendered Markdown with copy/download/print actions *@
     @if (!string.IsNullOrEmpty(_generatedReport))
     {
         <MudItem xs="12">
@@ -168,14 +179,32 @@
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">@_generatedReportTitle</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @_generatedReportTimestamp.ToString("dd.MM.yyyy HH:mm")
+                        </MudText>
                     </CardHeaderContent>
                     <CardHeaderActions>
+                        <MudTooltip Text="@L.T("reports.copy")">
+                            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small"
+                                           OnClick="CopyReportAsync" />
+                        </MudTooltip>
+                        <MudTooltip Text="@L.T("reports.download_md")">
+                            <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small"
+                                           OnClick="DownloadReportAsync" />
+                        </MudTooltip>
+                        <MudTooltip Text="@L.T("reports.print")">
+                            <MudIconButton Icon="@Icons.Material.Filled.Print" Size="Size.Small"
+                                           OnClick="PrintReportAsync" />
+                        </MudTooltip>
                         <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
-                                       OnClick="() => _generatedReport = null" />
+                                       OnClick="() => _generatedReport = null"
+                                       aria-label="@L.T("common.close")" />
                     </CardHeaderActions>
                 </MudCardHeader>
                 <MudCardContent>
-                    <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">@_generatedReport</pre>
+                    <div class="report-rendered">
+                        @((MarkupString)Markdown.ToHtml(_generatedReport, _mdPipeline))
+                    </div>
                 </MudCardContent>
             </MudCard>
         </MudItem>
@@ -218,6 +247,8 @@
     private bool _isGenerating;
     private string? _generatedReport;
     private string _generatedReportTitle = string.Empty;
+    private DateTime _generatedReportTimestamp;
+    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
     private List<WeeklyCount> _weeklyTrend = [];
     private string _avgResolutionTime = "-";
     private string _fastestResolution = "-";
@@ -429,6 +460,7 @@
                 _generatedReport = json;
             }
             _generatedReportTitle = title;
+            _generatedReportTimestamp = DateTime.Now;
         }
         catch (Exception ex)
         {
@@ -440,6 +472,50 @@
             _isGenerating = false;
             StateHasChanged();
         }
+    }
+
+    private async Task CopyReportAsync()
+    {
+        if (string.IsNullOrEmpty(_generatedReport)) return;
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", _generatedReport);
+            Snackbar.Add(L.T("reports.copied"), Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add(L.T("reports.copy_failed"), Severity.Error);
+        }
+    }
+
+    private async Task DownloadReportAsync()
+    {
+        if (string.IsNullOrEmpty(_generatedReport)) return;
+        try
+        {
+            // Build a slugged filename: "handover_2026-05-11.md"
+            var slug = _generatedReportTitle
+                .ToLowerInvariant()
+                .Replace(' ', '_')
+                .Replace('ä', 'a').Replace('ö', 'o').Replace('ü', 'u').Replace('ß', 's');
+            var filename = $"{slug}_{_generatedReportTimestamp:yyyy-MM-dd}.md";
+
+            // Encode the markdown for a data URL. Base64 keeps non-ASCII safe.
+            var bytes = System.Text.Encoding.UTF8.GetBytes(_generatedReport);
+            var base64 = Convert.ToBase64String(bytes);
+            var script = $"const a=document.createElement('a');a.href='data:text/markdown;base64,{base64}';a.download='{filename}';a.click();";
+            await JsRuntime.InvokeVoidAsync("eval", script);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"{L.T("common.error")}: {ErrorHelper.Categorize(ex).Message}", Severity.Error);
+        }
+    }
+
+    private async Task PrintReportAsync()
+    {
+        try { await JsRuntime.InvokeVoidAsync("window.print"); }
+        catch { }
     }
 
     private static string FormatDuration(TimeSpan ts)
