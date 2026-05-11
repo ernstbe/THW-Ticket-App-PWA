@@ -124,6 +124,22 @@
     </MudMainContent>
 </MudLayout>
 
+@* Floating "+" Quick-Create button. Hidden on the AddTicket page itself
+   to avoid covering the form submit button. *@
+<AuthorizeView>
+    <Authorized>
+        @if (!_currentPath.StartsWith("/tickets/add", StringComparison.OrdinalIgnoreCase))
+        {
+            <MudFab Color="Color.Primary"
+                    StartIcon="@Icons.Material.Filled.Add"
+                    aria-label="@L.T("tickets.new")"
+                    title="@L.T("tickets.new")"
+                    OnClick="@(() => Navigation.NavigateTo("tickets/add"))"
+                    Style="position: fixed; bottom: 24px; right: 24px; z-index: 1200;" />
+        }
+    </Authorized>
+</AuthorizeView>
+
 @if (_showShortcutHelp)
 {
     <MudOverlay Visible="true" DarkBackground="true" OnClick="@(() => _showShortcutHelp = false)" ZIndex="9999">
@@ -160,6 +176,7 @@
     private bool _showShortcutHelp;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private IJSObjectReference? _shortcutModule;
+    private string _currentPath = string.Empty;
 
     private string _primaryColor = "#003399";
     private string _primaryColorDark = "#4D7FCC";
@@ -206,7 +223,18 @@
         RealtimeService.NotificationUpdate += OnNotificationUpdate;
         SyncService.PendingCountChanged += OnPendingCountChanged;
         L.LanguageChanged += OnLanguageChanged;
+        // Track current path so the FAB can hide itself on the AddTicket page.
+        _currentPath = new Uri(Navigation.Uri).AbsolutePath
+            .Replace(new Uri(Navigation.BaseUri).AbsolutePath, "/", StringComparison.Ordinal);
+        Navigation.LocationChanged += OnLocationChanged;
         await RealtimeService.ConnectAsync();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _currentPath = new Uri(e.Location).AbsolutePath
+            .Replace(new Uri(Navigation.BaseUri).AbsolutePath, "/", StringComparison.Ordinal);
+        InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -232,8 +260,21 @@
             _shortcutModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/keyboard-shortcuts.js");
             await _shortcutModule.InvokeVoidAsync("register", _dotNetRef);
 
+            // Dark mode: respect user override first, fall back to system preference.
+            // The toggle in Settings stores "true" / "false". Anything else (null,
+            // empty) means "follow the OS".
             var darkMode = await LocalStorage.GetItemAsync("settings_darkmode");
             if (darkMode == "true") _isDarkMode = true;
+            else if (darkMode == "false") _isDarkMode = false;
+            else
+            {
+                try
+                {
+                    _isDarkMode = await JsRuntime.InvokeAsync<bool>(
+                        "eval", "window.matchMedia('(prefers-color-scheme: dark)').matches");
+                }
+                catch { /* fall through with default */ }
+            }
 
             var savedColor = await LocalStorage.GetItemAsync("settings_primary_color");
             if (!string.IsNullOrEmpty(savedColor))
@@ -353,6 +394,7 @@
         RealtimeService.NotificationUpdate -= OnNotificationUpdate;
         SyncService.PendingCountChanged -= OnPendingCountChanged;
         L.LanguageChanged -= OnLanguageChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
         if (_shortcutModule != null)
             _ = _shortcutModule.InvokeVoidAsync("unregister");
         _dotNetRef?.Dispose();

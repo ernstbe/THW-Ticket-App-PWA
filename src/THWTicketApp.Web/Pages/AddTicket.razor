@@ -9,6 +9,8 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.LocalizationService L
+@inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
+@implements IDisposable
 
 <PageTitle>@L.T("tickets.create_title") - THW Ticket App</PageTitle>
 
@@ -44,12 +46,27 @@ else
         </MudSelect>
     }
 
+    @if (_draftRestoredBanner)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-4" ShowCloseIcon="true"
+                  CloseIconClicked="@(() => _draftRestoredBanner = false)">
+            <div class="d-flex align-center justify-space-between" style="width:100%;">
+                <MudText>@L.T("tickets.draft_restored")</MudText>
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="DiscardDraftAsync">
+                    @L.T("tickets.draft_discard")
+                </MudButton>
+            </div>
+        </MudAlert>
+    }
+
     <MudForm @ref="_form">
-        <MudTextField @bind-Value="_subject" Label="@L.T("detail.subject")" Variant="Variant.Outlined"
+        <MudTextField Value="@_subject" ValueChanged="@OnSubjectChanged" T="string"
+                      Label="@L.T("detail.subject")" Variant="Variant.Outlined"
                       Required="true" RequiredError="@L.T("tickets.subject_required")"
                       Counter="200" MaxLength="200" Immediate="true" Class="mb-4" />
 
-        <MudTextField @bind-Value="_issue" Label="@L.T("detail.description")" Variant="Variant.Outlined"
+        <MudTextField Value="@_issue" ValueChanged="@OnIssueChanged" T="string"
+                      Label="@L.T("detail.description")" Variant="Variant.Outlined"
                       Lines="5" Required="true" RequiredError="@L.T("tickets.description_required")"
                       Class="mb-4" />
 
@@ -113,10 +130,17 @@ else
 }
 
 @code {
+    // localStorage key for the unsubmitted draft. Cleared on successful
+    // create, on explicit "Verwerfen", or when the user lands on the page
+    // with no stored content.
+    internal const string DraftKey = "draft_new_ticket";
+
     private MudForm _form = null!;
     private bool _isLoading;
     private string _subject = string.Empty;
     private string _issue = string.Empty;
+    private bool _draftRestoredBanner;
+    private System.Threading.Timer? _saveDebounce;
     private TicketType? _selectedType;
     private Priority? _selectedPriority;
     private Group? _selectedGroup;
@@ -129,7 +153,79 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await TryRestoreDraftAsync();
         await LoadDataAsync();
+    }
+
+    private async Task TryRestoreDraftAsync()
+    {
+        var raw = await LocalStorage.GetItemAsync(DraftKey);
+        if (string.IsNullOrEmpty(raw)) return;
+        try
+        {
+            var draft = JsonSerializer.Deserialize<DraftDto>(raw);
+            if (draft == null) return;
+            if (string.IsNullOrWhiteSpace(draft.Subject) && string.IsNullOrWhiteSpace(draft.Issue)) return;
+            _subject = draft.Subject ?? string.Empty;
+            _issue = draft.Issue ?? string.Empty;
+            _draftRestoredBanner = true;
+        }
+        catch { /* corrupted draft — ignore, user just types again */ }
+    }
+
+    private void OnSubjectChanged(string value)
+    {
+        _subject = value;
+        ScheduleDraftSave();
+    }
+
+    private void OnIssueChanged(string value)
+    {
+        _issue = value;
+        ScheduleDraftSave();
+    }
+
+    private void ScheduleDraftSave()
+    {
+        // Debounce: persist 500ms after the last keystroke so we don't
+        // hammer localStorage on every character.
+        _saveDebounce?.Dispose();
+        _saveDebounce = new System.Threading.Timer(async _ =>
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_subject) && string.IsNullOrWhiteSpace(_issue))
+                {
+                    await LocalStorage.RemoveItemAsync(DraftKey);
+                }
+                else
+                {
+                    var json = JsonSerializer.Serialize(new DraftDto { Subject = _subject, Issue = _issue });
+                    await LocalStorage.SetItemAsync(DraftKey, json);
+                }
+            }
+            catch { /* offline / quota / serialization — non-fatal */ }
+        }, null, 500, System.Threading.Timeout.Infinite);
+    }
+
+    private async Task DiscardDraftAsync()
+    {
+        _subject = string.Empty;
+        _issue = string.Empty;
+        _draftRestoredBanner = false;
+        _saveDebounce?.Dispose();
+        await LocalStorage.RemoveItemAsync(DraftKey);
+    }
+
+    public void Dispose()
+    {
+        _saveDebounce?.Dispose();
+    }
+
+    private sealed class DraftDto
+    {
+        public string? Subject { get; set; }
+        public string? Issue { get; set; }
     }
 
     private async Task LoadDataAsync()
@@ -210,6 +306,10 @@ else
 
             if (success)
             {
+                // Successful submit — drop the draft so the next /tickets/add
+                // visit starts fresh.
+                _saveDebounce?.Dispose();
+                await LocalStorage.RemoveItemAsync(DraftKey);
                 Snackbar.Add(L.T("tickets.created"), Severity.Success);
                 Navigation.NavigateTo("tickets");
             }
