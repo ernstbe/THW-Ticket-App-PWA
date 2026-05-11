@@ -400,6 +400,8 @@ public class LocalizationService
         ["tickets.form_load_error"] = "Fehler beim Laden der Formulardaten.",
         ["tickets.created"] = "Ticket erstellt!",
         ["tickets.server_rejected"] = "Server hat das Ticket abgelehnt.",
+        ["tickets.draft_restored"] = "Entwurf wiederhergestellt — du kannst da weitermachen, wo du aufgehört hast.",
+        ["tickets.draft_discard"] = "Verwerfen",
 
         // Dashboard
         ["dashboard.total"] = "Gesamt",
@@ -960,6 +962,8 @@ public class LocalizationService
         ["tickets.form_load_error"] = "Failed to load form data.",
         ["tickets.created"] = "Ticket created!",
         ["tickets.server_rejected"] = "Server rejected the ticket.",
+        ["tickets.draft_restored"] = "Draft restored — pick up where you left off.",
+        ["tickets.draft_discard"] = "Discard",
 
         // Dashboard
         ["dashboard.total"] = "Total",
