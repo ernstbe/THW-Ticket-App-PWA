@@ -1,0 +1,68 @@
+@*
+    Circular avatar with initials, color derived deterministically from the
+    user's name so the same person always gets the same color across pages.
+    Falls back to a generic person icon for null / empty input.
+
+    Usage:
+        <UserAvatar Name="@user.Fullname" Size="Size.Medium" />
+
+    The color is HSL with fixed saturation/lightness so it stays readable
+    on both light and dark themes — only the hue varies.
+*@
+
+@if (string.IsNullOrWhiteSpace(Name))
+{
+    <MudAvatar Size="@Size" Class="@Class" Style="@Style">
+        <MudIcon Icon="@Icons.Material.Filled.Person" />
+    </MudAvatar>
+}
+else
+{
+    <MudAvatar Size="@Size" Class="@Class"
+               Style="@($"background:{ColorFor(Name)};color:white;font-weight:500;{Style}")">
+        @InitialsFor(Name)
+    </MudAvatar>
+}
+
+@code {
+    [Parameter, EditorRequired] public string? Name { get; set; }
+    [Parameter] public Size Size { get; set; } = Size.Medium;
+    [Parameter] public string Class { get; set; } = string.Empty;
+    [Parameter] public string Style { get; set; } = string.Empty;
+
+    /// <summary>
+    /// First letter of the first two whitespace-separated parts of the name.
+    /// "Hans Müller" -> "HM", "trudesk" -> "T", "" -> "".
+    /// </summary>
+    internal static string InitialsFor(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0) return string.Empty;
+        if (parts.Length == 1) return parts[0][..1].ToUpperInvariant();
+        return $"{parts[0][..1]}{parts[1][..1]}".ToUpperInvariant();
+    }
+
+    /// <summary>
+    /// Deterministic HSL color from a name. Hash → hue in [0,360),
+    /// fixed saturation 55% and lightness 45% keep it readable on both
+    /// light and dark themes without per-theme branching.
+    /// </summary>
+    internal static string ColorFor(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "#9E9E9E";
+        // Simple FNV-1a 32-bit so the output is stable across .NET versions
+        // (the built-in string.GetHashCode is randomized per process).
+        unchecked
+        {
+            uint hash = 2166136261u;
+            foreach (var c in name)
+            {
+                hash ^= c;
+                hash *= 16777619u;
+            }
+            var hue = hash % 360;
+            return $"hsl({hue}, 55%, 45%)";
+        }
+    }
+}

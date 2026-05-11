@@ -14,7 +14,8 @@
 @inject LocalStorageService LocalStorage
 @inject LocalizationService L
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
-@implements IDisposable
+@inject IJSRuntime JsRuntime
+@implements IAsyncDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
 
@@ -228,9 +229,12 @@ else
                 @foreach (var comment in _ticket.Comments.OrderByDescending(c => c.Date))
                 {
                     <MudPaper Elevation="1" Class="pa-3 mb-3">
-                        <div class="d-flex justify-space-between mb-1">
-                            <MudText Typo="Typo.subtitle2">@(comment.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
-                            <MudText Typo="Typo.caption">@comment.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                        <div class="d-flex align-center mb-2 gap-3">
+                            <UserAvatar Name="@comment.Owner?.Fullname" Size="Size.Small" />
+                            <div class="d-flex flex-column" style="flex:1;">
+                                <MudText Typo="Typo.subtitle2">@(comment.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@comment.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                            </div>
                         </div>
                         @if (!string.IsNullOrEmpty(comment.Text))
                         {
@@ -291,8 +295,38 @@ else
                 </MudPaper>
             }
 
-            <MudTextField @bind-Value="_newComment" Label="@L.T("comments.new")" Variant="Variant.Outlined"
-                          Lines="3" Class="mb-3" />
+            <div class="d-flex gap-2 mb-1">
+                <MudToggleIconButton Toggled="@_commentPreview"
+                                     ToggledChanged="@((bool v) => _commentPreview = v)"
+                                     Icon="@Icons.Material.Filled.Edit"
+                                     ToggledIcon="@Icons.Material.Filled.Visibility"
+                                     Size="Size.Small"
+                                     title="@L.T("comments.preview_toggle")" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="align-self-center">
+                    @(_commentPreview ? L.T("comments.preview_on") : L.T("comments.preview_off"))
+                </MudText>
+            </div>
+            @if (_commentPreview)
+            {
+                <MudPaper Elevation="0" Class="pa-3 mb-3"
+                          Style="background: var(--mud-palette-background-gray); min-height: 80px;">
+                    @if (string.IsNullOrWhiteSpace(_newComment))
+                    {
+                        <MudText Color="Color.Secondary">
+                            <em>@L.T("comments.preview_empty")</em>
+                        </MudText>
+                    }
+                    else
+                    {
+                        @((MarkupString)Markdown.ToHtml(_newComment, _mdPipeline))
+                    }
+                </MudPaper>
+            }
+            else
+            {
+                <MudTextField @bind-Value="_newComment" Label="@L.T("comments.new")" Variant="Variant.Outlined"
+                              Lines="3" Class="mb-3" />
+            }
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddCommentAsync"
                        Disabled="@(string.IsNullOrWhiteSpace(_newComment) || _isLoading)">
                 @L.T("comments.send")
@@ -306,9 +340,12 @@ else
                 @foreach (var note in _ticket.Notes.OrderByDescending(n => n.Date))
                 {
                     <MudPaper Elevation="1" Class="pa-3 mb-3">
-                        <div class="d-flex justify-space-between mb-1">
-                            <MudText Typo="Typo.subtitle2">@(note.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
-                            <MudText Typo="Typo.caption">@note.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                        <div class="d-flex align-center mb-2 gap-3">
+                            <UserAvatar Name="@note.Owner?.Fullname" Size="Size.Small" />
+                            <div class="d-flex flex-column" style="flex:1;">
+                                <MudText Typo="Typo.subtitle2">@(note.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@note.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                            </div>
                         </div>
                         @if (!string.IsNullOrEmpty(note.Content))
                         {
@@ -329,6 +366,7 @@ else
 
         @* Attachments Tab *@
         <MudTabPanel Text="@($"{L.T("attachments.title")} ({_ticket.Attachments?.Count ?? 0})")" Icon="@Icons.Material.Filled.AttachFile">
+            <div id="attachment-dropzone" class="pwa-dropzone pa-3">
             @if (_ticket.Attachments != null && _ticket.Attachments.Count > 0)
             {
                 <MudTable Items="_ticket.Attachments" Dense="true" Hover="true">
@@ -371,6 +409,10 @@ else
                 {
                     <MudProgressCircular Size="Size.Small" Indeterminate="true" />
                 }
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+                    @L.T("attachments.drop_hint")
+                </MudText>
+            </div>
             </div>
         </MudTabPanel>
 
@@ -522,6 +564,7 @@ else
     private Ticket? _ticket;
     private bool _isLoading;
     private string _newComment = string.Empty;
+    private bool _commentPreview;
     private string _newNote = string.Empty;
     private string _editSubject = string.Empty;
     private string _editIssue = string.Empty;
@@ -577,6 +620,22 @@ else
         await LoadQuickRepliesAsync();
         await LoadSubscriptionStateAsync();
         Realtime.AnyTicketChanged += OnRealtimeChange;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _ticket == null) return;
+        try
+        {
+            _dropzoneModule = await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./js/dropzone-interop.js");
+            await _dropzoneModule.InvokeVoidAsync("register",
+                "attachment-dropzone", "attachment-upload");
+        }
+        catch
+        {
+            // Non-fatal — falling back to "click button to choose file".
+        }
     }
 
     private void OnRealtimeChange(string ticketId)
@@ -1108,13 +1167,20 @@ else
         return $"{minutes}m";
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Realtime.AnyTicketChanged -= OnRealtimeChange;
         _refreshDebounceCts?.Cancel();
         _refreshDebounceCts?.Dispose();
         _timer?.Dispose();
+        if (_dropzoneModule != null)
+        {
+            try { await _dropzoneModule.InvokeVoidAsync("unregister", "attachment-dropzone"); } catch { }
+            try { await _dropzoneModule.DisposeAsync(); } catch { }
+        }
     }
+
+    private IJSObjectReference? _dropzoneModule;
 
     private class TimeEntryItem
     {

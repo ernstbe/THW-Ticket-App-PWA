@@ -25,10 +25,11 @@
                 <div class="d-flex align-center gap-3">
                     @if (Ticket.Assignee != null)
                     {
-                        <MudText Typo="Typo.caption">
-                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
-                            @Ticket.Assignee.Fullname
-                        </MudText>
+                        <div class="d-flex align-center gap-1">
+                            <UserAvatar Name="@Ticket.Assignee.Fullname" Size="Size.Small"
+                                        Style="width:20px;height:20px;font-size:10px;" />
+                            <MudText Typo="Typo.caption">@Ticket.Assignee.Fullname</MudText>
+                        </div>
                     }
                     @if (Ticket.Group != null)
                     {

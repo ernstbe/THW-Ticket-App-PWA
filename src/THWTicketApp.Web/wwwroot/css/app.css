@@ -34,3 +34,17 @@ html, body {
 .validation-message {
     color: red;
 }
+
+/* Drag-and-drop attachment zone — visual feedback when the user hovers
+   over the area with a file. The .pwa-dropzone-active class is toggled
+   from js/dropzone-interop.js. */
+.pwa-dropzone {
+    border: 2px dashed transparent;
+    border-radius: 8px;
+    transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+}
+
+.pwa-dropzone-active {
+    border-color: var(--mud-palette-primary, #003399);
+    background: rgba(0, 51, 153, 0.05);
+}
