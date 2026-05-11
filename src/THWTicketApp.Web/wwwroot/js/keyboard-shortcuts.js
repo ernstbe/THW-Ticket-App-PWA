@@ -14,12 +14,21 @@ export function unregister() {
 function handleKeyDown(e) {
     if (!_shortcutRef) return;
 
-    // Ignore when typing in inputs
+    // Ctrl+K / Cmd+K: command palette. Special-cased BEFORE the
+    // input-ignore check so the user can summon the palette from any
+    // focused field (matches Linear / Notion / GitHub behaviour).
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        _shortcutRef.invokeMethodAsync('OnShortcut', 'palette');
+        return;
+    }
+
+    // Ignore other shortcuts when typing in inputs.
     const tag = e.target.tagName;
     const isEditable = e.target.isContentEditable;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || isEditable) return;
 
-    // Ctrl/Cmd shortcuts
+    // Other modified-key combos: let the browser handle them.
     if (e.ctrlKey || e.metaKey) return;
 
     let action = null;

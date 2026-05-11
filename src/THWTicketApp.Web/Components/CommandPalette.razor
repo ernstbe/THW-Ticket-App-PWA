@@ -1,0 +1,235 @@
+@*
+    Global Ctrl+K command palette. Mounted once in MainLayout; visible
+    when CommandPaletteService.IsOpen is true.
+
+    Renders a search input plus a grouped result list:
+
+      1. Filter the registered StaticActions by query
+      2. Optionally search tickets via API (debounced 250ms) when query
+         length >= 2
+
+    Arrow keys navigate, Enter selects, Esc closes.
+
+    Performance note: ticket search hits the API on every debounced
+    keystroke. For 50+ tickets in a small OV that's fine; if the data
+    set grows large, swap to /tickets/search with a server-side limit.
+*@
+
+@inject CommandPaletteService Palette
+@inject ITrueDeskApiService ApiService
+@inject NavigationManager Navigation
+@inject LocalizationService L
+@inject IJSRuntime JsRuntime
+@implements IDisposable
+
+@if (Palette.IsOpen)
+{
+    <MudOverlay Visible="true" DarkBackground="true" ZIndex="10000" OnClick="@(() => Palette.Close())">
+        <div style="position:fixed; top:10vh; left:50%; transform:translateX(-50%); width:90%; max-width:640px;"
+             @onclick:stopPropagation="true">
+            <MudPaper Elevation="16" Class="pa-0" Style="border-radius:12px; overflow:hidden;">
+                <div class="pa-3" style="border-bottom: 1px solid var(--mud-palette-lines-default);">
+                    <MudTextField @ref="_searchField" T="string" Value="@Palette.Query" ValueChanged="OnQueryChanged"
+                                  Placeholder="@L.T("palette.placeholder")"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true" DebounceInterval="0"
+                                  OnKeyDown="HandleKeyDown" AutoFocus="true" />
+                </div>
+                <div style="max-height: 60vh; overflow-y:auto;">
+                    @if (_results.Count == 0)
+                    {
+                        <div class="pa-4 text-center">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @L.T("palette.no_results")
+                            </MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        string? lastCategory = null;
+                        var i = 0;
+                        @foreach (var r in _results)
+                        {
+                            var idx = i++;
+                            var item = r;
+                            if (item.Category != lastCategory)
+                            {
+                                lastCategory = item.Category;
+                                <MudText Typo="Typo.caption" Color="Color.Secondary"
+                                         Class="px-3 pt-3 pb-1" Style="display:block; font-weight:600; text-transform:uppercase;">
+                                    @item.Category
+                                </MudText>
+                            }
+                            <div class="@($"d-flex align-center gap-3 px-3 py-2 {(idx == _selectedIndex ? "mud-theme-primary" : "")}")"
+                                 style="@($"cursor:pointer; {(idx == _selectedIndex ? "background:var(--mud-palette-primary); color:var(--mud-palette-primary-text);" : "")}")"
+                                 @onclick="@(() => InvokeAsync(() => Execute(item)))"
+                                 @onmouseenter="@(() => _selectedIndex = idx)">
+                                <MudIcon Icon="@(item.Icon ?? Icons.Material.Filled.ChevronRight)" Size="Size.Small" />
+                                <div style="flex:1; min-width:0;">
+                                    <MudText Typo="Typo.body2" Style="font-weight:500;">@item.Title</MudText>
+                                    @if (!string.IsNullOrEmpty(item.Subtitle))
+                                    {
+                                        <MudText Typo="Typo.caption" Style="opacity:0.85;">@item.Subtitle</MudText>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="d-flex justify-space-between align-center pa-2"
+                     style="border-top: 1px solid var(--mud-palette-lines-default); background:var(--mud-palette-background-gray); font-size:11px;">
+                    <span>↑ ↓ @L.T("palette.hint_navigate") &nbsp; ⏎ @L.T("palette.hint_select") &nbsp; Esc @L.T("palette.hint_close")</span>
+                    <span>@_results.Count</span>
+                </div>
+            </MudPaper>
+        </div>
+    </MudOverlay>
+}
+
+@code {
+    private MudTextField<string>? _searchField;
+    private List<PaletteAction> _results = new();
+    private int _selectedIndex;
+    private CancellationTokenSource? _searchCts;
+
+    protected override void OnInitialized()
+    {
+        Palette.StateChanged += OnPaletteChanged;
+    }
+
+    private async void OnPaletteChanged()
+    {
+        // Recompute results whenever IsOpen or Query changes.
+        await Recompute();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnQueryChanged(string value)
+    {
+        Palette.SetQuery(value);
+        await Recompute();
+    }
+
+    private async Task Recompute()
+    {
+        if (!Palette.IsOpen)
+        {
+            _results = new();
+            return;
+        }
+
+        // 1) Match against static actions synchronously.
+        var statics = Palette.StaticActions
+            .Select(a => (Action: a, Score: a.MatchScore(Palette.Query)))
+            .Where(t => t.Score > 0)
+            .OrderByDescending(t => t.Score)
+            .ThenBy(t => t.Action.Category)
+            .ThenBy(t => t.Action.Title)
+            .Select(t => t.Action)
+            .ToList();
+
+        // 2) Asynchronously search tickets if the query looks like it could
+        //    match a #id or a meaningful substring. Debounce via cancellation
+        //    so we don't fire 10 in-flight requests as the user types.
+        var tickets = new List<PaletteAction>();
+        if (!string.IsNullOrWhiteSpace(Palette.Query) && Palette.Query.Trim().Length >= 2)
+        {
+            _searchCts?.Cancel();
+            _searchCts = new CancellationTokenSource();
+            var token = _searchCts.Token;
+            try
+            {
+                await Task.Delay(250, token);
+                tickets = await SearchTicketsAsync(Palette.Query.Trim(), token);
+            }
+            catch (TaskCanceledException) { /* superseded by a fresher keystroke */ }
+            catch { /* API down, search unavailable — static results still work */ }
+            if (token.IsCancellationRequested) return;
+        }
+
+        _results = statics.Concat(tickets).ToList();
+        _selectedIndex = Math.Min(_selectedIndex, Math.Max(0, _results.Count - 1));
+    }
+
+    private async Task<List<PaletteAction>> SearchTicketsAsync(string query, CancellationToken ct)
+    {
+        try
+        {
+            var json = await ApiService.SearchTicketsAsync(query);
+            ct.ThrowIfCancellationRequested();
+
+            // The API can return either a wrapped or unwrapped array.
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            System.Text.Json.JsonElement arr;
+            if (root.ValueKind == System.Text.Json.JsonValueKind.Array) arr = root;
+            else if (root.TryGetProperty("tickets", out var t)) arr = t;
+            else return new();
+
+            var results = new List<PaletteAction>();
+            foreach (var el in arr.EnumerateArray().Take(10))
+            {
+                var uid = el.TryGetProperty("uid", out var u) ? u.GetInt32().ToString() : null;
+                var subject = el.TryGetProperty("subject", out var s) ? s.GetString() : null;
+                if (uid == null || subject == null) continue;
+
+                results.Add(new PaletteAction
+                {
+                    Id = $"ticket-{uid}",
+                    Title = $"#{uid} – {subject}",
+                    Category = L.T("palette.category_tickets"),
+                    Icon = Icons.Material.Filled.ConfirmationNumber,
+                    ExecuteAsync = () =>
+                    {
+                        Navigation.NavigateTo($"tickets/{uid}");
+                        return Task.CompletedTask;
+                    }
+                });
+            }
+            return results;
+        }
+        catch { return new(); }
+    }
+
+    private async Task Execute(PaletteAction action)
+    {
+        Palette.Close();
+        if (action.ExecuteAsync != null) await action.ExecuteAsync();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Escape":
+                Palette.Close();
+                break;
+            case "ArrowDown":
+                if (_results.Count > 0)
+                {
+                    _selectedIndex = (_selectedIndex + 1) % _results.Count;
+                    StateHasChanged();
+                }
+                break;
+            case "ArrowUp":
+                if (_results.Count > 0)
+                {
+                    _selectedIndex = (_selectedIndex - 1 + _results.Count) % _results.Count;
+                    StateHasChanged();
+                }
+                break;
+            case "Enter":
+                if (_selectedIndex >= 0 && _selectedIndex < _results.Count)
+                    await Execute(_results[_selectedIndex]);
+                break;
+        }
+    }
+
+    public void Dispose()
+    {
+        Palette.StateChanged -= OnPaletteChanged;
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+    }
+}

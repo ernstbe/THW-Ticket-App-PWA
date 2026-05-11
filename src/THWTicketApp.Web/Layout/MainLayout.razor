@@ -11,6 +11,7 @@
 @inject THWTicketApp.Web.Services.AppSettingsInitializer SettingsInit
 @inject THWTicketApp.Shared.Services.ISyncService SyncService
 @inject THWTicketApp.Web.Services.IdleLockService IdleLock
+@inject THWTicketApp.Web.Services.CommandPaletteService Palette
 @inject IJSRuntime JsRuntime
 @implements IDisposable
 
@@ -124,6 +125,11 @@
     </MudMainContent>
 </MudLayout>
 
+@* Global Ctrl+K command palette. Mounted once, visible when the service
+   says so. Each page can call Palette.Register(...) to expose its own
+   actions. *@
+<CommandPalette />
+
 @* Floating "+" Quick-Create button. Hidden on the AddTicket page itself
    to avoid covering the form submit button. *@
 <AuthorizeView>
@@ -147,6 +153,7 @@
             <MudText Typo="Typo.h6" Class="mb-4">@L.T("shortcuts.title")</MudText>
             <MudSimpleTable Dense="true" Hover="true">
                 <tbody>
+                    <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>@L.T("shortcuts.palette")</td></tr>
                     <tr><td><kbd>N</kbd></td><td>@L.T("shortcuts.new_ticket")</td></tr>
                     <tr><td><kbd>T</kbd></td><td>@L.T("shortcuts.tickets")</td></tr>
                     <tr><td><kbd>K</kbd></td><td>@L.T("shortcuts.kanban")</td></tr>
@@ -227,7 +234,40 @@
         _currentPath = new Uri(Navigation.Uri).AbsolutePath
             .Replace(new Uri(Navigation.BaseUri).AbsolutePath, "/", StringComparison.Ordinal);
         Navigation.LocationChanged += OnLocationChanged;
+        RegisterPaletteActions();
         await RealtimeService.ConnectAsync();
+    }
+
+    private void RegisterPaletteActions()
+    {
+        // Navigation entries — match the drawer items so the palette is a
+        // complete keyboard-only alternative to the side menu.
+        var nav = L.T("palette.category_navigation");
+        var act = L.T("palette.category_actions");
+        Palette.RegisterMany(new[]
+        {
+            new PaletteAction { Id="nav-dashboard",     Title=L.T("nav.dashboard"),     Icon=Icons.Material.Filled.Dashboard,         Category=nav, Keywords=new[]{"home","start"},                ExecuteAsync=()=>{ Navigation.NavigateTo("./"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-tickets",       Title=L.T("nav.tickets"),       Icon=Icons.Material.Filled.ConfirmationNumber, Category=nav, Keywords=new[]{"liste","list"},                ExecuteAsync=()=>{ Navigation.NavigateTo("tickets"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-kanban",        Title=L.T("nav.kanban"),        Icon=Icons.Material.Filled.ViewKanban,        Category=nav, Keywords=new[]{"board","spalten"},             ExecuteAsync=()=>{ Navigation.NavigateTo("kanban"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-favorites",     Title=L.T("nav.favorites"),     Icon=Icons.Material.Filled.Star,              Category=nav, Keywords=new[]{"stern","favoriten"},           ExecuteAsync=()=>{ Navigation.NavigateTo("favorites"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-team",          Title=L.T("nav.team"),          Icon=Icons.Material.Filled.Groups,            Category=nav, Keywords=new[]{"mitglieder","leute"},          ExecuteAsync=()=>{ Navigation.NavigateTo("team"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-reports",       Title=L.T("nav.reports"),       Icon=Icons.Material.Filled.BarChart,          Category=nav, Keywords=new[]{"statistik","report"},          ExecuteAsync=()=>{ Navigation.NavigateTo("reports"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-assets",        Title=L.T("nav.assets"),        Icon=Icons.Material.Filled.Inventory2,        Category=nav, Keywords=new[]{"ausrüstung","inventar"},       ExecuteAsync=()=>{ Navigation.NavigateTo("assets"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-documents",     Title=L.T("nav.documents"),     Icon=Icons.Material.Filled.FolderOpen,        Category=nav, Keywords=new[]{"dateien","docs"},              ExecuteAsync=()=>{ Navigation.NavigateTo("documents"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-notices",       Title=L.T("nav.notices"),       Icon=Icons.Material.Filled.Campaign,          Category=nav, Keywords=new[]{"mitteilungen","ankündigung"}, ExecuteAsync=()=>{ Navigation.NavigateTo("notices"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-recurring",     Title=L.T("nav.recurring"),     Icon=Icons.Material.Filled.EventRepeat,       Category=nav, Keywords=new[]{"wiederholend","cron"},         ExecuteAsync=()=>{ Navigation.NavigateTo("recurring-tasks"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-templates",     Title=L.T("nav.templates"),     Icon=Icons.Material.Filled.Description,       Category=nav, Keywords=new[]{"vorlage","template"},          ExecuteAsync=()=>{ Navigation.NavigateTo("templates"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-calendar",      Title=L.T("nav.calendar"),      Icon=Icons.Material.Filled.CalendarMonth,     Category=nav, Keywords=new[]{"kalender","termine"},          ExecuteAsync=()=>{ Navigation.NavigateTo("calendar"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-scanner",       Title=L.T("nav.scanner"),       Icon=Icons.Material.Filled.QrCodeScanner,     Category=nav, Keywords=new[]{"qr","barcode"},                ExecuteAsync=()=>{ Navigation.NavigateTo("scanner"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-notifications", Title=L.T("nav.notifications"), Icon=Icons.Material.Filled.Notifications,     Category=nav, Keywords=new[]{"benachrichtigungen"},          ExecuteAsync=()=>{ Navigation.NavigateTo("notifications"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-profile",       Title=L.T("nav.profile"),       Icon=Icons.Material.Filled.AccountCircle,     Category=nav, Keywords=new[]{"benutzer","ich"},              ExecuteAsync=()=>{ Navigation.NavigateTo("profile"); return Task.CompletedTask; } },
+            new PaletteAction { Id="nav-settings",      Title=L.T("nav.settings"),      Icon=Icons.Material.Filled.Settings,          Category=nav, Keywords=new[]{"einstellungen","config"},      ExecuteAsync=()=>{ Navigation.NavigateTo("settings"); return Task.CompletedTask; } },
+
+            // Quick actions — high-frequency operations exposed as one-liners.
+            new PaletteAction { Id="act-new-ticket",  Title=L.T("tickets.new"),         Subtitle=L.T("palette.subtitle_new_ticket"), Icon=Icons.Material.Filled.Add,    Category=act, Keywords=new[]{"erstellen","create","add","ticket"},     ExecuteAsync=()=>{ Navigation.NavigateTo("tickets/add"); return Task.CompletedTask; } },
+            new PaletteAction { Id="act-toggle-dark", Title=L.T("settings.darkmode"),   Subtitle=L.T("palette.subtitle_toggle_dark"),Icon=Icons.Material.Filled.DarkMode, Category=act, Keywords=new[]{"theme","hell","dunkel","mode"},          ExecuteAsync=async ()=>{ await ToggleDarkMode(); } },
+            new PaletteAction { Id="act-logout",      Title=L.T("common.logout"),       Icon=Icons.Material.Filled.Logout,             Category=act, Keywords=new[]{"abmelden","ausloggen","signout"},          ExecuteAsync=async ()=>{ await LogoutAsync(); } },
+        });
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -352,6 +392,7 @@
                 case "reports": Navigation.NavigateTo("reports"); break;
                 case "search": Navigation.NavigateTo("tickets"); break;
                 case "help": _showShortcutHelp = !_showShortcutHelp; StateHasChanged(); break;
+                case "palette": Palette.Toggle(); break;
             }
         });
     }
