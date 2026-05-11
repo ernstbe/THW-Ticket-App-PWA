@@ -15,12 +15,15 @@ permissions:
 jobs:
   docker:
     runs-on: ubuntu-latest
-    # Build on: tag push, manual trigger, OR merged PR with 'deploy' label
+    # Build on: tag push, manual trigger, OR any merged PR — UNLESS it carries
+    # the 'skip-deploy' label (use that for docs-only / chore PRs that shouldn't
+    # trigger a production deploy). Inverted from the old 'deploy'-label gate,
+    # which was easy to forget and silently shipped nothing.
     if: >
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.merged == true &&
-       contains(github.event.pull_request.labels.*.name, 'deploy'))
+       !contains(github.event.pull_request.labels.*.name, 'skip-deploy'))
     steps:
       # For PR-merge events, the ref is refs/pull/.../merge — check out master
       # explicitly so the build uses the merged code on the default branch.
