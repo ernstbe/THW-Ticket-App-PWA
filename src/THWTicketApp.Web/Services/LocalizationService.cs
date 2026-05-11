@@ -81,6 +81,8 @@ public class LocalizationService
         ["login.connection_error"] = "Verbindungsfehler",
         ["login.passkey"] = "Mit Passkey anmelden",
         ["login.passkey_failed"] = "Passkey-Anmeldung fehlgeschlagen.",
+        ["login.passkey_cancelled"] = "Passkey-Anmeldung abgebrochen.",
+        ["login.passkey_no_session"] = "Passkey OK, aber keine gesperrte Sitzung gefunden. Bitte einmal mit Benutzername und Passwort anmelden — danach funktioniert der Passkey-Button.",
         ["login.username_required"] = "Benutzername ist erforderlich",
         ["login.password_required"] = "Passwort ist erforderlich",
 
@@ -639,6 +641,8 @@ public class LocalizationService
         ["login.connection_error"] = "Connection error",
         ["login.passkey"] = "Sign in with Passkey",
         ["login.passkey_failed"] = "Passkey authentication failed.",
+        ["login.passkey_cancelled"] = "Passkey authentication cancelled.",
+        ["login.passkey_no_session"] = "Passkey OK, but no locked session found. Please sign in with username and password once — the Passkey button will work afterwards.",
         ["login.username_required"] = "Username is required",
         ["login.password_required"] = "Password is required",
 

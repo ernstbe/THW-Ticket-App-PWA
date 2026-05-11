@@ -196,19 +196,30 @@
         try
         {
             var result = await _webauthnModule.InvokeAsync<PasskeyAuthResult?>("authenticatePasskey");
-            if (result != null && !string.IsNullOrEmpty(result.UserId))
+            if (result == null || string.IsNullOrEmpty(result.UserId))
             {
-                // Passkey authentication succeeded — unlock the stored session.
-                // Reads locked_auth_* keys that LogoutAsync stashed away.
-                var restored = await ApiService.TryUnlockSessionAsync();
-                if (restored)
-                {
-                    AuthStateProvider.NotifyAuthStateChanged();
-                    Navigation.NavigateTo("./");
-                    return;
-                }
+                // Biometric prompt was cancelled, OS keychain doesn't have the
+                // credential anymore, or the credential was registered against
+                // a different rpId. Different from "no session to unlock".
+                _errorMessage = L.T("login.passkey_failed");
+                return;
             }
-            _errorMessage = L.T("login.passkey_failed");
+
+            // Passkey authentication succeeded — unlock the stored session.
+            // Reads locked_auth_* keys that LogoutAsync stashed away.
+            var restored = await ApiService.TryUnlockSessionAsync();
+            if (restored)
+            {
+                AuthStateProvider.NotifyAuthStateChanged();
+                Navigation.NavigateTo("./");
+                return;
+            }
+
+            // Biometric worked, but nothing to restore. Almost always means
+            // the user registered the passkey before the biometric-lock flow
+            // existed, so logout cleared the token instead of stashing it.
+            // Tell them clearly so they don't keep clicking the button.
+            _errorMessage = L.T("login.passkey_no_session");
         }
         catch
         {
