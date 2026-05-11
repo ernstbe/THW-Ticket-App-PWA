@@ -1210,6 +1210,47 @@ public class TrueDeskApiService : ITrueDeskApiService
     // Profile (v2)
     // -----------------------------------------------------------------
 
+    public async Task<UserProfile?> GetCurrentUserProfileAsync()
+    {
+        try
+        {
+            // GET /api/v2/login returns the full session user document.
+            // The trudesk handler is accountsApi.sessionUser; PR #41's
+            // v1-token fallback in apiv2 middleware means our accesstoken
+            // header works here too.
+            var response = await SendWithAutoRefreshAsync(() =>
+                _httpClient.GetAsync($"{V2BaseUrl}/login"));
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            using var doc = JsonDocument.Parse(json);
+
+            // sessionUser returns the raw user object; some other endpoints
+            // wrap responses. Handle both.
+            var root = doc.RootElement;
+            JsonElement userEl;
+            if (root.TryGetProperty("user", out var u)) userEl = u;
+            else if (root.TryGetProperty("account", out var a)) userEl = a;
+            else userEl = root;
+
+            return new UserProfile
+            {
+                Id = userEl.TryGetProperty("_id", out var idEl) ? idEl.GetString() : null,
+                Username = userEl.TryGetProperty("username", out var unEl) ? unEl.GetString() : null,
+                Fullname = userEl.TryGetProperty("fullname", out var fnEl) ? fnEl.GetString() : null,
+                Email = userEl.TryGetProperty("email", out var emEl) ? emEl.GetString() : null,
+                Title = userEl.TryGetProperty("title", out var tEl) ? tEl.GetString() : null,
+                WorkNumber = userEl.TryGetProperty("workNumber", out var wnEl) ? wnEl.GetString() : null,
+                MobileNumber = userEl.TryGetProperty("mobileNumber", out var mnEl) ? mnEl.GetString() : null,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber)
     {
         if (string.IsNullOrWhiteSpace(fullname)) return false;
