@@ -33,6 +33,7 @@ builder.Services.AddScoped<ISyncService>(sp => sp.GetRequiredService<SyncService
 builder.Services.AddScoped<LocalizationService>();
 builder.Services.AddScoped<BrowserNotificationService>();
 builder.Services.AddScoped<IdleLockService>();
+builder.Services.AddScoped<RecentTicketsService>();
 
 // Auth
 builder.Services.AddScoped<AuthStateProvider>();

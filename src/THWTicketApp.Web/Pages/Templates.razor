@@ -27,7 +27,9 @@
 
 @if (_templates.Count == 0 && !_isLoading)
 {
-    <MudAlert Severity="Severity.Info">@L.T("templates.none")</MudAlert>
+    <EmptyState Icon="@Icons.Material.Outlined.Description"
+                Title="@L.T("templates.none")"
+                Description="@L.T("templates.empty_description")" />
 }
 else
 {
