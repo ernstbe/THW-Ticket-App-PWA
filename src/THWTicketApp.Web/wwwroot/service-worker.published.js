@@ -71,7 +71,13 @@ async function onInstall(event) {
         new Request(asset.url, { integrity: asset.hash, cache: "no-cache" }),
     );
   await caches.open(cacheName).then((cache) => cache.addAll(assetsRequests));
+  // Stay in "waiting" until the page tells us to activate (via SKIP_WAITING).
+  // index.html shows an update banner; user clicks "Neu laden" to apply.
 }
+
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
+});
 
 async function onActivate(event) {
   console.info("Service worker: Activate");
@@ -83,6 +89,9 @@ async function onActivate(event) {
       .filter((key) => key.startsWith(cacheNamePrefix) && key !== cacheName)
       .map((key) => caches.delete(key)),
   );
+
+  // Take control of already-open clients without requiring a hard refresh.
+  await self.clients.claim();
 }
 
 async function onFetch(event) {
