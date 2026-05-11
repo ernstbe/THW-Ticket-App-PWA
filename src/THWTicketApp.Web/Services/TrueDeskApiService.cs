@@ -130,6 +130,8 @@ public class TrueDeskApiService : ITrueDeskApiService
                 await _localStorage.SetItemAsync("auth_refresh_token", _refreshToken ?? string.Empty);
                 await _localStorage.SetItemAsync("auth_username", username);
                 await _localStorage.SetItemAsync("auth_userid", CurrentUserId ?? string.Empty);
+                // Drop any stale locked-session keys from a previous logout-with-passkey.
+                await ClearLockedAuthAsync();
                 return true;
             }
             return false;
@@ -203,6 +205,18 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public async Task LogoutAsync()
     {
+        // If a passkey is registered on this device, treat logout as "lock":
+        // keep the session token in a separate localStorage key that only the
+        // explicit biometric-unlock flow reads. AuthStateProvider's auto-restore
+        // looks at "auth_token" and finds nothing, so the user gets the login
+        // screen — but the Passkey button can unlock without re-entering creds.
+        var passkeyId = await _localStorage.GetItemAsync("passkey_credential_id");
+        if (!string.IsNullOrEmpty(passkeyId) && IsAuthenticated)
+        {
+            await LockSessionAsync();
+            return;
+        }
+
         try
         {
             if (IsAuthenticated)
@@ -224,6 +238,74 @@ public class TrueDeskApiService : ITrueDeskApiService
         await _localStorage.RemoveItemAsync("auth_refresh_token");
         await _localStorage.RemoveItemAsync("auth_username");
         await _localStorage.RemoveItemAsync("auth_userid");
+        await ClearLockedAuthAsync();
+    }
+
+    private async Task ClearLockedAuthAsync()
+    {
+        await _localStorage.RemoveItemAsync("locked_auth_token");
+        await _localStorage.RemoveItemAsync("locked_auth_refresh_token");
+        await _localStorage.RemoveItemAsync("locked_auth_username");
+        await _localStorage.RemoveItemAsync("locked_auth_userid");
+    }
+
+    private async Task LockSessionAsync()
+    {
+        // Move auth_* keys to locked_* so normal auto-restore won't pick them up.
+        // Only TryUnlockSessionAsync (called after a successful biometric prompt)
+        // moves them back. We intentionally do NOT call /logout on the server —
+        // the v1 accessToken stays valid so unlock is instant.
+        var token = _authToken ?? await _localStorage.GetItemAsync("auth_token");
+        var refresh = _refreshToken ?? await _localStorage.GetItemAsync("auth_refresh_token");
+        var username = CurrentUsername ?? await _localStorage.GetItemAsync("auth_username");
+        var userid = CurrentUserId ?? await _localStorage.GetItemAsync("auth_userid");
+
+        if (!string.IsNullOrEmpty(token))
+            await _localStorage.SetItemAsync("locked_auth_token", token);
+        if (!string.IsNullOrEmpty(refresh))
+            await _localStorage.SetItemAsync("locked_auth_refresh_token", refresh);
+        if (!string.IsNullOrEmpty(username))
+            await _localStorage.SetItemAsync("locked_auth_username", username);
+        if (!string.IsNullOrEmpty(userid))
+            await _localStorage.SetItemAsync("locked_auth_userid", userid);
+
+        _authToken = null;
+        _refreshToken = null;
+        CurrentUsername = null;
+        CurrentUserId = null;
+        SetAuthHeader(null);
+        await _localStorage.RemoveItemAsync("auth_token");
+        await _localStorage.RemoveItemAsync("auth_refresh_token");
+        await _localStorage.RemoveItemAsync("auth_username");
+        await _localStorage.RemoveItemAsync("auth_userid");
+    }
+
+    public async Task<bool> TryUnlockSessionAsync()
+    {
+        // Called by Login.razor after navigator.credentials.get() succeeded.
+        // Moves locked_* keys back to auth_* and then performs the normal restore.
+        var token = await _localStorage.GetItemAsync("locked_auth_token");
+        if (string.IsNullOrEmpty(token))
+        {
+            // No locked session — fall through to a normal restore in case
+            // auth_* still exists (e.g. first-ever unlock after registering passkey).
+            return await TryRestoreSessionAsync();
+        }
+
+        var refresh = await _localStorage.GetItemAsync("locked_auth_refresh_token");
+        var username = await _localStorage.GetItemAsync("locked_auth_username");
+        var userid = await _localStorage.GetItemAsync("locked_auth_userid");
+
+        await _localStorage.SetItemAsync("auth_token", token);
+        if (!string.IsNullOrEmpty(refresh))
+            await _localStorage.SetItemAsync("auth_refresh_token", refresh);
+        if (!string.IsNullOrEmpty(username))
+            await _localStorage.SetItemAsync("auth_username", username);
+        if (!string.IsNullOrEmpty(userid))
+            await _localStorage.SetItemAsync("auth_userid", userid);
+
+        await ClearLockedAuthAsync();
+        return await TryRestoreSessionAsync();
     }
 
     // Tickets

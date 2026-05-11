@@ -198,8 +198,9 @@
             var result = await _webauthnModule.InvokeAsync<PasskeyAuthResult?>("authenticatePasskey");
             if (result != null && !string.IsNullOrEmpty(result.UserId))
             {
-                // Passkey authentication succeeded - try to restore the stored session
-                var restored = await ApiService.TryRestoreSessionAsync();
+                // Passkey authentication succeeded — unlock the stored session.
+                // Reads locked_auth_* keys that LogoutAsync stashed away.
+                var restored = await ApiService.TryUnlockSessionAsync();
                 if (restored)
                 {
                     AuthStateProvider.NotifyAuthStateChanged();
