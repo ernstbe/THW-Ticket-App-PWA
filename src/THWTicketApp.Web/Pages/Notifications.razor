@@ -13,9 +13,17 @@
 
 <PageTitle>@L.T("nav.notifications") - THW Ticket App</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-4">
+<div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
     <MudText Typo="Typo.h4">@L.T("nav.notifications")</MudText>
     <div class="d-flex gap-2">
+        @if (_notifications.Any(n => !n.IsRead))
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.DoneAll"
+                       OnClick="MarkAllReadAsync" Disabled="_isLoading || _markingAll">
+                @L.T("notifications.mark_all_read")
+            </MudButton>
+        }
         <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadNotificationsAsync"
                        Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
     </div>
@@ -52,30 +60,39 @@ else
     <MudStack Spacing="2">
         @foreach (var notification in PagedNotifications)
         {
-            <MudPaper Class="pa-3 cursor-pointer" Elevation="1" @onclick="@(() => OpenNotification(notification))">
+            var n = notification;
+            var unread = !n.IsRead;
+            <MudPaper Class="pa-3 cursor-pointer" Elevation="1"
+                      Style="@($"border-left: 4px solid {(unread ? "var(--mud-palette-primary)" : "transparent")}; {(unread ? "background: var(--mud-palette-background-grey, rgba(0,51,153,0.04));" : "")}")"
+                      @onclick="@(() => OpenNotification(n))">
                 <div class="d-flex align-center gap-3">
-                    <MudIcon Icon="@GetNotificationIcon(notification)" Color="@GetNotificationColor(notification)" />
-                    <div class="flex-grow-1">
-                        <MudText Typo="Typo.body2" Style="font-weight: 600;">
-                            @(notification.Title ?? L.T("notifications.default_title"))
+                    <MudIcon Icon="@GetNotificationIcon(n)" Color="@GetNotificationColor(n)" />
+                    <div class="flex-grow-1" style="min-width:0;">
+                        <MudText Typo="Typo.body2" Style="@($"font-weight: {(unread ? "700" : "500")};")">
+                            @(n.Title ?? L.T("notifications.default_title"))
                         </MudText>
-                        @if (!string.IsNullOrEmpty(notification.Description))
+                        @if (!string.IsNullOrEmpty(n.Description))
                         {
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @notification.Description
+                                @n.Description
                             </MudText>
                         }
-                        @if (notification.Date != default)
+                        @if (n.Date != default)
                         {
                             <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                                @notification.Date.ToString("dd.MM.yyyy HH:mm")
+                                @n.Date.ToString("dd.MM.yyyy HH:mm")
                             </MudText>
                         }
                     </div>
-                    @if (!notification.IsRead)
+                    @if (unread)
                     {
-                        <MudIcon Icon="@Icons.Material.Filled.Circle" Size="Size.Small"
-                                 Color="Color.Primary" Style="font-size: 10px;" />
+                        <div @onclick:stopPropagation="true">
+                            <MudTooltip Text="@L.T("notifications.mark_read")">
+                                <MudIconButton Icon="@Icons.Material.Filled.MarkEmailRead" Size="Size.Small"
+                                               Color="Color.Primary"
+                                               OnClick="@(async () => await MarkReadAsync(n))" />
+                            </MudTooltip>
+                        </div>
                     }
                 </div>
             </MudPaper>
@@ -96,6 +113,7 @@ else
 @code {
     private const int PageSize = 20;
     private bool _isLoading;
+    private bool _markingAll;
     private List<NotificationItem> _notifications = [];
     private string _activeFilter = "all";
     private int _displayedCount = PageSize;
@@ -159,6 +177,8 @@ else
                 {
                     var item = new NotificationItem();
 
+                    if (el.TryGetProperty("_id", out var idEl))
+                        item.Id = idEl.GetString();
                     if (el.TryGetProperty("title", out var titleEl))
                         item.Title = titleEl.GetString();
                     if (el.TryGetProperty("message", out var msgEl))
@@ -208,14 +228,52 @@ else
         }
     }
 
-    private void OpenNotification(NotificationItem notification)
+    private async Task OpenNotification(NotificationItem notification)
     {
-        notification.IsRead = true;
+        // Persist the read state before navigating away, so the count in
+        // the app bar updates immediately and a reload doesn't bring it
+        // back as unread.
+        if (!notification.IsRead && !string.IsNullOrEmpty(notification.Id))
+        {
+            notification.IsRead = true;
+            _ = ApiService.MarkNotificationReadAsync(notification.Id);
+        }
 
         if (!string.IsNullOrEmpty(notification.TicketUid))
             Navigation.NavigateTo($"tickets/{notification.TicketUid}");
         else if (!string.IsNullOrEmpty(notification.TicketId))
             Navigation.NavigateTo($"tickets/{notification.TicketId}");
+    }
+
+    private async Task MarkReadAsync(NotificationItem notification)
+    {
+        if (notification.IsRead || string.IsNullOrEmpty(notification.Id)) return;
+        // Optimistic: flip locally first; revert if the server rejects.
+        notification.IsRead = true;
+        StateHasChanged();
+        var ok = await ApiService.MarkNotificationReadAsync(notification.Id);
+        if (!ok)
+        {
+            notification.IsRead = false;
+            StateHasChanged();
+            Snackbar.Add(L.T("notifications.mark_failed"), Severity.Error);
+        }
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        _markingAll = true;
+        try
+        {
+            var updated = await ApiService.MarkAllNotificationsReadAsync();
+            foreach (var n in _notifications) n.IsRead = true;
+            Snackbar.Add(string.Format(L.T("notifications.marked_all"), updated), Severity.Success);
+        }
+        finally
+        {
+            _markingAll = false;
+            StateHasChanged();
+        }
     }
 
     private static string GetNotificationIcon(NotificationItem n) => n.EventType switch
@@ -239,6 +297,7 @@ else
 
     private class NotificationItem
     {
+        public string? Id { get; set; }   // Notification _id — needed for server-side markRead
         public string? Title { get; set; }
         public string? Description { get; set; }
         public string? EventType { get; set; }

@@ -613,4 +613,54 @@ public class TrueDeskApiServiceTests
         Assert.False(ok);
         Assert.Empty(_handler.Requests);
     }
+
+    // -----------------------------------------------------------------
+    // Notifications mark-read (trudesk PR #47)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task MarkNotificationReadAsync_postsToV1MarkReadEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.MarkNotificationReadAsync("abc123");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v1/users/notifications/abc123/markRead", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task MarkNotificationReadAsync_returnsFalseOnEmptyId()
+    {
+        var ok = await _sut.MarkNotificationReadAsync("");
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
+
+    [Fact]
+    public async Task MarkNotificationReadAsync_returnsFalseOn404()
+    {
+        _handler.SetDefault(HttpStatusCode.NotFound);
+        var ok = await _sut.MarkNotificationReadAsync("missing");
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task MarkAllNotificationsReadAsync_postsToBulkEndpointAndReturnsCount()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"updated\":7}");
+        var count = await _sut.MarkAllNotificationsReadAsync();
+
+        Assert.Equal(7, count);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v1/users/notifications/markAllRead", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task MarkAllNotificationsReadAsync_returnsZeroOnFailure()
+    {
+        _handler.SetDefault(HttpStatusCode.InternalServerError);
+        var count = await _sut.MarkAllNotificationsReadAsync();
+        Assert.Equal(0, count);
+    }
 }
