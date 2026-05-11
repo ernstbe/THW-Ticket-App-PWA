@@ -4,6 +4,7 @@
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject THWTicketApp.Web.Services.LocalizationService L
 
 <PageTitle>@L.T("profile.title") - THW Ticket App</PageTitle>
@@ -54,6 +55,84 @@
         </MudCard>
     </MudItem>
 
+    @* Active Sessions (PR #52 backend, multi-device tokens) *@
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">@L.T("profile.sessions_title")</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@L.T("profile.sessions_subtitle")</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                                   OnClick="LoadSessionsAsync" Disabled="_sessionsLoading"
+                                   aria-label="@L.T("common.refresh")" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_sessionsLoading)
+                {
+                    <MudSkeleton Width="100%" Height="48px" Class="mb-2" />
+                    <MudSkeleton Width="100%" Height="48px" Class="mb-2" />
+                }
+                else if (_sessions.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@L.T("profile.sessions_empty")</MudText>
+                }
+                else
+                {
+                    <MudList T="SessionInfo" Dense="true">
+                        @foreach (var s in _sessions)
+                        {
+                            <MudListItem T="SessionInfo" Value="s">
+                                <div class="d-flex align-center gap-3" style="width:100%;">
+                                    <MudIcon Icon="@SessionIcon(s)" Color="@(s.IsCurrent ? Color.Primary : Color.Default)" />
+                                    <div class="flex-grow-1">
+                                        <MudText Typo="Typo.body2" Style="font-weight:600;">
+                                            @SessionLabel(s)
+                                            @if (s.IsCurrent)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="ml-2">
+                                                    @L.T("profile.sessions_current")
+                                                </MudChip>
+                                            }
+                                            @if (s.IsLegacy)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-2">
+                                                    @L.T("profile.sessions_legacy")
+                                                </MudChip>
+                                            }
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                            @SessionMeta(s)
+                                        </MudText>
+                                    </div>
+                                    @if (!s.IsCurrent && !s.IsLegacy && !string.IsNullOrEmpty(s.DeviceId))
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => RevokeSessionAsync(s.DeviceId!))"
+                                                       Disabled="_sessionRevoking"
+                                                       aria-label="@L.T("profile.sessions_revoke")" />
+                                    }
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+
+                    @if (_sessions.Count(s => !s.IsCurrent) > 0)
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Error" Class="mt-3"
+                                   StartIcon="@Icons.Material.Filled.RemoveCircle"
+                                   OnClick="RevokeAllOtherSessionsAsync" Disabled="_sessionRevoking">
+                            @L.T("profile.sessions_revoke_others")
+                        </MudButton>
+                    }
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
     @* Change Password *@
     <MudItem xs="12" md="6">
         <MudCard>
@@ -97,9 +176,142 @@
     private bool _isSaving;
     private bool _isLoading = true;
 
+    private List<SessionInfo> _sessions = new();
+    private bool _sessionsLoading = true;
+    private bool _sessionRevoking;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadProfileAsync();
+        await LoadSessionsAsync();
+    }
+
+    private async Task LoadSessionsAsync()
+    {
+        _sessionsLoading = true;
+        StateHasChanged();
+        try
+        {
+            _sessions = await ApiService.GetSessionsAsync();
+            // Current session first, then by last used descending.
+            _sessions = _sessions
+                .OrderByDescending(s => s.IsCurrent)
+                .ThenByDescending(s => s.LastUsedAt ?? DateTime.MinValue)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _sessionsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RevokeSessionAsync(string deviceId)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, L.T("profile.sessions_revoke_title") },
+            { x => x.Message, L.T("profile.sessions_revoke_confirm") },
+            { x => x.ConfirmText, L.T("profile.sessions_revoke") },
+            { x => x.CancelText, L.T("common.cancel") }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(null, parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        _sessionRevoking = true;
+        try
+        {
+            var ok = await ApiService.RevokeSessionAsync(deviceId);
+            if (ok)
+            {
+                Snackbar.Add(L.T("profile.sessions_revoked"), Severity.Success);
+                await LoadSessionsAsync();
+            }
+            else
+            {
+                Snackbar.Add(L.T("profile.sessions_revoke_failed"), Severity.Error);
+            }
+        }
+        finally { _sessionRevoking = false; }
+    }
+
+    private async Task RevokeAllOtherSessionsAsync()
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, L.T("profile.sessions_revoke_others_title") },
+            { x => x.Message, L.T("profile.sessions_revoke_others_confirm") },
+            { x => x.ConfirmText, L.T("profile.sessions_revoke_others") },
+            { x => x.CancelText, L.T("common.cancel") }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(null, parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        _sessionRevoking = true;
+        try
+        {
+            var ok = await ApiService.RevokeAllOtherSessionsAsync();
+            if (ok)
+            {
+                Snackbar.Add(L.T("profile.sessions_revoked"), Severity.Success);
+                await LoadSessionsAsync();
+            }
+            else
+            {
+                Snackbar.Add(L.T("profile.sessions_revoke_failed"), Severity.Error);
+            }
+        }
+        finally { _sessionRevoking = false; }
+    }
+
+    private string SessionIcon(SessionInfo s)
+    {
+        var ua = s.UserAgent?.ToLowerInvariant() ?? string.Empty;
+        if (ua.Contains("mobile") || ua.Contains("android") || ua.Contains("iphone"))
+            return Icons.Material.Filled.PhoneIphone;
+        if (ua.Contains("ipad") || ua.Contains("tablet"))
+            return Icons.Material.Filled.Tablet;
+        if (string.IsNullOrEmpty(s.UserAgent))
+            return Icons.Material.Filled.QuestionMark;
+        return Icons.Material.Filled.Computer;
+    }
+
+    private string SessionLabel(SessionInfo s)
+    {
+        if (s.IsLegacy) return L.T("profile.sessions_legacy_label");
+        if (!string.IsNullOrEmpty(s.UserAgent))
+        {
+            // First ~60 chars of the UA — enough to distinguish Chrome on Win
+            // from Safari on iPhone without dumping a wall of vendor string.
+            var ua = s.UserAgent;
+            return ua.Length > 60 ? ua.Substring(0, 60) + "…" : ua;
+        }
+        return s.DeviceId ?? L.T("profile.sessions_unknown_device");
+    }
+
+    private string SessionMeta(SessionInfo s)
+    {
+        var parts = new List<string>();
+        if (s.LastUsedAt.HasValue)
+            parts.Add($"{L.T("profile.sessions_last_seen")}: {FormatRelative(s.LastUsedAt.Value)}");
+        if (s.CreatedAt.HasValue)
+            parts.Add($"{L.T("profile.sessions_created")}: {s.CreatedAt.Value.ToLocalTime():yyyy-MM-dd}");
+        return parts.Count == 0 ? string.Empty : string.Join(" · ", parts);
+    }
+
+    private static string FormatRelative(DateTime dt)
+    {
+        var diff = DateTime.UtcNow - dt.ToUniversalTime();
+        if (diff.TotalMinutes < 1) return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} min";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} h";
+        return $"{(int)diff.TotalDays} d";
     }
 
     private async Task LoadProfileAsync()

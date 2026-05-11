@@ -1293,6 +1293,61 @@ public class TrueDeskApiService : ITrueDeskApiService
         return response.IsSuccessStatusCode;
     }
 
+    // ── Active sessions (multi-device tokens — trudesk PR #52) ───────────
+
+    public async Task<List<SessionInfo>> GetSessionsAsync()
+    {
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/account/sessions"));
+            if (!response.IsSuccessStatusCode) return new List<SessionInfo>();
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("sessions", out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return new List<SessionInfo>();
+
+            var list = new List<SessionInfo>();
+            foreach (var item in arr.EnumerateArray())
+            {
+                list.Add(new SessionInfo
+                {
+                    DeviceId = item.TryGetProperty("deviceId", out var dEl) && dEl.ValueKind == JsonValueKind.String ? dEl.GetString() : null,
+                    UserAgent = item.TryGetProperty("userAgent", out var uEl) && uEl.ValueKind == JsonValueKind.String ? uEl.GetString() : null,
+                    CreatedAt = item.TryGetProperty("createdAt", out var cEl) && cEl.ValueKind == JsonValueKind.String ? cEl.GetDateTime() : null,
+                    LastUsedAt = item.TryGetProperty("lastUsedAt", out var lEl) && lEl.ValueKind == JsonValueKind.String ? lEl.GetDateTime() : null,
+                    IsCurrent = item.TryGetProperty("isCurrent", out var icEl) && icEl.ValueKind == JsonValueKind.True,
+                    IsLegacy = item.TryGetProperty("isLegacy", out var ilEl) && ilEl.ValueKind == JsonValueKind.True
+                });
+            }
+            return list;
+        }
+        catch
+        {
+            return new List<SessionInfo>();
+        }
+    }
+
+    public async Task<bool> RevokeSessionAsync(string deviceId)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId)) return false;
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V1BaseUrl}/account/sessions/{Uri.EscapeDataString(deviceId)}"));
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> RevokeAllOtherSessionsAsync()
+    {
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V1BaseUrl}/account/sessions"));
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public async Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword)
     {
         if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
