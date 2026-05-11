@@ -29,7 +29,7 @@ else if (_ticket == null)
 }
 else
 {
-    <div class="d-flex justify-space-between align-center mb-4">
+    <div class="d-flex justify-space-between align-center mb-4 pwa-no-print">
         <div class="d-flex align-center gap-3">
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("tickets"))"
                            aria-label="@L.T("common.back")" />
@@ -41,6 +41,11 @@ else
                 <MudIconButton Icon="@(_isSubscribed ? Icons.Material.Filled.NotificationsActive : Icons.Material.Filled.NotificationsNone)"
                                Color="@(_isSubscribed ? Color.Info : Color.Default)"
                                OnClick="ToggleSubscriptionAsync" />
+            </MudTooltip>
+            <MudTooltip Text="@L.T("detail.print")">
+                <MudIconButton Icon="@Icons.Material.Filled.Print"
+                               OnClick="PrintAsync"
+                               aria-label="@L.T("detail.print")" />
             </MudTooltip>
         </div>
         <div class="d-flex gap-2">
@@ -54,7 +59,66 @@ else
         <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
     }
 
-    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="pa-4">
+    @* Print-only summary. Hidden in screen view; revealed by the @media print
+       block in app.css which also hides the rest of the interactive UI. *@
+    <div class="pwa-print-only">
+        <h1>THW Ticket #@_ticket.Uid</h1>
+        <h2>@_ticket.Subject</h2>
+        <table>
+            <tr><th>Status</th><td>@(_ticket.Status?.TranslatedName ?? "-")</td></tr>
+            <tr><th>Priorität</th><td>@(_ticket.Priority?.TranslatedName ?? "-")</td></tr>
+            <tr><th>Ersteller</th><td>@(_ticket.Owner?.Fullname ?? "-")</td></tr>
+            <tr><th>Zuständig</th><td>@(_ticket.Assignee?.Fullname ?? "Nicht zugewiesen")</td></tr>
+            <tr><th>Gruppe</th><td>@(_ticket.Group?.Name ?? "-")</td></tr>
+            <tr><th>Typ</th><td>@(_ticket.Type?.TranslatedName ?? "-")</td></tr>
+            <tr><th>Erstellt</th><td>@_ticket.Date.ToString("dd.MM.yyyy HH:mm")</td></tr>
+            <tr><th>Aktualisiert</th><td>@_ticket.Updated.ToString("dd.MM.yyyy HH:mm")</td></tr>
+            @if (_ticket.DueDate != DateTime.MinValue)
+            {
+                <tr><th>Fällig</th><td>@_ticket.DueDate.ToString("dd.MM.yyyy")</td></tr>
+            }
+        </table>
+        <h3>Beschreibung</h3>
+        <div>
+            @if (!string.IsNullOrEmpty(_ticket.Issue))
+            {
+                @((MarkupString)Markdown.ToHtml(_ticket.Issue, _mdPipeline))
+            }
+            else
+            {
+                <em>Keine Beschreibung.</em>
+            }
+        </div>
+        @if (_ticket.Comments?.Count > 0)
+        {
+            <h3>Kommentare (@_ticket.Comments.Count)</h3>
+            @foreach (var c in _ticket.Comments.OrderBy(c => c.Date))
+            {
+                <div style="margin-bottom:1em;">
+                    <strong>@(c.Owner?.Fullname ?? "?")</strong>
+                    <span>— @c.Date.ToString("dd.MM.yyyy HH:mm")</span>
+                    <div>@((MarkupString)Markdown.ToHtml(c.Text ?? string.Empty, _mdPipeline))</div>
+                </div>
+            }
+        }
+        @if (_ticket.Notes?.Count > 0)
+        {
+            <h3>Notizen (@_ticket.Notes.Count)</h3>
+            @foreach (var n in _ticket.Notes.OrderBy(n => n.Date))
+            {
+                <div style="margin-bottom:1em;">
+                    <strong>@(n.Owner?.Fullname ?? "?")</strong>
+                    <span>— @n.Date.ToString("dd.MM.yyyy HH:mm")</span>
+                    <div>@((MarkupString)Markdown.ToHtml(n.Content ?? string.Empty, _mdPipeline))</div>
+                </div>
+            }
+        }
+        <p style="margin-top:2em; font-size:10px; color:#666;">
+            Gedruckt am @DateTime.Now.ToString("dd.MM.yyyy HH:mm") — THW Ticket App
+        </p>
+    </div>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="pa-4 pwa-no-print">
         @* Details Tab *@
         <MudTabPanel Text="@L.T("detail.details")" Icon="@Icons.Material.Filled.Info">
             <MudGrid>
@@ -1035,6 +1099,16 @@ else
             }
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    private async Task PrintAsync()
+    {
+        // Triggers the browser's print dialog. The @media print rules in
+        // app.css hide the app shell + tabs and reveal the .pwa-print-only
+        // summary built above. User can then "Save as PDF" from the print
+        // dialog without us implementing a separate PDF pipeline.
+        try { await JsRuntime.InvokeVoidAsync("window.print"); }
+        catch { /* if the browser blocks print, snackbar would be overkill */ }
     }
 
     // Attachment upload

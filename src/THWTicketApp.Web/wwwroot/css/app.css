@@ -48,3 +48,40 @@ html, body {
     border-color: var(--mud-palette-primary, #003399);
     background: rgba(0, 51, 153, 0.05);
 }
+
+/* Print-only block on TicketDetail. Hidden in screen view; the print
+   media query below hides the app shell + tabs and shows this block
+   so users can "Save as PDF" from the browser print dialog for paper
+   handover during operations. */
+.pwa-print-only {
+    display: none;
+}
+
+@media print {
+    /* Show the print summary, hide everything else app-related. */
+    .pwa-print-only {
+        display: block !important;
+    }
+
+    /* Drawers, app bars, action buttons — kill them all. The MudTabs
+       on TicketDetail also gets .pwa-no-print to stay hidden. */
+    .mud-appbar,
+    .mud-drawer,
+    .mud-overlay,
+    .pwa-no-print,
+    .pwa-dropzone {
+        display: none !important;
+    }
+
+    body, html {
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .pwa-print-only h1 { font-size: 18pt; margin: 0 0 4pt 0; }
+    .pwa-print-only h2 { font-size: 14pt; margin: 0 0 12pt 0; font-weight: normal; }
+    .pwa-print-only h3 { font-size: 12pt; margin: 14pt 0 4pt 0; border-bottom: 1px solid #ccc; padding-bottom: 2pt; }
+    .pwa-print-only table { border-collapse: collapse; width: 100%; margin-bottom: 12pt; }
+    .pwa-print-only th { text-align: left; padding: 3pt 8pt 3pt 0; font-weight: 600; width: 100pt; vertical-align: top; }
+    .pwa-print-only td { padding: 3pt 0; }
+}

@@ -310,8 +310,15 @@ public class LocalizationService
         // Batch
         ["batch.toggle"] = "Mehrfachauswahl",
         ["batch.selected"] = "{0} Ticket(s) ausgewählt",
+        ["batch.empty"] = "Keine Tickets ausgewählt",
+        ["batch.select_all_visible"] = "Alle auf dieser Seite",
+        ["batch.change_status"] = "Status ändern",
         ["batch.deleted"] = "{0} gelöscht, {1} fehlgeschlagen",
         ["batch.updated"] = "{0} aktualisiert, {1} fehlgeschlagen",
+        ["batch.status_changed"] = "{0} auf „{1}“ geändert, {2} fehlgeschlagen",
+        ["tickets.change_status"] = "Status ändern…",
+        ["tickets.status_changed"] = "Status auf „{0}“ geändert.",
+        ["detail.print"] = "Drucken / Als PDF speichern",
 
         // Profile
         ["nav.profile"] = "Profil",
@@ -877,8 +884,15 @@ public class LocalizationService
         // Batch
         ["batch.toggle"] = "Multi-select",
         ["batch.selected"] = "{0} ticket(s) selected",
+        ["batch.empty"] = "No tickets selected",
+        ["batch.select_all_visible"] = "Select all on this page",
+        ["batch.change_status"] = "Change status",
         ["batch.deleted"] = "{0} deleted, {1} failed",
         ["batch.updated"] = "{0} updated, {1} failed",
+        ["batch.status_changed"] = "{0} changed to '{1}', {2} failed",
+        ["tickets.change_status"] = "Change status…",
+        ["tickets.status_changed"] = "Status changed to '{0}'.",
+        ["detail.print"] = "Print / Save as PDF",
 
         // Profile
         ["nav.profile"] = "Profile",

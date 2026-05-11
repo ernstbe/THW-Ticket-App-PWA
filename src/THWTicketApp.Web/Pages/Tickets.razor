@@ -155,24 +155,55 @@
     <MudAlert Severity="Severity.Info" Class="mb-4">@_statusMessage</MudAlert>
 }
 
-@* Batch action bar *@
-@if (_batchMode && _selectedTicketIds.Count > 0)
+@* Batch toolbar — show "select all visible" once batch mode is on,
+   regardless of whether anything is currently selected. *@
+@if (_batchMode)
 {
-    <MudPaper Elevation="3" Class="pa-3 mb-3 d-flex align-center gap-3">
+    <MudPaper Elevation="3" Class="pa-3 mb-3 d-flex align-center gap-3 flex-wrap">
         <MudText Typo="Typo.body2">
-            @string.Format(L.T("batch.selected"), _selectedTicketIds.Count)
+            @if (_selectedTicketIds.Count == 0)
+            {
+                @L.T("batch.empty")
+            }
+            else
+            {
+                @string.Format(L.T("batch.selected"), _selectedTicketIds.Count)
+            }
         </MudText>
+        <MudButton Variant="Variant.Text" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.SelectAll"
+                   OnClick="SelectAllVisible" Disabled="_isLoading">
+            @L.T("batch.select_all_visible")
+        </MudButton>
         <MudSpacer />
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Person"
-                   OnClick="BatchAssignToMeAsync" Disabled="_isLoading">
-            @L.T("tickets.assign_me")
-        </MudButton>
-        <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
-                   StartIcon="@Icons.Material.Filled.Delete"
-                   OnClick="BatchDeleteAsync" Disabled="_isLoading">
-            @L.T("common.delete")
-        </MudButton>
+        @if (_selectedTicketIds.Count > 0)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Person"
+                       OnClick="BatchAssignToMeAsync" Disabled="_isLoading">
+                @L.T("tickets.assign_me")
+            </MudButton>
+            @if (_allStatuses.Count > 0)
+            {
+                <MudMenu Label="@L.T("batch.change_status")"
+                         StartIcon="@Icons.Material.Filled.SwapHoriz"
+                         Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                         Disabled="_isLoading" Dense="true">
+                    @foreach (var s in _allStatuses)
+                    {
+                        var status = s;
+                        <MudMenuItem OnClick="@(() => BatchChangeStatusAsync(status))">
+                            @status.Name
+                        </MudMenuItem>
+                    }
+                </MudMenu>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="BatchDeleteAsync" Disabled="_isLoading">
+                @L.T("common.delete")
+            </MudButton>
+        }
         <MudButton Variant="Variant.Text" Size="Size.Small"
                    OnClick="ClearSelection">@L.T("common.cancel")</MudButton>
     </MudPaper>
@@ -215,7 +246,9 @@ else
                         OnSelectedChanged="@(v => ToggleSelection(t.Id, v))"
                         OnClick="NavigateToDetail"
                         OnAssignToMe="AssignToMeAsync"
-                        OnClose="CloseTicketAsync" />
+                        OnClose="CloseTicketAsync"
+                        AvailableStatuses="_allStatuses"
+                        OnChangeStatus="QuickChangeStatusAsync" />
         }
     </MudStack>
 
@@ -254,6 +287,7 @@ else
     // Batch selection
     private bool _batchMode;
     private HashSet<string> _selectedTicketIds = new();
+    private List<Status> _allStatuses = [];
 
     // Advanced filter
     private bool _showAdvancedFilter;
@@ -272,8 +306,22 @@ else
         if (!string.IsNullOrEmpty(InitialFilter))
             _activeFilter = InitialFilter;
         await LoadSavedFiltersAsync();
+        await LoadStatusesAsync();
         await LoadTicketsAsync();
         Realtime.AnyTicketChanged += OnRealtimeChange;
+    }
+
+    private async Task LoadStatusesAsync()
+    {
+        try
+        {
+            var json = await ApiService.GetStatusesAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            _allStatuses = JsonHelper.DeserializeWrappedArray<Status>(json, "status", options).ToList();
+            foreach (var s in _allStatuses)
+                s.Name = TrudeskTranslationHelper.TranslateStatus(s.Name ?? string.Empty);
+        }
+        catch { /* status dropdowns just stay empty — bulk close fallback still works */ }
     }
 
     private void OnRealtimeChange(string ticketId)
@@ -462,6 +510,24 @@ else
         catch { Snackbar.Add(L.T("tickets.assign_failed"), Severity.Error); }
     }
 
+    private async Task QuickChangeStatusAsync((Ticket Ticket, Status Status) args)
+    {
+        if (string.IsNullOrEmpty(args.Status.Id)) return;
+        try
+        {
+            if (await ApiService.UpdateTicketStatusAsync(args.Ticket.Id, args.Status.Id))
+            {
+                Snackbar.Add(string.Format(L.T("tickets.status_changed"), args.Status.Name), Severity.Success);
+                await LoadTicketsAsync();
+            }
+            else
+            {
+                Snackbar.Add(L.T("tickets.close_failed"), Severity.Error);
+            }
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
     private async Task CloseTicketAsync(Ticket ticket)
     {
         try
@@ -499,6 +565,34 @@ else
         {
             var (deleted, failed) = await ApiService.BatchDeleteTicketsAsync(_selectedTicketIds);
             Snackbar.Add(string.Format(L.T("batch.deleted"), deleted, failed), deleted > 0 ? Severity.Success : Severity.Error);
+            _selectedTicketIds.Clear();
+            await LoadTicketsAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
+    }
+
+    private void SelectAllVisible()
+    {
+        // Select every ticket currently rendered on the active page only.
+        // Cross-page select-all is intentionally not offered — the user
+        // would have no way to verify which tickets they're acting on.
+        foreach (var t in PagedTickets) _selectedTicketIds.Add(t.Id);
+        StateHasChanged();
+    }
+
+    private async Task BatchChangeStatusAsync(Status target)
+    {
+        if (_selectedTicketIds.Count == 0 || string.IsNullOrEmpty(target.Id)) return;
+        _isLoading = true;
+        try
+        {
+            var batch = _selectedTicketIds
+                .Select(id => new Dictionary<string, object?> { ["id"] = id, ["status"] = target.Id })
+                .ToList();
+            var (updated, failed) = await ApiService.BatchUpdateTicketsAsync(batch);
+            Snackbar.Add(string.Format(L.T("batch.status_changed"), updated, target.Name, failed),
+                updated > 0 ? Severity.Success : Severity.Error);
             _selectedTicketIds.Clear();
             await LoadTicketsAsync();
         }
