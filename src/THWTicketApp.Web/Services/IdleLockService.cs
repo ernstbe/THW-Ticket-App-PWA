@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
 using MudBlazor;
 using THWTicketApp.Shared.Services;
@@ -56,6 +57,39 @@ public sealed class IdleLockService : IAsyncDisposable
         _navigation = navigation;
         _snackbar = snackbar;
         _localization = localization;
+
+        // Re-evaluate on every auth-state transition so a fresh login on the
+        // same tab restarts the watcher. Without this, the watcher only ever
+        // starts on the first MainLayout render — a logout-then-login round
+        // trip leaves the user idle-unprotected until they reload the page.
+        _authState.AuthenticationStateChanged += OnAuthenticationStateChanged;
+    }
+
+    private void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        _ = HandleAuthChangeAsync(task);
+    }
+
+    private async Task HandleAuthChangeAsync(Task<AuthenticationState> task)
+    {
+        try
+        {
+            var state = await task;
+            var isAuthed = state.User?.Identity?.IsAuthenticated == true;
+            if (isAuthed)
+            {
+                // StartAsync internally no-ops when not enabled or no passkey.
+                if (!_watching) await StartAsync();
+            }
+            else
+            {
+                if (_watching) await StopAsync();
+            }
+        }
+        catch
+        {
+            // Auth-state observation must not throw into Blazor's event loop.
+        }
     }
 
     public async Task LoadSettingsAsync()
@@ -149,6 +183,7 @@ public sealed class IdleLockService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _authState.AuthenticationStateChanged -= OnAuthenticationStateChanged;
         await StopAsync();
         _selfRef?.Dispose();
         if (_module != null)
