@@ -23,9 +23,9 @@
 @if (_isLoading)
 {
     <MudGrid Class="mb-6">
-        @for (var i = 0; i < 6; i++)
+        @for (var i = 0; i < 4; i++)
         {
-            <MudItem xs="6" sm="4" md="2">
+            <MudItem xs="6" md="3">
                 <MudCard Elevation="2" Class="pa-4">
                     <MudSkeleton SkeletonType="SkeletonType.Circle" Width="40px" Height="40px" Class="mb-2" />
                     <MudSkeleton Width="60%" />
@@ -37,32 +37,26 @@
 }
 else
 {
+    @* Four focused stat cards — each is actionable (clicks filter the list).
+       Total/Mine dropped: Total isn't a filter the user wants to click and
+       Mine is reachable via the "Meine Tickets" filter chip on the list. *@
     <MudGrid Class="mb-6">
-        <MudItem xs="6" sm="4" md="2">
-            <StatCard Icon="@Icons.Material.Filled.ConfirmationNumber" IconColor="Color.Primary"
-                      Value="_totalTickets" Label="@L.T("dashboard.total")"
-                      OnClick="@(() => Navigation.NavigateTo("tickets"))" />
-        </MudItem>
-        <MudItem xs="6" sm="4" md="2">
+        <MudItem xs="6" md="3">
             <StatCard Icon="@Icons.Material.Filled.FolderOpen" IconColor="Color.Info"
                       Value="_openTickets" Label="@L.T("dashboard.open")"
                       OnClick="@(() => Navigation.NavigateTo("tickets?filter=open"))" />
         </MudItem>
-        <MudItem xs="6" sm="4" md="2">
+        <MudItem xs="6" md="3">
             <StatCard Icon="@Icons.Material.Filled.HourglassTop" IconColor="Color.Warning"
                       Value="_pendingTickets" Label="@L.T("dashboard.in_progress")"
                       OnClick="@(() => Navigation.NavigateTo("tickets?filter=pending"))" />
         </MudItem>
-        <MudItem xs="6" sm="4" md="2">
+        <MudItem xs="6" md="3">
             <StatCard Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success"
                       Value="_closedTickets" Label="@L.T("dashboard.closed")"
                       OnClick="@(() => Navigation.NavigateTo("tickets?filter=closed"))" />
         </MudItem>
-        <MudItem xs="6" sm="4" md="2">
-            <StatCard Icon="@Icons.Material.Filled.PersonPin" IconColor="Color.Secondary"
-                      Value="_myTickets" Label="@L.T("dashboard.mine")" />
-        </MudItem>
-        <MudItem xs="6" sm="4" md="2">
+        <MudItem xs="6" md="3">
             <StatCard Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error"
                       Value="_overdueTickets" Label="@L.T("dashboard.overdue")" ValueColor="Color.Error" />
         </MudItem>
@@ -126,6 +120,12 @@ else
             </MudButton>
         </MudPaper>
 
+        @* Secondary widgets — hidden on mobile to keep the main ticket list
+           reachable without scrolling past 5+ sidebar cards. Desktop sees
+           the full sidebar; mobile users can reach the data via the
+           dedicated pages (Tickets list, Reports, Assets etc). *@
+        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+
         @* Recently visited tickets — local-only, no API call. Empty on first
            use and after explicit clear. *@
         @if (_recentlyVisited.Count > 0)
@@ -150,7 +150,7 @@ else
 
         @if (_ticketsPerGroup.Count > 0)
         {
-            <MudPaper Elevation="2" Class="pa-4">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
                 <MudText Typo="Typo.h6" Class="mb-3">@L.T("dashboard.tickets_per_group")</MudText>
                 @foreach (var g in _ticketsPerGroup)
                 {
@@ -215,6 +215,8 @@ else
                 </MudPaper>
             }
         }
+
+        </MudHidden>
     </MudItem>
 </MudGrid>
 
