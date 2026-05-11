@@ -30,29 +30,77 @@ else if (_ticket == null)
 }
 else
 {
-    <div class="d-flex justify-space-between align-center mb-4 pwa-no-print">
-        <div class="d-flex align-center gap-3">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("tickets"))"
-                           aria-label="@L.T("common.back")" />
-            <MudText Typo="Typo.h5">#@_ticket.Uid – @_ticket.Subject</MudText>
-            <MudIconButton Icon="@(_isFavorite ? Icons.Material.Filled.Star : Icons.Material.Filled.StarOutline)"
-                           Color="@(_isFavorite ? Color.Warning : Color.Default)"
-                           OnClick="ToggleFavoriteAsync" />
-            <MudTooltip Text="@(_isSubscribed ? L.T("detail.unsubscribe") : L.T("detail.subscribe"))">
-                <MudIconButton Icon="@(_isSubscribed ? Icons.Material.Filled.NotificationsActive : Icons.Material.Filled.NotificationsNone)"
-                               Color="@(_isSubscribed ? Color.Info : Color.Default)"
-                               OnClick="ToggleSubscriptionAsync" />
-            </MudTooltip>
-            <MudTooltip Text="@L.T("detail.print")">
-                <MudIconButton Icon="@Icons.Material.Filled.Print"
-                               OnClick="PrintAsync"
-                               aria-label="@L.T("detail.print")" />
-            </MudTooltip>
-        </div>
-        <div class="d-flex gap-2">
-            <StatusBadge Status="@_ticket.Status" />
-            <PriorityBadge Priority="@_ticket.Priority" />
-        </div>
+    @* ─── Header ───────────────────────────────────────────────────────── *@
+    <div class="d-flex align-center gap-2 mb-2 pwa-no-print">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("tickets"))"
+                       aria-label="@L.T("common.back")" />
+        <MudText Typo="Typo.caption" Color="Color.Secondary">#@_ticket.Uid</MudText>
+        @if (_editingTitle)
+        {
+            <MudTextField @bind-Value="_editSubject" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Immediate="true" Style="flex:1;"
+                          OnKeyDown="@(async (e) => { if (e.Key == "Enter") await SaveTitleAsync(); else if (e.Key == "Escape") CancelTitleEdit(); })" />
+            <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small"
+                           OnClick="SaveTitleAsync" />
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                           OnClick="CancelTitleEdit" />
+        }
+        else
+        {
+            <MudText Typo="Typo.h5" Style="flex:1; cursor:text;" @onclick="StartTitleEdit"
+                     title="@L.T("detail.click_to_edit")">@_ticket.Subject</MudText>
+        }
+        <MudIconButton Icon="@(_isFavorite ? Icons.Material.Filled.Star : Icons.Material.Filled.StarOutline)"
+                       Color="@(_isFavorite ? Color.Warning : Color.Default)"
+                       OnClick="ToggleFavoriteAsync"
+                       aria-label="@L.T("detail.favorite")" />
+        <MudTooltip Text="@(_isSubscribed ? L.T("detail.unsubscribe") : L.T("detail.subscribe"))">
+            <MudIconButton Icon="@(_isSubscribed ? Icons.Material.Filled.NotificationsActive : Icons.Material.Filled.NotificationsNone)"
+                           Color="@(_isSubscribed ? Color.Info : Color.Default)"
+                           OnClick="ToggleSubscriptionAsync" />
+        </MudTooltip>
+        <MudMenu Icon="@Icons.Material.Filled.MoreVert" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+            <MudMenuItem Icon="@Icons.Material.Filled.Print" OnClick="PrintAsync">@L.T("detail.print")</MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="DeleteTicketAsync">
+                <MudText Color="Color.Error">@L.T("detail.delete_ticket")</MudText>
+            </MudMenuItem>
+        </MudMenu>
+    </div>
+
+    @* ─── Chips bar — inline status/priority/group/assignee changes ───── *@
+    <div class="d-flex align-center gap-2 mb-4 pwa-no-print flex-wrap">
+        <ChipWithMenu T="Status"
+                      Label="@_ticket.Status?.TranslatedName"
+                      Icon="@Icons.Material.Filled.Circle"
+                      Color="@StatusChipColor(_ticket.Status)"
+                      Items="_statuses"
+                      ItemTitle="@(s => s.TranslatedName ?? "")"
+                      OnSelected="QuickChangeStatusAsync" />
+        <ChipWithMenu T="Priority"
+                      Label="@_ticket.Priority?.TranslatedName"
+                      Icon="@Icons.Material.Filled.Flag"
+                      Color="@PriorityChipColor(_ticket.Priority)"
+                      Items="_priorities"
+                      ItemTitle="@(p => p.TranslatedName ?? "")"
+                      OnSelected="QuickChangePriorityAsync" />
+        <ChipWithMenu T="Group"
+                      Label="@_ticket.Group?.Name"
+                      EmptyLabel="@L.T("detail.no_group")"
+                      Icon="@Icons.Material.Filled.Group"
+                      Items="_groups"
+                      ItemTitle="@(g => g.Name ?? "")"
+                      OnSelected="QuickChangeGroupAsync" />
+        <ChipWithMenu T="User"
+                      Label="@_ticket.Assignee?.Fullname"
+                      EmptyLabel="@L.T("detail.unassigned")"
+                      Icon="@Icons.Material.Filled.AssignmentInd"
+                      Items="_users"
+                      ItemTitle="@(u => u.Fullname ?? "")"
+                      OnSelected="QuickAssignAsync"
+                      OnClear="ClearAssigneeAsync"
+                      ClearLabel="@L.T("detail.remove_assign")"
+                      EmptyMenuLabel="@L.T("detail.no_assignees_available")" />
     </div>
 
     @if (_isLoading)
@@ -60,8 +108,7 @@ else
         <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
     }
 
-    @* Print-only summary. Hidden in screen view; revealed by the @media print
-       block in app.css which also hides the rest of the interactive UI. *@
+    @* ─── Print-only summary (revealed by @media print in app.css) ───── *@
     <div class="pwa-print-only">
         <h1>THW Ticket #@_ticket.Uid</h1>
         <h2>@_ticket.Subject</h2>
@@ -85,10 +132,7 @@ else
             {
                 @((MarkupString)Markdown.ToHtml(_ticket.Issue, _mdPipeline))
             }
-            else
-            {
-                <em>Keine Beschreibung.</em>
-            }
+            else { <em>Keine Beschreibung.</em> }
         </div>
         @if (_ticket.Comments?.Count > 0)
         {
@@ -119,508 +163,401 @@ else
         </p>
     </div>
 
-    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="pa-4 pwa-no-print">
-        @* Details Tab *@
-        <MudTabPanel Text="@L.T("detail.details")" Icon="@Icons.Material.Filled.Info">
-            <MudGrid>
-                <MudItem xs="12" md="8">
-                    <MudText Typo="Typo.subtitle2" Class="mb-1">@L.T("detail.description")</MudText>
-                    <MudPaper Elevation="0" Class="pa-3 mb-4" Style="background: var(--mud-palette-background-gray);">
-                        @if (!string.IsNullOrEmpty(_ticket.Issue))
-                        {
-                            @((MarkupString)Markdown.ToHtml(_ticket.Issue, _mdPipeline))
-                        }
-                        else
-                        {
-                            <MudText Color="Color.Secondary">@L.T("detail.no_description")</MudText>
-                        }
-                    </MudPaper>
-
-                    @* Edit section *@
-                    <MudExpansionPanels Class="mb-4">
-                        <MudExpansionPanel Text="@L.T("detail.edit")">
-                            <MudTextField @bind-Value="_editSubject" Label="@L.T("detail.subject")" Variant="Variant.Outlined" Class="mb-3" />
-                            <MudTextField @bind-Value="_editIssue" Label="@L.T("detail.description")" Variant="Variant.Outlined" Lines="4" Class="mb-3" />
-                            <MudGrid>
-                                <MudItem xs="6">
-                                    <MudSelect T="Status" @bind-Value="_selectedStatus" Label="@L.T("detail.status")" Variant="Variant.Outlined"
-                                               ToStringFunc="@(s => s?.TranslatedName ?? "")">
-                                        @foreach (var s in _statuses)
-                                        {
-                                            <MudSelectItem Value="s">@s.TranslatedName</MudSelectItem>
-                                        }
-                                    </MudSelect>
-                                </MudItem>
-                                <MudItem xs="6">
-                                    <MudSelect T="Priority" @bind-Value="_selectedPriority" Label="@L.T("detail.priority")" Variant="Variant.Outlined"
-                                               ToStringFunc="@(p => p?.TranslatedName ?? "")">
-                                        @foreach (var p in _priorities)
-                                        {
-                                            <MudSelectItem Value="p">@p.TranslatedName</MudSelectItem>
-                                        }
-                                    </MudSelect>
-                                </MudItem>
-                            </MudGrid>
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-3"
-                                       OnClick="SaveEditAsync" Disabled="_isLoading">@L.T("common.save")</MudButton>
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
-                </MudItem>
-
-                <MudItem xs="12" md="4">
-                    <MudPaper Elevation="1" Class="pa-4">
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.details")</MudText>
-                        <MudList T="string" Dense="true">
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Person">
-                                <MudText Typo="Typo.caption">@L.T("detail.creator")</MudText>
-                                <MudText>@(_ticket.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
-                            </MudListItem>
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.AssignmentInd">
-                                <MudText Typo="Typo.caption">@L.T("detail.assignee")</MudText>
-                                <MudText>@(_ticket.Assignee?.Fullname ?? L.T("detail.unassigned"))</MudText>
-                            </MudListItem>
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Group">
-                                <MudText Typo="Typo.caption">@L.T("detail.group")</MudText>
-                                <MudText>@(_ticket.Group?.Name ?? "-")</MudText>
-                            </MudListItem>
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Category">
-                                <MudText Typo="Typo.caption">@L.T("detail.type")</MudText>
-                                <MudText>@(_ticket.Type?.TranslatedName ?? "-")</MudText>
-                            </MudListItem>
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.CalendarToday">
-                                <MudText Typo="Typo.caption">@L.T("detail.created")</MudText>
-                                <MudText>@_ticket.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
-                            </MudListItem>
-                            <MudListItem T="string" Icon="@Icons.Material.Filled.Update">
-                                <MudText Typo="Typo.caption">@L.T("detail.updated")</MudText>
-                                <MudText>@_ticket.Updated.ToString("dd.MM.yyyy HH:mm")</MudText>
-                            </MudListItem>
-                            @if (_ticket.DueDate != DateTime.MinValue)
-                            {
-                                <MudListItem T="string" Icon="@Icons.Material.Filled.Event">
-                                    <MudText Typo="Typo.caption">@L.T("detail.due")</MudText>
-                                    <MudText Color="@(_ticket.DueDate < DateTime.Now ? Color.Error : Color.Default)">
-                                        @_ticket.DueDate.ToString("dd.MM.yyyy HH:mm")
-                                    </MudText>
-                                </MudListItem>
-                            }
-                        </MudList>
-
-                        @* Assignee picker *@
-                        <MudDivider Class="my-3" />
-                        <MudSelect T="User" @bind-Value="_selectedAssignee" Label="@L.T("detail.assign_to")" Variant="Variant.Outlined"
-                                   ToStringFunc="@(u => u?.Fullname ?? "")" Dense="true" Class="mb-2"
-                                   Clearable="true">
-                            @foreach (var u in _users)
-                            {
-                                <MudSelectItem Value="u">@u.Fullname</MudSelectItem>
-                            }
-                        </MudSelect>
-                        <div class="d-flex gap-2">
-                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-                                       OnClick="AssignAsync" Disabled="_isLoading">@L.T("detail.assign")</MudButton>
-                            <MudButton Size="Size.Small" Variant="Variant.Outlined"
-                                       OnClick="ClearAssigneeAsync" Disabled="_isLoading">@L.T("detail.remove_assign")</MudButton>
-                        </div>
-
-                        @* Tags *@
-                        <MudDivider Class="my-3" />
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.tags")</MudText>
-                        <div class="d-flex flex-wrap gap-1 align-center">
-                            @if (_ticket.Tags?.Count > 0)
-                            {
-                                @foreach (var tag in _ticket.Tags)
-                                {
-                                    var tagId = tag.Id;
-                                    <MudChip T="string" Size="Size.Small" OnClose="@(_ => RemoveTagAsync(tagId!))"
-                                             Disabled="_isLoading">@tag.Name</MudChip>
-                                }
-                            }
-                            @if (_availableTags.Any(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
-                            {
-                                <MudMenu Icon="@Icons.Material.Filled.Add" Size="Size.Small"
-                                         Dense="true" aria-label="@L.T("detail.add_tag")">
-                                    @foreach (var tag in _availableTags.Where(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
-                                    {
-                                        <MudMenuItem OnClick="@(() => AddTagAsync(tag.Id!, tag.Name!))">@tag.Name</MudMenuItem>
-                                    }
-                                </MudMenu>
-                            }
-                        </div>
-
-                        @* Linked Tickets *@
-                        <MudDivider Class="my-3" />
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.linked")</MudText>
-                        @if (_linkedTickets.Count > 0)
-                        {
-                            @foreach (var link in _linkedTickets)
-                            {
-                                <div class="d-flex align-center gap-2 mb-1">
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@link.LinkType</MudChip>
-                                    <MudLink Href="@($"/tickets/{link.Uid}")" Typo="Typo.body2">
-                                        #@link.Uid – @link.Subject
-                                    </MudLink>
-                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
-                                                   OnClick="@(() => RemoveLinkedTicketAsync(link))" />
-                                </div>
-                            }
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.no_links")</MudText>
-                        }
-                        <div class="d-flex gap-2 mt-2">
-                            <MudNumericField @bind-Value="_linkTicketUid" Label="@L.T("detail.link_ticket_num")" Variant="Variant.Outlined"
-                                             Margin="Margin.Dense" Style="max-width: 100px;" T="int" />
-                            <MudSelect @bind-Value="_linkType" Label="@L.T("detail.type")" Variant="Variant.Outlined" Dense="true"
-                                       Style="max-width: 130px;" T="string">
-                                <MudSelectItem Value="@(L.T("detail.link_related"))">@L.T("detail.link_related")</MudSelectItem>
-                                <MudSelectItem Value="@(L.T("detail.link_blocks"))">@L.T("detail.link_blocks")</MudSelectItem>
-                                <MudSelectItem Value="@(L.T("detail.link_blocked_by"))">@L.T("detail.link_blocked_by")</MudSelectItem>
-                                <MudSelectItem Value="@(L.T("detail.link_duplicate"))">@L.T("detail.link_duplicate")</MudSelectItem>
-                            </MudSelect>
-                            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
-                                           OnClick="AddLinkedTicketAsync" />
-                        </div>
-                    </MudPaper>
-                </MudItem>
-            </MudGrid>
-        </MudTabPanel>
-
-        @* Comments Tab *@
-        <MudTabPanel Text="@($"{L.T("comments.title")} ({_ticket.Comments?.Count ?? 0})")" Icon="@Icons.Material.Filled.Comment">
-            @if (_ticket.Comments != null)
-            {
-                @foreach (var comment in _ticket.Comments.OrderByDescending(c => c.Date))
+    @* ─── Main layout: left = description+feed+composer, right = sidebar ─ *@
+    <MudGrid Class="pwa-no-print">
+        <MudItem xs="12" md="8">
+            @* Description (click to edit) *@
+            <MudPaper Elevation="1" Class="pa-4 mb-4">
+                <div class="d-flex align-center justify-space-between mb-2">
+                    <MudText Typo="Typo.subtitle2">@L.T("detail.description")</MudText>
+                    @if (!_editingDescription)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="StartDescriptionEdit"
+                                       aria-label="@L.T("common.edit")" />
+                    }
+                </div>
+                @if (_editingDescription)
                 {
-                    <MudPaper Elevation="1" Class="pa-3 mb-3">
-                        <div class="d-flex align-center mb-2 gap-3">
-                            <UserAvatar Name="@comment.Owner?.Fullname" Size="Size.Small" />
-                            <div class="d-flex flex-column" style="flex:1;">
-                                <MudText Typo="Typo.subtitle2">@(comment.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@comment.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
-                            </div>
-                        </div>
-                        @if (!string.IsNullOrEmpty(comment.Text))
-                        {
-                            @((MarkupString)Markdown.ToHtml(comment.Text, _mdPipeline))
-                        }
-                    </MudPaper>
-                }
-            }
-
-            <MudDivider Class="my-4" />
-
-            @* Quick Reply Templates *@
-            <div class="d-flex gap-2 mb-2">
-                <MudMenu Label="@L.T("comments.quickreply")" Variant="Variant.Outlined" Size="Size.Small"
-                         StartIcon="@Icons.Material.Filled.Reply" Dense="true">
-                    @foreach (var template in _quickReplyTemplates)
-                    {
-                        <MudMenuItem OnClick="@(() => InsertQuickReply(template))">@TruncateTemplate(template)</MudMenuItem>
-                    }
-                    <MudDivider />
-                    <MudMenuItem OnClick="OpenQuickReplyEditor">
-                        <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Class="mr-1" />
-                        @L.T("detail.edit_templates")
-                    </MudMenuItem>
-                </MudMenu>
-                <MudMenu Label="@L.T("comments.mention")" Variant="Variant.Outlined" Size="Size.Small"
-                         StartIcon="@Icons.Material.Filled.AlternateEmail" Dense="true">
-                    @foreach (var user in _users)
-                    {
-                        <MudMenuItem OnClick="@(() => InsertMention(user))">@user.Fullname</MudMenuItem>
-                    }
-                </MudMenu>
-            </div>
-
-            @* Quick Reply Editor Dialog *@
-            @if (_showQuickReplyEditor)
-            {
-                <MudPaper Elevation="2" Class="pa-3 mb-3">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.quickreply_templates")</MudText>
-                    @for (int i = 0; i < _quickReplyTemplates.Count; i++)
-                    {
-                        var idx = i;
-                        <div class="d-flex gap-2 mb-1 align-center">
-                            <MudTextField @bind-Value="_quickReplyTemplates[idx]" Variant="Variant.Outlined"
-                                          Margin="Margin.Dense" Style="flex: 1;" T="string" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                           Color="Color.Error" OnClick="@(() => RemoveQuickReply(idx))" />
-                        </div>
-                    }
-                    <div class="d-flex gap-2 mt-2">
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="AddEmptyQuickReply"
-                                   StartIcon="@Icons.Material.Filled.Add">@L.T("detail.new_template")</MudButton>
-                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-                                   OnClick="SaveQuickRepliesAsync">@L.T("common.save")</MudButton>
-                        <MudButton Size="Size.Small" Variant="Variant.Text"
-                                   OnClick="@(() => _showQuickReplyEditor = false)">@L.T("common.close")</MudButton>
+                    <MudTextField @bind-Value="_editIssue" Variant="Variant.Outlined" Lines="6"
+                                  Immediate="true" Class="mb-2" />
+                    <div class="d-flex gap-2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="SaveDescriptionAsync" Disabled="_isLoading">
+                            @L.T("common.save")
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small"
+                                   OnClick="CancelDescriptionEdit">
+                            @L.T("common.cancel")
+                        </MudButton>
                     </div>
-                </MudPaper>
-            }
-
-            <div class="d-flex gap-2 mb-1">
-                <MudToggleIconButton Toggled="@_commentPreview"
-                                     ToggledChanged="@((bool v) => _commentPreview = v)"
-                                     Icon="@Icons.Material.Filled.Edit"
-                                     ToggledIcon="@Icons.Material.Filled.Visibility"
-                                     Size="Size.Small"
-                                     title="@L.T("comments.preview_toggle")" />
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="align-self-center">
-                    @(_commentPreview ? L.T("comments.preview_on") : L.T("comments.preview_off"))
-                </MudText>
-            </div>
-            @if (_commentPreview)
-            {
-                <MudPaper Elevation="0" Class="pa-3 mb-3"
-                          Style="background: var(--mud-palette-background-gray); min-height: 80px;">
-                    @if (string.IsNullOrWhiteSpace(_newComment))
+                }
+                else
+                {
+                    @if (!string.IsNullOrEmpty(_ticket.Issue))
                     {
-                        <MudText Color="Color.Secondary">
-                            <em>@L.T("comments.preview_empty")</em>
-                        </MudText>
+                        @((MarkupString)Markdown.ToHtml(_ticket.Issue, _mdPipeline))
                     }
                     else
                     {
-                        @((MarkupString)Markdown.ToHtml(_newComment, _mdPipeline))
+                        <MudText Color="Color.Secondary"><em>@L.T("detail.no_description")</em></MudText>
                     }
-                </MudPaper>
-            }
-            else
-            {
-                <MudTextField @bind-Value="_newComment" Label="@L.T("comments.new")" Variant="Variant.Outlined"
-                              Lines="3" Class="mb-3" />
-            }
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddCommentAsync"
-                       Disabled="@(string.IsNullOrWhiteSpace(_newComment) || _isLoading)">
-                @L.T("comments.send")
-            </MudButton>
-        </MudTabPanel>
+                }
+            </MudPaper>
 
-        @* Notes Tab *@
-        <MudTabPanel Text="@($"{L.T("notes.title")} ({_ticket.Notes?.Count ?? 0})")" Icon="@Icons.Material.Filled.Note">
-            @if (_ticket.Notes != null)
-            {
-                @foreach (var note in _ticket.Notes.OrderByDescending(n => n.Date))
-                {
-                    <MudPaper Elevation="1" Class="pa-3 mb-3">
-                        <div class="d-flex align-center mb-2 gap-3">
-                            <UserAvatar Name="@note.Owner?.Fullname" Size="Size.Small" />
-                            <div class="d-flex flex-column" style="flex:1;">
-                                <MudText Typo="Typo.subtitle2">@(note.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@note.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
-                            </div>
+            @* Activity feed *@
+            <MudText Typo="Typo.h6" Class="mb-3">@L.T("detail.activity")</MudText>
+            <TicketActivityFeed Ticket="_ticket" />
+
+            @* Composer — bottom of the left column, sticky-ish *@
+            <MudPaper Elevation="2" Class="pa-3 mt-6" Style="position: sticky; bottom: 0;">
+                <MudTabs Elevation="0" Rounded="false" Border="false"
+                         ApplyEffectsToContainer="true" @bind-ActivePanelIndex="_composerTab">
+                    <MudTabPanel Text="@L.T("detail.composer_comment")" Icon="@Icons.Material.Filled.Comment">
+                        @* Quick replies + mentions *@
+                        <div class="d-flex gap-2 mb-2 flex-wrap">
+                            <MudMenu Label="@L.T("comments.quickreply")" Variant="Variant.Outlined" Size="Size.Small"
+                                     StartIcon="@Icons.Material.Filled.Reply" Dense="true">
+                                @foreach (var template in _quickReplyTemplates)
+                                {
+                                    <MudMenuItem OnClick="@(() => InsertQuickReply(template))">@TruncateTemplate(template)</MudMenuItem>
+                                }
+                                <MudDivider />
+                                <MudMenuItem OnClick="OpenQuickReplyEditor">
+                                    <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Class="mr-1" />
+                                    @L.T("detail.edit_templates")
+                                </MudMenuItem>
+                            </MudMenu>
+                            @if (_users.Any())
+                            {
+                                <MudMenu Label="@L.T("comments.mention")" Variant="Variant.Outlined" Size="Size.Small"
+                                         StartIcon="@Icons.Material.Filled.AlternateEmail" Dense="true">
+                                    @foreach (var user in _users)
+                                    {
+                                        <MudMenuItem OnClick="@(() => InsertMention(user))">@user.Fullname</MudMenuItem>
+                                    }
+                                </MudMenu>
+                            }
+                            <MudToggleIconButton Toggled="@_commentPreview"
+                                                 ToggledChanged="@((bool v) => _commentPreview = v)"
+                                                 Icon="@Icons.Material.Filled.Edit"
+                                                 ToggledIcon="@Icons.Material.Filled.Visibility"
+                                                 Size="Size.Small"
+                                                 title="@L.T("comments.preview_toggle")" />
                         </div>
-                        @if (!string.IsNullOrEmpty(note.Content))
+                        @if (_showQuickReplyEditor)
                         {
-                            @((MarkupString)Markdown.ToHtml(note.Content, _mdPipeline))
+                            <MudPaper Elevation="0" Class="pa-3 mb-3" Style="background: var(--mud-palette-background-gray);">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.quickreply_templates")</MudText>
+                                @for (int i = 0; i < _quickReplyTemplates.Count; i++)
+                                {
+                                    var idx = i;
+                                    <div class="d-flex gap-2 mb-1 align-center">
+                                        <MudTextField @bind-Value="_quickReplyTemplates[idx]" Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense" Style="flex: 1;" T="string" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                       Color="Color.Error" OnClick="@(() => RemoveQuickReply(idx))" />
+                                    </div>
+                                }
+                                <div class="d-flex gap-2 mt-2">
+                                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="AddEmptyQuickReply"
+                                               StartIcon="@Icons.Material.Filled.Add">@L.T("detail.new_template")</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                               OnClick="SaveQuickRepliesAsync">@L.T("common.save")</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text"
+                                               OnClick="@(() => _showQuickReplyEditor = false)">@L.T("common.close")</MudButton>
+                                </div>
+                            </MudPaper>
                         }
-                    </MudPaper>
-                }
-            }
+                        @if (_commentPreview)
+                        {
+                            <MudPaper Elevation="0" Class="pa-3 mb-3"
+                                      Style="background: var(--mud-palette-background-gray); min-height: 80px;">
+                                @if (string.IsNullOrWhiteSpace(_newComment))
+                                {
+                                    <MudText Color="Color.Secondary"><em>@L.T("comments.preview_empty")</em></MudText>
+                                }
+                                else
+                                {
+                                    @((MarkupString)Markdown.ToHtml(_newComment, _mdPipeline))
+                                }
+                            </MudPaper>
+                        }
+                        else
+                        {
+                            <MudTextField @bind-Value="_newComment" Placeholder="@L.T("comments.new")"
+                                          Variant="Variant.Outlined" Lines="3" Class="mb-2" />
+                        }
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="false"
+                                   StartIcon="@Icons.Material.Filled.Send"
+                                   OnClick="AddCommentAsync"
+                                   Disabled="@(string.IsNullOrWhiteSpace(_newComment) || _isLoading)">
+                            @L.T("comments.send")
+                        </MudButton>
+                    </MudTabPanel>
+                    <MudTabPanel Text="@L.T("detail.composer_note")" Icon="@Icons.Material.Filled.Note">
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                            @L.T("detail.note_visible_internal")
+                        </MudAlert>
+                        <MudTextField @bind-Value="_newNote" Placeholder="@L.T("notes.new")"
+                                      Variant="Variant.Outlined" Lines="3" Class="mb-2" />
+                        <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                                   StartIcon="@Icons.Material.Filled.NoteAdd"
+                                   OnClick="AddNoteAsync"
+                                   Disabled="@(string.IsNullOrWhiteSpace(_newNote) || _isLoading)">
+                            @L.T("notes.add")
+                        </MudButton>
+                    </MudTabPanel>
+                </MudTabs>
+            </MudPaper>
+        </MudItem>
 
-            <MudDivider Class="my-4" />
-            <MudTextField @bind-Value="_newNote" Label="@L.T("notes.new")" Variant="Variant.Outlined"
-                          Lines="3" Class="mb-3" />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddNoteAsync"
-                       Disabled="@(string.IsNullOrWhiteSpace(_newNote) || _isLoading)">
-                @L.T("notes.add")
-            </MudButton>
-        </MudTabPanel>
-
-        @* Attachments Tab *@
-        <MudTabPanel Text="@($"{L.T("attachments.title")} ({_ticket.Attachments?.Count ?? 0})")" Icon="@Icons.Material.Filled.AttachFile">
-            <div id="attachment-dropzone" class="pwa-dropzone pa-3">
-            @if (_ticket.Attachments != null && _ticket.Attachments.Count > 0)
-            {
-                <MudTable Items="_ticket.Attachments" Dense="true" Hover="true">
-                    <HeaderContent>
-                        <MudTh>@L.T("attachments.name")</MudTh>
-                        <MudTh>@L.T("attachments.type")</MudTh>
-                        <MudTh>@L.T("attachments.size")</MudTh>
-                        <MudTh>@L.T("attachments.date")</MudTh>
-                        <MudTh>@L.T("attachments.actions")</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd>@context.Name</MudTd>
-                        <MudTd>@context.MimeType</MudTd>
-                        <MudTd>@context.SizeFormatted</MudTd>
-                        <MudTd>@(context.UploadDate?.ToString("dd.MM.yyyy") ?? "-")</MudTd>
-                        <MudTd>
-                            <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small"
-                                           OnClick="() => DownloadAttachment(context)" />
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
-                                           OnClick="() => DeleteAttachmentAsync(context)" />
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
-            }
-            else
-            {
-                <MudText Color="Color.Secondary">@L.T("attachments.none")</MudText>
-            }
-
-            <MudDivider Class="my-4" />
-            <div class="d-flex gap-2 align-center">
-                <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
-                           accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt,.zip" />
-                <MudButton HtmlTag="label" Variant="Variant.Filled" Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
-                           Disabled="_isUploading">
-                    @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
-                </MudButton>
-                @if (_isUploading)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                }
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
-                    @L.T("attachments.drop_hint")
-                </MudText>
-            </div>
-            </div>
-        </MudTabPanel>
-
-        @* Checklist Tab *@
-        <MudTabPanel Text="@($"{L.T("checklist.title")} ({_ticket.Checklist?.Count ?? 0})")"
-                     Icon="@Icons.Material.Filled.CheckBox">
-            @if (_ticket.Checklist?.Count > 0)
-            {
-                <MudList T="string" Dense="true">
-                    @foreach (var item in _ticket.Checklist)
+        @* ─── Sidebar ────────────────────────────────────────────────── *@
+        <MudItem xs="12" md="4">
+            @* Meta *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.details")</MudText>
+                <div class="d-flex flex-column gap-1">
+                    <div class="d-flex align-center gap-2">
+                        <UserAvatar Name="@_ticket.Owner?.Fullname" Size="Size.Small" />
+                        <div style="flex:1;">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.creator")</MudText>
+                            <MudText Typo="Typo.body2">@(_ticket.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
+                        </div>
+                    </div>
+                    <MudDivider Class="my-2" />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.type")</MudText>
+                        <MudText Typo="Typo.body2">@(_ticket.Type?.TranslatedName ?? "-")</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.created")</MudText>
+                        <MudText Typo="Typo.body2">@_ticket.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.updated")</MudText>
+                        <MudText Typo="Typo.body2">@_ticket.Updated.ToString("dd.MM.yyyy HH:mm")</MudText>
+                    </div>
+                    @if (_ticket.DueDate != DateTime.MinValue)
                     {
-                        var itemRef = item;
-                        <MudListItem>
+                        <div>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.due")</MudText>
+                            <MudText Typo="Typo.body2" Color="@(_ticket.DueDate < DateTime.Now ? Color.Error : Color.Default)">
+                                @_ticket.DueDate.ToString("dd.MM.yyyy HH:mm")
+                            </MudText>
+                        </div>
+                    }
+                </div>
+            </MudPaper>
+
+            @* Tags *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.tags")</MudText>
+                <div class="d-flex flex-wrap gap-1 align-center">
+                    @if (_ticket.Tags?.Count > 0)
+                    {
+                        @foreach (var tag in _ticket.Tags)
+                        {
+                            var tagId = tag.Id;
+                            <MudChip T="string" Size="Size.Small" OnClose="@(_ => RemoveTagAsync(tagId!))"
+                                     Disabled="_isLoading">@tag.Name</MudChip>
+                        }
+                    }
+                    @if (_availableTags.Any(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                 Dense="true" aria-label="@L.T("detail.add_tag")">
+                            @foreach (var tag in _availableTags.Where(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+                            {
+                                <MudMenuItem OnClick="@(() => AddTagAsync(tag.Id!, tag.Name!))">@tag.Name</MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+                    @if ((_ticket.Tags?.Count ?? 0) == 0 && !_availableTags.Any())
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                    }
+                </div>
+            </MudPaper>
+
+            @* Checklist *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                    @L.T("checklist.title")
+                    @if (_ticket.Checklist?.Count > 0)
+                    {
+                        <span style="font-weight:normal; opacity:0.7;">
+                            (@(_ticket.Checklist.Count(c => c.Completed))/@_ticket.Checklist.Count)
+                        </span>
+                    }
+                </MudText>
+                @if (_ticket.Checklist?.Count > 0)
+                {
+                    <div class="d-flex flex-column gap-1 mb-2">
+                        @foreach (var item in _ticket.Checklist)
+                        {
+                            var itemRef = item;
                             <div class="d-flex align-center gap-2">
                                 <MudCheckBox T="bool" Value="@itemRef.Completed" Dense="true"
                                              ValueChanged="@(v => ToggleChecklistItemAsync(itemRef.Id!, v))"
                                              Disabled="_isLoading" />
-                                <MudText Style="@(itemRef.Completed ? "text-decoration: line-through; opacity: 0.6;" : "")">
+                                <MudText Typo="Typo.body2"
+                                         Style="@(itemRef.Completed ? "text-decoration: line-through; opacity: 0.6; flex:1;" : "flex:1;")">
                                     @itemRef.Title
                                 </MudText>
-                                <MudSpacer />
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
                                                OnClick="@(() => DeleteChecklistItemAsync(itemRef.Id!))"
-                                               Disabled="_isLoading" Color="Color.Error"
+                                               Disabled="_isLoading"
                                                aria-label="@L.T("common.delete")" />
                             </div>
-                        </MudListItem>
+                        }
+                    </div>
+                }
+                <div class="d-flex gap-1">
+                    <MudTextField @bind-Value="_newChecklistTitle" Placeholder="@L.T("checklist.new_item")"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1"
+                                  OnKeyDown="@(async (e) => { if (e.Key == "Enter") await AddChecklistItemAsync(); })" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                                   OnClick="AddChecklistItemAsync"
+                                   Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_newChecklistTitle))" />
+                </div>
+            </MudPaper>
+
+            @* Attachments *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                    @L.T("attachments.title")
+                    @if (_ticket.Attachments?.Count > 0)
+                    {
+                        <span style="font-weight:normal; opacity:0.7;">(@_ticket.Attachments.Count)</span>
                     }
-                </MudList>
-            }
-            else
-            {
-                <MudText Color="Color.Secondary" Class="my-3">@L.T("checklist.empty")</MudText>
-            }
-
-            <div class="d-flex gap-2 mt-3">
-                <MudTextField @bind-Value="_newChecklistTitle" Label="@L.T("checklist.new_item")"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1"
-                              OnKeyDown="@(async (e) => { if (e.Key == "Enter") await AddChecklistItemAsync(); })" />
-                <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                           OnClick="AddChecklistItemAsync" Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_newChecklistTitle))"
-                           StartIcon="@Icons.Material.Filled.Add">
-                    @L.T("common.add")
-                </MudButton>
-            </div>
-        </MudTabPanel>
-
-        @* Time Tracking Tab *@
-        <MudTabPanel Text="@L.T("time.title")" Icon="@Icons.Material.Filled.Timer">
-            <MudGrid>
-                <MudItem xs="12" md="6">
-                    <MudPaper Elevation="1" Class="pa-4">
-                        <MudText Typo="Typo.h6" Class="mb-3">@L.T("time.timer")</MudText>
-                        <MudText Typo="Typo.h3" Class="mb-3" Style="font-family: monospace; font-weight: 600;"
-                                 Color="@(_timerRunning ? Color.Primary : Color.Default)">
-                            @FormatElapsed(_timerElapsed)
-                        </MudText>
-                        <div class="d-flex gap-2 mb-4">
-                            @if (!_timerRunning)
+                </MudText>
+                <div id="attachment-dropzone" class="pwa-dropzone pa-2">
+                    @if (_ticket.Attachments != null && _ticket.Attachments.Count > 0)
+                    {
+                        <div class="d-flex flex-column gap-1 mb-2">
+                            @foreach (var att in _ticket.Attachments)
                             {
-                                <MudButton Variant="Variant.Filled" Color="Color.Success"
-                                           StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="StartTimer">
-                                    @L.T("time.start")
-                                </MudButton>
-                            }
-                            else
-                            {
-                                <MudButton Variant="Variant.Filled" Color="Color.Error"
-                                           StartIcon="@Icons.Material.Filled.Stop" OnClick="StopTimer">
-                                    @L.T("time.stop")
-                                </MudButton>
+                                var a = att;
+                                <div class="d-flex align-center gap-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" />
+                                    <MudLink Typo="Typo.body2" Style="flex:1; min-width:0; word-break:break-all;"
+                                             OnClick="@(() => DownloadAttachment(a))">@a.Name</MudLink>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@a.SizeFormatted</MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="() => DeleteAttachmentAsync(a)" />
+                                </div>
                             }
                         </div>
-                        <MudTextField @bind-Value="_timeEntryDescription" Label="@L.T("time.description")"
-                                      Variant="Variant.Outlined" />
-                    </MudPaper>
-                </MudItem>
-                <MudItem xs="12" md="6">
-                    <MudPaper Elevation="1" Class="pa-4">
-                        <MudText Typo="Typo.h6" Class="mb-3">@L.T("time.total"): @FormatMinutes(_totalTimeMinutes)</MudText>
-                        @if (_timeEntries.Count > 0)
-                        {
-                            <MudSimpleTable Dense="true">
-                                <thead>
-                                    <tr>
-                                        <th>@L.T("time.col_start")</th>
-                                        <th>@L.T("time.col_duration")</th>
-                                        <th>@L.T("time.col_description")</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var entry in _timeEntries.OrderByDescending(e => e.Start))
-                                    {
-                                        <tr>
-                                            <td>@entry.Start.ToString("dd.MM HH:mm")</td>
-                                            <td>@FormatMinutes(entry.DurationMinutes)</td>
-                                            <td>@(entry.Description ?? "-")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </MudSimpleTable>
-                        }
-                        else
-                        {
-                            <MudText Color="Color.Secondary">@L.T("time.no_entries")</MudText>
-                        }
-                    </MudPaper>
-                </MudItem>
-            </MudGrid>
-        </MudTabPanel>
-
-        @* History Tab *@
-        <MudTabPanel Text="@($"{L.T("history.title")} ({_ticket.History?.Count ?? 0})")" Icon="@Icons.Material.Filled.History">
-            @if (_ticket.History != null)
-            {
-                <MudTimeline TimelinePosition="TimelinePosition.Start">
-                    @foreach (var item in _ticket.History.OrderByDescending(h => h.Date))
-                    {
-                        <MudTimelineItem Color="Color.Primary" Size="Size.Small">
-                            <ItemContent>
-                                <MudText Typo="Typo.subtitle2">@item.TranslatedAction</MudText>
-                                @if (!string.IsNullOrEmpty(item.Description))
-                                {
-                                    <MudText Typo="Typo.body2">@item.Description</MudText>
-                                }
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    @item.Date.ToString("dd.MM.yyyy HH:mm") – @(item.Owner?.Fullname ?? "System")
-                                </MudText>
-                            </ItemContent>
-                        </MudTimelineItem>
                     }
-                </MudTimeline>
-            }
-        </MudTabPanel>
-    </MudTabs>
+                    <div class="d-flex gap-2 align-center">
+                        <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
+                                   accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt,.zip" />
+                        <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
+                                   Disabled="_isUploading">
+                            @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
+                        </MudButton>
+                        @if (_isUploading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @L.T("attachments.drop_hint")
+                        </MudText>
+                    </div>
+                </div>
+            </MudPaper>
 
-    @* Delete button *@
-    <div class="d-flex justify-end mt-4">
-        <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete"
-                   OnClick="DeleteTicketAsync">
-            @L.T("detail.delete_ticket")
-        </MudButton>
-    </div>
+            @* Linked tickets *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.linked")</MudText>
+                @if (_linkedTickets.Count > 0)
+                {
+                    <div class="d-flex flex-column gap-1 mb-2">
+                        @foreach (var link in _linkedTickets)
+                        {
+                            var l = link;
+                            <div class="d-flex align-center gap-2">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@l.LinkType</MudChip>
+                                <MudLink Href="@($"/tickets/{l.Uid}")" Typo="Typo.body2" Style="flex:1; min-width:0;">
+                                    #@l.Uid – @l.Subject
+                                </MudLink>
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                               OnClick="@(() => RemoveLinkedTicketAsync(l))" />
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">@L.T("detail.no_links")</MudText>
+                }
+                <div class="d-flex gap-1 align-center">
+                    <MudNumericField @bind-Value="_linkTicketUid" Placeholder="#" Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" Style="max-width: 80px;" T="int" />
+                    <MudSelect @bind-Value="_linkType" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Dense="true" T="string" Style="flex:1;">
+                        <MudSelectItem Value="@(L.T("detail.link_related"))">@L.T("detail.link_related")</MudSelectItem>
+                        <MudSelectItem Value="@(L.T("detail.link_blocks"))">@L.T("detail.link_blocks")</MudSelectItem>
+                        <MudSelectItem Value="@(L.T("detail.link_blocked_by"))">@L.T("detail.link_blocked_by")</MudSelectItem>
+                        <MudSelectItem Value="@(L.T("detail.link_duplicate"))">@L.T("detail.link_duplicate")</MudSelectItem>
+                    </MudSelect>
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                                   OnClick="AddLinkedTicketAsync" />
+                </div>
+            </MudPaper>
+
+            @* Time tracking *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                    @L.T("time.title")
+                    <span style="font-weight:normal; opacity:0.7;">(@FormatMinutes(_totalTimeMinutes))</span>
+                </MudText>
+                <div class="d-flex align-center gap-2 mb-2">
+                    <MudText Typo="Typo.h6" Style="font-family:monospace; flex:1;"
+                             Color="@(_timerRunning ? Color.Primary : Color.Default)">
+                        @FormatElapsed(_timerElapsed)
+                    </MudText>
+                    @if (!_timerRunning)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success"
+                                       OnClick="StartTimer" />
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Stop" Color="Color.Error"
+                                       OnClick="StopTimer" />
+                    }
+                </div>
+                @if (_timerRunning)
+                {
+                    <MudTextField @bind-Value="_timeEntryDescription" Placeholder="@L.T("time.description")"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+                @if (_timeEntries.Count > 0)
+                {
+                    <MudExpansionPanels Elevation="0" Class="mt-2" Dense="true">
+                        <MudExpansionPanel Text="@($"{_timeEntries.Count} {L.T("time.entries_short")}")">
+                            <div class="d-flex flex-column gap-1">
+                                @foreach (var entry in _timeEntries.OrderByDescending(e => e.Start))
+                                {
+                                    <div class="d-flex align-center gap-2">
+                                        <MudText Typo="Typo.caption">@entry.Start.ToString("dd.MM HH:mm")</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatMinutes(entry.DurationMinutes)</MudText>
+                                        @if (!string.IsNullOrEmpty(entry.Description))
+                                        {
+                                            <MudText Typo="Typo.caption" Style="flex:1;">@entry.Description</MudText>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 }
 
 @code {
@@ -628,37 +565,44 @@ else
 
     private Ticket? _ticket;
     private bool _isLoading;
+
+    // Inline editing state
+    private bool _editingTitle;
+    private bool _editingDescription;
+    private string _editSubject = string.Empty;
+    private string _editIssue = string.Empty;
+
+    // Composer state
+    private int _composerTab;
     private string _newComment = string.Empty;
     private bool _commentPreview;
     private string _newNote = string.Empty;
-    private string _editSubject = string.Empty;
-    private string _editIssue = string.Empty;
-    private Status? _selectedStatus;
-    private Priority? _selectedPriority;
-    private User? _selectedAssignee;
+
+    // Reference data (loaded once after ticket)
     private List<Status> _statuses = [];
     private List<Priority> _priorities = [];
+    private List<Group> _groups = [];
     private List<User> _users = [];
-    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-
-    // Tags
     private List<Tag> _availableTags = [];
+
+    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
 
     // Checklist
     private string _newChecklistTitle = string.Empty;
 
-    // Subscription
+    // Subscription + favorites
     private bool _isSubscribed;
+    private bool _isFavorite;
 
-    // Attachment upload
+    // Attachments
     private bool _isUploading;
+    private IJSObjectReference? _dropzoneModule;
 
-    // Quick reply templates
+    // Quick replies
     private List<string> _quickReplyTemplates = new();
     private bool _showQuickReplyEditor;
 
-    // Favorites & Linked Tickets
-    private bool _isFavorite;
+    // Linked tickets (local)
     private List<LinkedTicketItem> _linkedTickets = [];
     private int _linkTicketUid;
     private string _linkType = "";
@@ -673,6 +617,8 @@ else
     private System.Threading.Timer? _timer;
 
     private CancellationTokenSource? _refreshDebounceCts;
+
+    // ─── Lifecycle ───────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
@@ -697,10 +643,7 @@ else
             await _dropzoneModule.InvokeVoidAsync("register",
                 "attachment-dropzone", "attachment-upload");
         }
-        catch
-        {
-            // Non-fatal — falling back to "click button to choose file".
-        }
+        catch { /* drag-drop is optional — button still works */ }
     }
 
     private void OnRealtimeChange(string ticketId)
@@ -721,30 +664,26 @@ else
         });
     }
 
+    // ─── Data loading ────────────────────────────────────────────────────
+
     private async Task LoadTicketAsync()
     {
         _isLoading = true;
         StateHasChanged();
-
         try
         {
             var json = await ApiService.GetTicketAsync(TicketUid.ToString());
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("ticket", out var ticketEl))
-                _ticket = JsonSerializer.Deserialize<Ticket>(ticketEl.GetRawText(), options);
-            else
-                _ticket = JsonSerializer.Deserialize<Ticket>(json, options);
+            _ticket = doc.RootElement.TryGetProperty("ticket", out var ticketEl)
+                ? JsonSerializer.Deserialize<Ticket>(ticketEl.GetRawText(), options)
+                : JsonSerializer.Deserialize<Ticket>(json, options);
 
             if (_ticket != null)
             {
                 TrudeskTranslationHelper.TranslateTicket(_ticket);
                 _editSubject = _ticket.Subject ?? string.Empty;
                 _editIssue = _ticket.Issue ?? string.Empty;
-
-                // Record the visit for the dashboard "Recently visited" card.
-                // Fire-and-forget — a localStorage failure here is irrelevant
-                // to the user's ability to view this ticket.
                 _ = RecentTickets.RecordAsync(
                     _ticket.Uid.ToString(),
                     _ticket.Subject ?? string.Empty,
@@ -755,11 +694,7 @@ else
         {
             Snackbar.Add($"{L.T("common.error")}: {ErrorHelper.Categorize(ex).Message}", Severity.Error);
         }
-        finally
-        {
-            _isLoading = false;
-            StateHasChanged();
-        }
+        finally { _isLoading = false; StateHasChanged(); }
     }
 
     private async Task LoadReferenceDataAsync()
@@ -767,32 +702,26 @@ else
         try
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-            // Essential reference data (v1 — must succeed for the page to work)
             var statusTask = ApiService.GetStatusesAsync();
             var prioTask = ApiService.GetPrioritiesAsync();
             var tagsTask = ApiService.GetTagsAsync();
-            await Task.WhenAll(statusTask, prioTask, tagsTask);
+            var groupsTask = ApiService.GetGroupsAsync();
+            await Task.WhenAll(statusTask, prioTask, tagsTask, groupsTask);
 
             _statuses = JsonHelper.DeserializeWrappedArray<Status>(statusTask.Result, "status", options).ToList();
             foreach (var s in _statuses) s.Name = TrudeskTranslationHelper.TranslateStatus(s.Name);
 
             using var prioDoc = JsonDocument.Parse(prioTask.Result);
-            if (prioDoc.RootElement.TryGetProperty("priorities", out var prioEl))
-                _priorities = JsonSerializer.Deserialize<List<Priority>>(prioEl.GetRawText(), options) ?? [];
-            else
-                _priorities = JsonSerializer.Deserialize<List<Priority>>(prioTask.Result, options) ?? [];
+            _priorities = prioDoc.RootElement.TryGetProperty("priorities", out var prioEl)
+                ? JsonSerializer.Deserialize<List<Priority>>(prioEl.GetRawText(), options) ?? []
+                : JsonSerializer.Deserialize<List<Priority>>(prioTask.Result, options) ?? [];
             foreach (var p in _priorities) p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
 
             _availableTags = JsonHelper.DeserializeWrappedArray<Tag>(tagsTask.Result, "tags", options).ToList();
 
-            if (_ticket != null)
-            {
-                _selectedStatus = _statuses.FirstOrDefault(s => s.Id == _ticket.Status?.Id);
-                _selectedPriority = _priorities.FirstOrDefault(p => p.Id == _ticket.Priority?.Id);
-            }
+            var groupResp = JsonSerializer.Deserialize<GetGroupResponse>(groupsTask.Result, options);
+            _groups = groupResp?.Groups ?? [];
 
-            // Optional: assignees list (role-restricted — may fail for regular users)
             try
             {
                 var usersJson = await ApiService.GetAssigneesAsync();
@@ -803,22 +732,28 @@ else
 
             StateHasChanged();
         }
-        catch { }
+        catch { /* sidebar functionality degrades but core view works */ }
     }
 
-    private async Task SaveEditAsync()
+    // ─── Inline title/description editing ───────────────────────────────
+
+    private void StartTitleEdit()
+    {
+        _editSubject = _ticket?.Subject ?? string.Empty;
+        _editingTitle = true;
+    }
+    private void CancelTitleEdit() => _editingTitle = false;
+
+    private async Task SaveTitleAsync()
     {
         if (_ticket == null || string.IsNullOrWhiteSpace(_editSubject)) return;
         _isLoading = true;
         try
         {
             _ticket.Subject = _editSubject;
-            _ticket.Issue = _editIssue;
-            if (_selectedStatus != null) _ticket.Status = _selectedStatus;
-            if (_selectedPriority != null) _ticket.Priority = _selectedPriority;
-
             if (await ApiService.EditTicketAsync(_ticket))
             {
+                _editingTitle = false;
                 Snackbar.Add(L.T("detail.ticket_updated"), Severity.Success);
                 await LoadTicketAsync();
             }
@@ -828,32 +763,135 @@ else
         finally { _isLoading = false; }
     }
 
-    private async Task AssignAsync()
+    private void StartDescriptionEdit()
     {
-        if (_ticket == null || _selectedAssignee == null) return;
-        _isLoading = true;
-        try
-        {
-            if (await ApiService.AssignTicketAsync(_ticket.Id, _selectedAssignee.Id))
-            { Snackbar.Add(L.T("detail.assign_updated"), Severity.Success); await LoadTicketAsync(); }
-            else Snackbar.Add(L.T("detail.assign_failed"), Severity.Error);
-        }
-        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
-        finally { _isLoading = false; }
+        _editIssue = _ticket?.Issue ?? string.Empty;
+        _editingDescription = true;
     }
+    private void CancelDescriptionEdit() => _editingDescription = false;
 
-    private async Task ClearAssigneeAsync()
+    private async Task SaveDescriptionAsync()
     {
         if (_ticket == null) return;
         _isLoading = true;
         try
         {
-            if (await ApiService.ClearTicketAssigneeAsync(_ticket.Id))
-            { Snackbar.Add(L.T("detail.assign_removed"), Severity.Success); await LoadTicketAsync(); }
+            _ticket.Issue = _editIssue;
+            if (await ApiService.EditTicketAsync(_ticket))
+            {
+                _editingDescription = false;
+                Snackbar.Add(L.T("detail.ticket_updated"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
     }
+
+    // ─── Chip menu actions ──────────────────────────────────────────────
+
+    private async Task QuickChangeStatusAsync(Status s)
+    {
+        if (_ticket == null || string.IsNullOrEmpty(s.Id)) return;
+        try
+        {
+            if (await ApiService.UpdateTicketStatusAsync(_ticket.Id, s.Id))
+            {
+                Snackbar.Add(string.Format(L.T("tickets.status_changed"), s.Name), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    private async Task QuickChangePriorityAsync(Priority p)
+    {
+        if (_ticket == null) return;
+        try
+        {
+            _ticket.Priority = p;
+            if (await ApiService.EditTicketAsync(_ticket))
+            {
+                Snackbar.Add(L.T("detail.ticket_updated"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    private async Task QuickChangeGroupAsync(Group g)
+    {
+        if (_ticket == null) return;
+        try
+        {
+            _ticket.Group = g;
+            if (await ApiService.EditTicketAsync(_ticket))
+            {
+                Snackbar.Add(L.T("detail.ticket_updated"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    private async Task QuickAssignAsync(User u)
+    {
+        if (_ticket == null) return;
+        try
+        {
+            if (await ApiService.AssignTicketAsync(_ticket.Id, u.Id))
+            {
+                Snackbar.Add(L.T("detail.assign_updated"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.assign_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    private async Task ClearAssigneeAsync()
+    {
+        if (_ticket == null) return;
+        try
+        {
+            if (await ApiService.ClearTicketAssigneeAsync(_ticket.Id))
+            {
+                Snackbar.Add(L.T("detail.assign_removed"), Severity.Success);
+                await LoadTicketAsync();
+            }
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    // ─── Chip coloring ──────────────────────────────────────────────────
+
+    private static Color StatusChipColor(Status? s)
+    {
+        if (s == null) return Color.Default;
+        if (s.IsResolved) return Color.Success;
+        return s.Uid switch
+        {
+            1 => Color.Info,      // Open
+            2 => Color.Warning,   // Pending
+            _ => Color.Default
+        };
+    }
+
+    private static Color PriorityChipColor(Priority? p)
+    {
+        if (p == null) return Color.Default;
+        // Priority.Overdue maps to high — colour by name fallback.
+        var n = (p.Name ?? "").ToLowerInvariant();
+        if (n.Contains("hoch") || n.Contains("high") || n.Contains("urgent")) return Color.Error;
+        if (n.Contains("normal")) return Color.Info;
+        return Color.Default;
+    }
+
+    // ─── Tags ───────────────────────────────────────────────────────────
 
     private async Task AddTagAsync(string tagId, string tagName)
     {
@@ -862,10 +900,7 @@ else
         try
         {
             if (await ApiService.AddTagToTicketAsync(_ticket.Id, tagId))
-            {
-                Snackbar.Add($"{L.T("detail.tag_added")}: {tagName}", Severity.Success);
-                await LoadTicketAsync();
-            }
+            { Snackbar.Add($"{L.T("detail.tag_added")}: {tagName}", Severity.Success); await LoadTicketAsync(); }
             else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
@@ -879,15 +914,14 @@ else
         try
         {
             if (await ApiService.RemoveTagFromTicketAsync(_ticket.Id, tagId))
-            {
-                Snackbar.Add(L.T("detail.tag_removed"), Severity.Success);
-                await LoadTicketAsync();
-            }
+            { Snackbar.Add(L.T("detail.tag_removed"), Severity.Success); await LoadTicketAsync(); }
             else Snackbar.Add(L.T("detail.delete_failed"), Severity.Error);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
     }
+
+    // ─── Checklist ──────────────────────────────────────────────────────
 
     private async Task AddChecklistItemAsync()
     {
@@ -896,10 +930,7 @@ else
         try
         {
             if (await ApiService.AddChecklistItemAsync(_ticket.Uid.ToString(), _newChecklistTitle))
-            {
-                _newChecklistTitle = string.Empty;
-                await LoadTicketAsync();
-            }
+            { _newChecklistTitle = string.Empty; await LoadTicketAsync(); }
             else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
@@ -926,13 +957,14 @@ else
         _isLoading = true;
         try
         {
-            if (await ApiService.DeleteChecklistItemAsync(_ticket.Uid.ToString(), itemId))
-                await LoadTicketAsync();
+            if (await ApiService.DeleteChecklistItemAsync(_ticket.Uid.ToString(), itemId)) await LoadTicketAsync();
             else Snackbar.Add(L.T("detail.delete_failed"), Severity.Error);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
     }
+
+    // ─── Comments + Notes ───────────────────────────────────────────────
 
     private async Task AddCommentAsync()
     {
@@ -972,11 +1004,12 @@ else
         finally { _isLoading = false; }
     }
 
+    // ─── Attachments ────────────────────────────────────────────────────
+
     private void DownloadAttachment(Attachment attachment)
     {
         if (attachment?.Path == null) return;
-        var url = ApiService.GetAttachmentUrl(attachment.Path);
-        Navigation.NavigateTo(url, true);
+        Navigation.NavigateTo(ApiService.GetAttachmentUrl(attachment.Path), true);
     }
 
     private async Task DeleteAttachmentAsync(Attachment attachment)
@@ -992,6 +1025,28 @@ else
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
     }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        if (_ticket == null) return;
+        _isUploading = true;
+        StateHasChanged();
+        try
+        {
+            var file = e.File;
+            using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+            if (await ApiService.UploadAttachmentAsync(_ticket.Id, stream, file.Name))
+            {
+                Snackbar.Add(L.T("attachments.uploaded"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isUploading = false; StateHasChanged(); }
+    }
+
+    // ─── Ticket actions ─────────────────────────────────────────────────
 
     private async Task DeleteTicketAsync()
     {
@@ -1010,82 +1065,34 @@ else
         finally { _isLoading = false; }
     }
 
-    // Favorites
+    private async Task PrintAsync()
+    {
+        try { await JsRuntime.InvokeVoidAsync("window.print"); }
+        catch { }
+    }
+
+    // ─── Favorites / Subscription ───────────────────────────────────────
+
     private async Task LoadFavoriteStateAsync()
     {
         var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
-        var favs = System.Text.Json.JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
+        var favs = JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
         _isFavorite = favs.Contains(TicketUid);
     }
 
     private async Task ToggleFavoriteAsync()
     {
         var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
-        var favs = System.Text.Json.JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
-
-        if (_isFavorite) favs.Remove(TicketUid);
-        else favs.Add(TicketUid);
-
+        var favs = JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
+        if (_isFavorite) favs.Remove(TicketUid); else favs.Add(TicketUid);
         _isFavorite = !_isFavorite;
-        await LocalStorage.SetItemAsync("favorite_tickets", System.Text.Json.JsonSerializer.Serialize(favs));
+        await LocalStorage.SetItemAsync("favorite_tickets", JsonSerializer.Serialize(favs));
     }
 
-    // Linked Tickets
-    private async Task LoadLinkedTicketsAsync()
-    {
-        try
-        {
-            var json = await LocalStorage.GetItemAsync($"linked_tickets_{TicketUid}");
-            if (!string.IsNullOrEmpty(json))
-                _linkedTickets = System.Text.Json.JsonSerializer.Deserialize<List<LinkedTicketItem>>(json,
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
-        }
-        catch { }
-    }
-
-    private async Task AddLinkedTicketAsync()
-    {
-        if (_linkTicketUid <= 0 || _linkTicketUid == TicketUid) return;
-
-        if (_linkedTickets.Any(l => l.Uid == _linkTicketUid)) return;
-
-        // Try to fetch the linked ticket's subject
-        string subject = $"Ticket #{_linkTicketUid}";
-        try
-        {
-            var json = await ApiService.GetTicketAsync(_linkTicketUid.ToString());
-            var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            using var doc = System.Text.Json.JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("ticket", out var tEl))
-            {
-                var t = System.Text.Json.JsonSerializer.Deserialize<Ticket>(tEl.GetRawText(), options);
-                if (t?.Subject != null) subject = t.Subject;
-            }
-        }
-        catch { }
-
-        _linkedTickets.Add(new LinkedTicketItem { Uid = _linkTicketUid, Subject = subject, LinkType = _linkType });
-        await SaveLinkedTicketsAsync();
-        _linkTicketUid = 0;
-    }
-
-    private async Task RemoveLinkedTicketAsync(LinkedTicketItem link)
-    {
-        _linkedTickets.Remove(link);
-        await SaveLinkedTicketsAsync();
-    }
-
-    private async Task SaveLinkedTicketsAsync()
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(_linkedTickets);
-        await LocalStorage.SetItemAsync($"linked_tickets_{TicketUid}", json);
-    }
-
-    // Subscription
     private async Task LoadSubscriptionStateAsync()
     {
         var subJson = await LocalStorage.GetItemAsync("subscribed_tickets") ?? "[]";
-        var subs = System.Text.Json.JsonSerializer.Deserialize<List<int>>(subJson) ?? [];
+        var subs = JsonSerializer.Deserialize<List<int>>(subJson) ?? [];
         _isSubscribed = subs.Contains(TicketUid);
     }
 
@@ -1098,53 +1105,64 @@ else
             if (success)
             {
                 _isSubscribed = !_isSubscribed;
-                // Track locally
                 var subJson = await LocalStorage.GetItemAsync("subscribed_tickets") ?? "[]";
-                var subs = System.Text.Json.JsonSerializer.Deserialize<List<int>>(subJson) ?? [];
+                var subs = JsonSerializer.Deserialize<List<int>>(subJson) ?? [];
                 if (_isSubscribed) { if (!subs.Contains(TicketUid)) subs.Add(TicketUid); }
                 else subs.Remove(TicketUid);
-                await LocalStorage.SetItemAsync("subscribed_tickets", System.Text.Json.JsonSerializer.Serialize(subs));
+                await LocalStorage.SetItemAsync("subscribed_tickets", JsonSerializer.Serialize(subs));
                 Snackbar.Add(_isSubscribed ? L.T("detail.subscribed") : L.T("detail.unsubscribed"), Severity.Success);
             }
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
-    private async Task PrintAsync()
-    {
-        // Triggers the browser's print dialog. The @media print rules in
-        // app.css hide the app shell + tabs and reveal the .pwa-print-only
-        // summary built above. User can then "Save as PDF" from the print
-        // dialog without us implementing a separate PDF pipeline.
-        try { await JsRuntime.InvokeVoidAsync("window.print"); }
-        catch { /* if the browser blocks print, snackbar would be overkill */ }
-    }
+    // ─── Linked tickets (local-only) ────────────────────────────────────
 
-    // Attachment upload
-    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    private async Task LoadLinkedTicketsAsync()
     {
-        if (_ticket == null) return;
-        _isUploading = true;
-        StateHasChanged();
         try
         {
-            var file = e.File;
-            using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024); // 50MB max
-            if (await ApiService.UploadAttachmentAsync(_ticket.Id, stream, file.Name))
-            {
-                Snackbar.Add(L.T("attachments.uploaded"), Severity.Success);
-                await LoadTicketAsync();
-            }
-            else
-            {
-                Snackbar.Add(L.T("common.error"), Severity.Error);
-            }
+            var json = await LocalStorage.GetItemAsync($"linked_tickets_{TicketUid}");
+            if (!string.IsNullOrEmpty(json))
+                _linkedTickets = JsonSerializer.Deserialize<List<LinkedTicketItem>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
         }
-        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
-        finally { _isUploading = false; StateHasChanged(); }
+        catch { }
     }
 
-    // Quick Reply Templates
+    private async Task AddLinkedTicketAsync()
+    {
+        if (_linkTicketUid <= 0 || _linkTicketUid == TicketUid) return;
+        if (_linkedTickets.Any(l => l.Uid == _linkTicketUid)) return;
+        string subject = $"Ticket #{_linkTicketUid}";
+        try
+        {
+            var json = await ApiService.GetTicketAsync(_linkTicketUid.ToString());
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("ticket", out var tEl))
+            {
+                var t = JsonSerializer.Deserialize<Ticket>(tEl.GetRawText(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (t?.Subject != null) subject = t.Subject;
+            }
+        }
+        catch { }
+        _linkedTickets.Add(new LinkedTicketItem { Uid = _linkTicketUid, Subject = subject, LinkType = _linkType });
+        await SaveLinkedTicketsAsync();
+        _linkTicketUid = 0;
+    }
+
+    private async Task RemoveLinkedTicketAsync(LinkedTicketItem link)
+    {
+        _linkedTickets.Remove(link);
+        await SaveLinkedTicketsAsync();
+    }
+
+    private async Task SaveLinkedTicketsAsync()
+        => await LocalStorage.SetItemAsync($"linked_tickets_{TicketUid}", JsonSerializer.Serialize(_linkedTickets));
+
+    // ─── Quick replies ──────────────────────────────────────────────────
+
     private static readonly List<string> DefaultQuickReplies =
     [
         "Vielen Dank für Ihre Meldung. Wir kümmern uns darum.",
@@ -1159,10 +1177,9 @@ else
         try
         {
             var json = await LocalStorage.GetItemAsync("quick_reply_templates");
-            if (!string.IsNullOrEmpty(json))
-                _quickReplyTemplates = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new(DefaultQuickReplies);
-            else
-                _quickReplyTemplates = new(DefaultQuickReplies);
+            _quickReplyTemplates = !string.IsNullOrEmpty(json)
+                ? JsonSerializer.Deserialize<List<string>>(json) ?? new(DefaultQuickReplies)
+                : new(DefaultQuickReplies);
         }
         catch { _quickReplyTemplates = new(DefaultQuickReplies); }
     }
@@ -1177,13 +1194,13 @@ else
     private async Task SaveQuickRepliesAsync()
     {
         _quickReplyTemplates.RemoveAll(string.IsNullOrWhiteSpace);
-        await LocalStorage.SetItemAsync("quick_reply_templates",
-            System.Text.Json.JsonSerializer.Serialize(_quickReplyTemplates));
+        await LocalStorage.SetItemAsync("quick_reply_templates", JsonSerializer.Serialize(_quickReplyTemplates));
         _showQuickReplyEditor = false;
         Snackbar.Add(L.T("detail.templates_saved"), Severity.Success);
     }
 
-    // Time tracking
+    // ─── Time tracking ──────────────────────────────────────────────────
+
     private void StartTimer()
     {
         _timerStart = DateTime.Now;
@@ -1202,21 +1219,18 @@ else
         _timer = null;
         _timerRunning = false;
         var duration = DateTime.Now - _timerStart;
-
         if (duration.TotalMinutes >= 0.5)
         {
-            var entry = new TimeEntryItem
+            _timeEntries.Add(new TimeEntryItem
             {
                 Start = _timerStart,
                 DurationMinutes = (int)Math.Ceiling(duration.TotalMinutes),
                 Description = string.IsNullOrWhiteSpace(_timeEntryDescription) ? null : _timeEntryDescription
-            };
-            _timeEntries.Add(entry);
+            });
             _totalTimeMinutes = _timeEntries.Sum(e => e.DurationMinutes);
             _timeEntryDescription = string.Empty;
             await SaveTimeEntriesAsync();
         }
-
         _timerElapsed = TimeSpan.Zero;
     }
 
@@ -1227,8 +1241,8 @@ else
             var json = await LocalStorage.GetItemAsync($"time_entries_{TicketUid}");
             if (!string.IsNullOrEmpty(json))
             {
-                _timeEntries = System.Text.Json.JsonSerializer.Deserialize<List<TimeEntryItem>>(json,
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+                _timeEntries = JsonSerializer.Deserialize<List<TimeEntryItem>>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
                 _totalTimeMinutes = _timeEntries.Sum(e => e.DurationMinutes);
             }
         }
@@ -1236,19 +1250,17 @@ else
     }
 
     private async Task SaveTimeEntriesAsync()
-    {
-        var json = System.Text.Json.JsonSerializer.Serialize(_timeEntries);
-        await LocalStorage.SetItemAsync($"time_entries_{TicketUid}", json);
-    }
+        => await LocalStorage.SetItemAsync($"time_entries_{TicketUid}", JsonSerializer.Serialize(_timeEntries));
 
-    internal static string FormatElapsed(TimeSpan ts) =>
-        $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
+    internal static string FormatElapsed(TimeSpan ts) => $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
 
     internal static string FormatMinutes(int minutes)
     {
         if (minutes >= 60) return $"{minutes / 60}h {minutes % 60}m";
         return $"{minutes}m";
     }
+
+    // ─── Disposal ───────────────────────────────────────────────────────
 
     public async ValueTask DisposeAsync()
     {
@@ -1263,7 +1275,7 @@ else
         }
     }
 
-    private IJSObjectReference? _dropzoneModule;
+    // ─── Local DTOs ─────────────────────────────────────────────────────
 
     private class TimeEntryItem
     {

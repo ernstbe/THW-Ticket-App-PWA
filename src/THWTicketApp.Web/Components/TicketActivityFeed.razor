@@ -1,0 +1,131 @@
+@*
+    Chronological merged feed of everything that has happened on a ticket:
+    comments, notes (internal), status/field changes from history, and
+    file uploads. Newest event at the top, threaded by author avatar.
+
+    The parent passes the raw Ticket; this component computes the merged
+    list locally so we don't keep three near-identical loops around.
+*@
+
+@using THWTicketApp.Shared.Models
+@using Markdig
+@inject LocalizationService L
+
+@if (Items.Count == 0)
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="my-4 text-center">
+        @L.T("detail.activity_empty")
+    </MudText>
+}
+else
+{
+    <div class="d-flex flex-column gap-3">
+        @foreach (var ev in Items)
+        {
+            <div class="d-flex align-start gap-3" data-event-kind="@ev.Kind">
+                <UserAvatar Name="@ev.AuthorName" Size="Size.Small" />
+                <div style="flex:1; min-width:0;">
+                    <div class="d-flex align-center gap-2 flex-wrap">
+                        <MudText Typo="Typo.subtitle2">@ev.AuthorName</MudText>
+                        @if (ev.Kind == ActivityKind.Note)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning"
+                                     Variant="Variant.Filled" Class="ml-1">
+                                @L.T("detail.activity_internal")
+                            </MudChip>
+                        }
+                        else if (ev.Kind == ActivityKind.History)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @ev.HistoryAction
+                            </MudText>
+                        }
+                        <MudSpacer />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @FormatRelative(ev.Date)
+                        </MudText>
+                    </div>
+                    @if (!string.IsNullOrEmpty(ev.Body))
+                    {
+                        <MudPaper Elevation="0" Class="pa-3 mt-1"
+                                  Style="@($"background: {(ev.Kind == ActivityKind.Note ? "rgba(255,193,7,0.08)" : "var(--mud-palette-background-gray)")};")">
+                            @if (ev.Kind == ActivityKind.History)
+                            {
+                                <MudText Typo="Typo.body2">@ev.Body</MudText>
+                            }
+                            else
+                            {
+                                @((MarkupString)Markdown.ToHtml(ev.Body, _md))
+                            }
+                        </MudPaper>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Ticket? Ticket { get; set; }
+
+    private List<ActivityEvent> Items => BuildFeed(Ticket);
+    private static readonly MarkdownPipeline _md = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+    internal static List<ActivityEvent> BuildFeed(Ticket? ticket)
+    {
+        var list = new List<ActivityEvent>();
+        if (ticket == null) return list;
+
+        if (ticket.Comments != null)
+            list.AddRange(ticket.Comments.Select(c => new ActivityEvent
+            {
+                Kind = ActivityKind.Comment,
+                Date = c.Date,
+                AuthorName = c.Owner?.Fullname,
+                Body = c.Text
+            }));
+
+        if (ticket.Notes != null)
+            list.AddRange(ticket.Notes.Select(n => new ActivityEvent
+            {
+                Kind = ActivityKind.Note,
+                Date = n.Date,
+                AuthorName = n.Owner?.Fullname,
+                Body = n.Content
+            }));
+
+        if (ticket.History != null)
+            list.AddRange(ticket.History.Select(h => new ActivityEvent
+            {
+                Kind = ActivityKind.History,
+                Date = h.Date,
+                AuthorName = h.Owner?.Fullname ?? "System",
+                HistoryAction = h.TranslatedAction,
+                Body = h.Description
+            }));
+
+        // Newest first — matches the inline editor at the top of the page.
+        return list.OrderByDescending(e => e.Date).ToList();
+    }
+
+    internal static string FormatRelative(DateTime when)
+    {
+        var diff = DateTime.Now - when;
+        if (diff.TotalSeconds < 60) return "gerade eben";
+        if (diff.TotalMinutes < 60) return $"vor {(int)diff.TotalMinutes} Min.";
+        if (diff.TotalHours < 24) return $"vor {(int)diff.TotalHours} Std.";
+        if (diff.TotalDays < 7) return $"vor {(int)diff.TotalDays} Tagen";
+        return when.ToString("dd.MM.yyyy HH:mm");
+    }
+
+    internal enum ActivityKind { Comment, Note, History }
+
+    internal sealed class ActivityEvent
+    {
+        public ActivityKind Kind { get; init; }
+        public DateTime Date { get; init; }
+        public string? AuthorName { get; init; }
+        public string? Body { get; init; }
+        public string? HistoryAction { get; init; }
+    }
+}
