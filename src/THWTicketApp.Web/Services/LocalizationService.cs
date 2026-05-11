@@ -86,6 +86,16 @@ public class LocalizationService
         ["onboarding.step4_title"] = "Schnell anmelden mit Passkey",
         ["onboarding.step4_body"] = "In den Einstellungen kannst du einen Passkey registrieren. Dann meldest du dich künftig mit Fingerabdruck oder Gesichtserkennung an — kein Passwort mehr nötig.",
         ["settings.show_onboarding"] = "Einführung erneut anzeigen",
+        ["settings.autosave_hint"] = "Änderungen werden automatisch gespeichert.",
+        ["settings.notifications_enable"] = "Benachrichtigungen aktivieren",
+        ["settings.advanced"] = "Erweitert",
+        ["settings.advanced_warning"] = "Diese Einstellungen sind nur für Administratoren — falsche Werte können die App unbenutzbar machen.",
+        ["settings.danger_zone"] = "Konto",
+        ["settings.logout_hint"] = "Beendet die Session auf diesem Gerät.",
+        ["notifications.mark_all_read"] = "Alle als gelesen",
+        ["notifications.mark_read"] = "Als gelesen markieren",
+        ["notifications.mark_failed"] = "Konnte nicht als gelesen markiert werden.",
+        ["notifications.marked_all"] = "{0} Benachrichtigungen als gelesen markiert.",
 
         // Login
         ["login.title"] = "Anmelden",
@@ -708,6 +718,16 @@ public class LocalizationService
         ["onboarding.step4_title"] = "Quick sign-in with Passkey",
         ["onboarding.step4_body"] = "In Settings you can register a passkey. Future sign-ins use your fingerprint or face recognition — no password needed.",
         ["settings.show_onboarding"] = "Show intro again",
+        ["settings.autosave_hint"] = "Changes are saved automatically.",
+        ["settings.notifications_enable"] = "Enable notifications",
+        ["settings.advanced"] = "Advanced",
+        ["settings.advanced_warning"] = "These settings are for administrators only — wrong values can break the app.",
+        ["settings.danger_zone"] = "Account",
+        ["settings.logout_hint"] = "Ends your session on this device.",
+        ["notifications.mark_all_read"] = "Mark all as read",
+        ["notifications.mark_read"] = "Mark as read",
+        ["notifications.mark_failed"] = "Could not mark as read.",
+        ["notifications.marked_all"] = "{0} notifications marked as read.",
 
         // Login
         ["login.title"] = "Sign In",

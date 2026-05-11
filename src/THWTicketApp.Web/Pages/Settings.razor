@@ -21,8 +21,12 @@
 
 <MudText Typo="Typo.h4" Class="mb-4">@L.T("settings.title")</MudText>
 
+<MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" Variant="Variant.Outlined">
+    <MudText Typo="Typo.caption">@L.T("settings.autosave_hint")</MudText>
+</MudAlert>
+
 <MudGrid>
-    @* Appearance *@
+    @* Appearance — auto-saves on every change *@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
@@ -31,60 +35,15 @@
             <MudCardContent>
                 <div class="d-flex justify-space-between align-center mb-3">
                     <MudText>@L.T("settings.darkmode")</MudText>
-                    <MudSwitch @bind-Value="_isDarkMode" Color="Color.Primary" T="bool" />
+                    <MudSwitch Value="@_isDarkMode" ValueChanged="@(async (bool v) => await SetDarkModeAsync(v))"
+                               Color="Color.Primary" T="bool" />
                 </div>
-
-                <MudDivider Class="mb-3" />
-
-                <div class="d-flex justify-space-between align-center mb-2">
-                    <div>
-                        <MudText>@L.T("settings.notifications")</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            @L.T("settings.notifications_desc")
-                        </MudText>
-                    </div>
-                    <MudSwitch @bind-Value="_isNotificationsEnabled" Color="Color.Primary" T="bool" />
-                </div>
-
-                @if (_isNotificationsEnabled)
-                {
-                    <div class="ml-4">
-                        <div class="d-flex justify-space-between align-center mb-1">
-                            <MudText Typo="Typo.body2">@L.T("settings.notify_new")</MudText>
-                            <MudSwitch @bind-Value="_notifyOnNewTickets" Color="Color.Primary" T="bool" />
-                        </div>
-                        <div class="d-flex justify-space-between align-center mb-1">
-                            <MudText Typo="Typo.body2">@L.T("settings.notify_comments")</MudText>
-                            <MudSwitch @bind-Value="_notifyOnComments" Color="Color.Primary" T="bool" />
-                        </div>
-                        <div class="d-flex justify-space-between align-center mb-1">
-                            <MudText Typo="Typo.body2">@L.T("settings.notify_status")</MudText>
-                            <MudSwitch @bind-Value="_notifyOnStatusChanges" Color="Color.Primary" T="bool" />
-                        </div>
-                        <div class="d-flex justify-space-between align-center mb-1">
-                            <div>
-                                <MudText Typo="Typo.body2">@L.T("settings.notify_mine")</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    @L.T("settings.notify_mine_desc")
-                                </MudText>
-                            </div>
-                            <MudSwitch @bind-Value="_notifyOnlyMyTickets" Color="Color.Primary" T="bool" />
-                        </div>
-                        <div class="d-flex justify-space-between align-center">
-                            <div>
-                                <MudText Typo="Typo.body2">@L.T("settings.notify_highprio")</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    @L.T("settings.notify_highprio_desc")
-                                </MudText>
-                            </div>
-                            <MudSwitch @bind-Value="_notifyOnlyHighPriority" Color="Color.Primary" T="bool" />
-                        </div>
-                    </div>
-                }
 
                 <MudDivider Class="my-3" />
 
-                <MudSelect T="string" @bind-Value="_selectedLanguage" Label="@L.T("settings.language")"
+                <MudSelect T="string" Value="@_selectedLanguage"
+                           ValueChanged="@(async (string v) => await SetLanguageAsync(v))"
+                           Label="@L.T("settings.language")"
                            Variant="Variant.Outlined" Dense="true">
                     <MudSelectItem Value="@("de")">Deutsch</MudSelectItem>
                     <MudSelectItem Value="@("en")">English</MudSelectItem>
@@ -100,7 +59,7 @@
                         <MudIconButton Icon="@(_selectedColor == c.Value ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Circle)"
                                        Style="@($"color: {c.Value};")"
                                        Size="Size.Large"
-                                       OnClick="@(() => _selectedColor = c.Value)"
+                                       OnClick="@(async () => await SetThemeColorAsync(c.Value))"
                                        aria-label="@c.Name" />
                     }
                 </div>
@@ -108,34 +67,111 @@
         </MudCard>
     </MudItem>
 
-    @* API Configuration *@
+    @* Notifications — split out so it can grow without crowding Appearance *@
     <MudItem xs="12" md="6">
         <MudCard>
             <MudCardHeader>
-                <MudText Typo="Typo.h6">@L.T("settings.api")</MudText>
+                <MudText Typo="Typo.h6">@L.T("settings.notifications")</MudText>
             </MudCardHeader>
             <MudCardContent>
-                <MudTextField @bind-Value="_apiBaseUrl" Label="@L.T("settings.api_url")"
-                              Placeholder="http://localhost:8118/api/v1"
-                              Variant="Variant.Outlined" Class="mb-3" />
-
-                <MudNumericField @bind-Value="_connectionTimeout" Label="@L.T("settings.timeout")"
-                                 Min="5" Max="300" Variant="Variant.Outlined" Class="mb-3" T="int" />
-
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                           OnClick="TestConnectionAsync" Disabled="_isTesting"
-                           StartIcon="@Icons.Material.Filled.NetworkCheck">
-                    @(_isTesting ? L.T("settings.testing") : L.T("settings.test_connection"))
-                </MudButton>
-
-                @if (!string.IsNullOrEmpty(_connectionStatus))
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <div>
+                        <MudText>@L.T("settings.notifications_enable")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @L.T("settings.notifications_desc")
+                        </MudText>
+                    </div>
+                    <MudSwitch Value="@_isNotificationsEnabled"
+                               ValueChanged="@(async (bool v) => await SetNotificationsEnabledAsync(v))"
+                               Color="Color.Primary" T="bool" />
+                </div>
+                @if (_isNotificationsEnabled)
                 {
-                    <MudAlert Severity="@_connectionSeverity" Class="mt-3" Dense="true">
-                        @_connectionStatus
-                    </MudAlert>
+                    <div class="ml-4">
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2">@L.T("settings.notify_new")</MudText>
+                            <MudSwitch Value="@_notifyOnNewTickets"
+                                       ValueChanged="@(async (bool v) => await AutoSaveBoolAsync("settings_notify_new", v, x => _notifyOnNewTickets = x))"
+                                       Color="Color.Primary" T="bool" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2">@L.T("settings.notify_comments")</MudText>
+                            <MudSwitch Value="@_notifyOnComments"
+                                       ValueChanged="@(async (bool v) => await AutoSaveBoolAsync("settings_notify_comments", v, x => _notifyOnComments = x))"
+                                       Color="Color.Primary" T="bool" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2">@L.T("settings.notify_status")</MudText>
+                            <MudSwitch Value="@_notifyOnStatusChanges"
+                                       ValueChanged="@(async (bool v) => await AutoSaveBoolAsync("settings_notify_status", v, x => _notifyOnStatusChanges = x))"
+                                       Color="Color.Primary" T="bool" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <div>
+                                <MudText Typo="Typo.body2">@L.T("settings.notify_mine")</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @L.T("settings.notify_mine_desc")
+                                </MudText>
+                            </div>
+                            <MudSwitch Value="@_notifyOnlyMyTickets"
+                                       ValueChanged="@(async (bool v) => await AutoSaveBoolAsync("settings_notify_only_mine", v, x => _notifyOnlyMyTickets = x))"
+                                       Color="Color.Primary" T="bool" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center">
+                            <div>
+                                <MudText Typo="Typo.body2">@L.T("settings.notify_highprio")</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @L.T("settings.notify_highprio_desc")
+                                </MudText>
+                            </div>
+                            <MudSwitch Value="@_notifyOnlyHighPriority"
+                                       ValueChanged="@(async (bool v) => await AutoSaveBoolAsync("settings_notify_high_prio", v, x => _notifyOnlyHighPriority = x))"
+                                       Color="Color.Primary" T="bool" />
+                        </div>
+                    </div>
                 }
             </MudCardContent>
         </MudCard>
+    </MudItem>
+
+    @* API Configuration — hidden behind an "Erweitert" expander so normal
+       users can't accidentally break the app by editing the URL. *@
+    <MudItem xs="12">
+        <MudExpansionPanels Elevation="0">
+            <MudExpansionPanel Text="@L.T("settings.advanced")"
+                               Style="background: transparent; border: 1px solid var(--mud-palette-lines-default); border-radius: 4px;">
+                <MudCard Elevation="0">
+                    <MudCardContent>
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                            @L.T("settings.advanced_warning")
+                        </MudAlert>
+                        <MudTextField @bind-Value="_apiBaseUrl" Label="@L.T("settings.api_url")"
+                                      Placeholder="http://localhost:8118/api/v1"
+                                      Variant="Variant.Outlined" Class="mb-3" />
+                        <MudNumericField @bind-Value="_connectionTimeout" Label="@L.T("settings.timeout")"
+                                         Min="5" Max="300" Variant="Variant.Outlined" Class="mb-3" T="int" />
+                        <div class="d-flex gap-2">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                                       OnClick="TestConnectionAsync" Disabled="_isTesting"
+                                       StartIcon="@Icons.Material.Filled.NetworkCheck">
+                                @(_isTesting ? L.T("settings.testing") : L.T("settings.test_connection"))
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                       OnClick="SaveAdvancedAsync"
+                                       StartIcon="@Icons.Material.Filled.Save">
+                                @L.T("common.save")
+                            </MudButton>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_connectionStatus))
+                        {
+                            <MudAlert Severity="@_connectionSeverity" Class="mt-3" Dense="true">
+                                @_connectionStatus
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
     </MudItem>
 
     @* Passkey / Biometrics *@
@@ -230,7 +266,9 @@
                             @L.T("settings.cache_desc")
                         </MudText>
                     </div>
-                    <MudSwitch @bind-Value="_isOfflineCacheEnabled" Color="Color.Primary" T="bool" />
+                    <MudSwitch Value="@_isOfflineCacheEnabled"
+                               ValueChanged="@(async (bool v) => await AutoSaveBoolAsync("settings_offline_cache", v, x => _isOfflineCacheEnabled = x))"
+                               Color="Color.Primary" T="bool" />
                 </div>
 
                 <MudButton Variant="Variant.Outlined" Color="Color.Error"
@@ -325,21 +363,30 @@
     </MudItem>
 </MudGrid>
 
-<div class="d-flex gap-3 mt-4 mb-6 flex-wrap">
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync"
-               StartIcon="@Icons.Material.Filled.Save">
-        @L.T("common.save")
-    </MudButton>
+@* Helper actions — non-destructive *@
+<div class="d-flex gap-3 mt-4 flex-wrap">
     <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => Onboarding.ShowNow())"
                StartIcon="@Icons.Material.Filled.HelpOutline">
         @L.T("settings.show_onboarding")
     </MudButton>
-    <MudSpacer />
-    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="LogoutAsync"
-               StartIcon="@Icons.Material.Filled.Logout">
-        @L.T("common.logout")
-    </MudButton>
 </div>
+
+@* Danger zone — visually separated from the rest with extra margin
+   and a red-bordered card so Logout can't be accidentally tapped
+   from the same gesture that toggled a switch. *@
+<MudPaper Elevation="0" Class="pa-4 mt-8 mb-6"
+          Style="border: 1px solid var(--mud-palette-error); border-radius: 8px; background: rgba(244,67,54,0.04);">
+    <div class="d-flex justify-space-between align-center flex-wrap gap-3">
+        <div>
+            <MudText Typo="Typo.subtitle2" Color="Color.Error">@L.T("settings.danger_zone")</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("settings.logout_hint")</MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="LogoutAsync"
+                   StartIcon="@Icons.Material.Filled.Logout">
+            @L.T("common.logout")
+        </MudButton>
+    </div>
+</MudPaper>
 
 @code {
     private bool _isDarkMode;
@@ -435,6 +482,61 @@
     {
         var val = await LocalStorage.GetItemAsync(key);
         return val != null ? val == "true" : defaultValue;
+    }
+
+    // ─── Auto-save helpers ──────────────────────────────────────────────
+    // Each toggle on the page wires its ValueChanged to one of these so
+    // settings persist on every interaction. Removes the foot-gun of
+    // "I changed the dark mode but didn't press Save".
+
+    private async Task AutoSaveBoolAsync(string key, bool value, Action<bool> setField)
+    {
+        setField(value);
+        await LocalStorage.SetItemAsync(key, value ? "true" : "false");
+    }
+
+    private async Task SetDarkModeAsync(bool value)
+    {
+        _isDarkMode = value;
+        await LocalStorage.SetItemAsync("settings_darkmode", value ? "true" : "false");
+        // MainLayout reads settings_darkmode on every mount; for an
+        // immediate effect the user would need to navigate away and back.
+        // Documenting the existing behaviour rather than papering over it.
+    }
+
+    private async Task SetLanguageAsync(string value)
+    {
+        _selectedLanguage = value;
+        await L.SetLanguageAsync(value);  // fires LanguageChanged → re-render
+    }
+
+    private async Task SetThemeColorAsync(string value)
+    {
+        _selectedColor = value;
+        await LocalStorage.SetItemAsync("settings_primary_color", value);
+    }
+
+    private async Task SetNotificationsEnabledAsync(bool value)
+    {
+        _isNotificationsEnabled = value;
+        await LocalStorage.SetItemAsync("settings_notifications", value ? "true" : "false");
+        if (value) await BrowserNotifications.RequestPermissionAsync();
+    }
+
+    /// <summary>Persists only the API URL + timeout (validated). Called
+    /// from the "Erweitert" expander's Save button.</summary>
+    private async Task SaveAdvancedAsync()
+    {
+        if (_connectionTimeout < 5 || _connectionTimeout > 300)
+        {
+            Snackbar.Add(L.T("settings.timeout_invalid"), Severity.Warning);
+            return;
+        }
+        AppSettings.ApiBaseUrl = _apiBaseUrl;
+        AppSettings.ConnectionTimeoutSeconds = _connectionTimeout;
+        await LocalStorage.SetItemAsync("settings_apiurl", _apiBaseUrl);
+        await LocalStorage.SetItemAsync("settings_timeout", _connectionTimeout.ToString());
+        Snackbar.Add(L.T("settings.saved"), Severity.Success);
     }
 
     private async Task SaveSettingsAsync()

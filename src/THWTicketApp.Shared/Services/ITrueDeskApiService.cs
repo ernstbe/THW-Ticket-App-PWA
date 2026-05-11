@@ -51,6 +51,8 @@ public interface ITrueDeskApiService
 
     Task<string> GetNotificationsAsync();
     Task<int> GetNotificationCountAsync();
+    Task<bool> MarkNotificationReadAsync(string notificationId);
+    Task<int> MarkAllNotificationsReadAsync();
 
     Task<string> GetTicketStatsAsync(int timespan = 30);
     Task<string> GetTicketStatsForGroupAsync(string groupId);

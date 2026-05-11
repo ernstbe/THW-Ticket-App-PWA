@@ -649,6 +649,35 @@ public class TrueDeskApiService : ITrueDeskApiService
         catch { return 0; }
     }
 
+    public async Task<bool> MarkNotificationReadAsync(string notificationId)
+    {
+        if (string.IsNullOrEmpty(notificationId)) return false;
+        try
+        {
+            // v1 endpoint — server-side patch landed in trudesk PR #47.
+            var response = await SendWithAutoRefreshAsync(() =>
+                _httpClient.PostAsync($"{V1BaseUrl}/users/notifications/{notificationId}/markRead", null));
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<int> MarkAllNotificationsReadAsync()
+    {
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() =>
+                _httpClient.PostAsync($"{V1BaseUrl}/users/notifications/markAllRead", null));
+            if (!response.IsSuccessStatusCode) return 0;
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("updated", out var u) && u.ValueKind == JsonValueKind.Number
+                ? u.GetInt32()
+                : 0;
+        }
+        catch { return 0; }
+    }
+
     public async Task<string> GetTicketStatsAsync(int timespan = 30)
     {
         var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/tickets/stats/{timespan}"));
