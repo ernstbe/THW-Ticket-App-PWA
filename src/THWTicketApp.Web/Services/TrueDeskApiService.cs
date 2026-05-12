@@ -911,10 +911,12 @@ public class TrueDeskApiService : ITrueDeskApiService
     }
 
     /// <summary>
-    /// Checks whether v2 endpoints can be called. In v1 mode, v2 endpoints
-    /// require JWT auth which we don't have — calls would always return 401.
+    /// Checks whether v2 endpoints can be called. trudesk's apiv2 middleware
+    /// accepts both the v2 JWT bearer header AND the v1 accesstoken header as
+    /// a fallback, so any authenticated client (v1 or v2 mode) can hit v2
+    /// endpoints — we just need to have some token attached.
     /// </summary>
-    private bool CanCallV2 => IsV2;
+    private bool CanCallV2 => IsAuthenticated;
 
     /// <summary>
     /// Guard for v2-only endpoints. Throws HttpRequestException so callers'
