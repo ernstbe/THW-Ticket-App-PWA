@@ -92,17 +92,10 @@ else
         try
         {
             var json = await ApiService.GetTicketTemplatesAsync();
-            Console.WriteLine($"[Templates] GET response ({json?.Length ?? 0} bytes): {Truncate(json, 400)}");
-            _templates = ParseTemplates(json ?? string.Empty);
-            Console.WriteLine($"[Templates] Parsed {_templates.Count} templates");
-            if (_templates.Count == 0 && !string.IsNullOrWhiteSpace(json) && !json.TrimStart().StartsWith('{'))
-            {
-                Snackbar.Add($"Unerwartete Server-Antwort (kein JSON): {Truncate(json, 100)}", Severity.Warning);
-            }
+            _templates = ParseTemplates(json);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Templates] LoadTemplatesAsync failed: {ex.GetType().Name}: {ex.Message}");
             var (message, _) = ErrorHelper.Categorize(ex);
             Snackbar.Add(message, Severity.Error);
         }
@@ -112,9 +105,6 @@ else
             StateHasChanged();
         }
     }
-
-    private static string Truncate(string? s, int max)
-        => string.IsNullOrEmpty(s) ? "(empty)" : (s.Length <= max ? s : s[..max] + "…");
 
     private void ShowCreateDialog()
     {
