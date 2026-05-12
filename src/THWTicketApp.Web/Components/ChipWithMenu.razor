@@ -3,11 +3,18 @@
     "open dropdown -> select -> click save" sequence with a single click.
     Used in the ticket detail header for status/priority/assignee/group.
 
-    Implementation note (MudBlazor 9): MudMenu's ActivatorContent slot used
-    to wrap any child and treat clicks on it as the activator click, but in
-    v9 the inner MudChip swallows the click event so the menu never opens.
-    We work around it by controlling the menu open-state via @ref and an
-    @onclick on a wrapper span.
+    Implementation note (MudBlazor 9): two earlier attempts failed —
+    1) MudMenu's ActivatorContent swallowed clicks because MudChip stops
+       click propagation internally,
+    2) calling _menu.OpenMenuAsync from an @onclick wrapper looked clean
+       in source but did not actually open the popup on the deployed
+       build.
+
+    Current approach: bind Open/OpenChanged on MudMenu, drive it from the
+    chip's own OnClick handler. The chip is the *anchor* of the menu
+    (`AnchorRef`) so the popup positions over the chip even though it's
+    rendered separately. Click on a menu item invokes the parent
+    callback and closes the popup.
 
     Usage:
         <ChipWithMenu Label="@_ticket.Status?.Name"
@@ -20,29 +27,28 @@
 
 @typeparam T
 
-<span @onclick="ToggleAsync" @onclick:stopPropagation="true"
-      style="cursor:pointer; display:inline-block;">
-    <MudChip T="string" Size="Size.Small" Color="@Color" Variant="Variant.Filled"
-             Icon="@Icon" Style="cursor:pointer;">
-        @if (string.IsNullOrEmpty(Label))
-        {
-            <em style="opacity:0.7;">@(EmptyLabel ?? "—")</em>
-        }
-        else
-        {
-            @Label
-        }
-    </MudChip>
-</span>
+<MudChip @ref="_chip" T="string" Size="Size.Small" Color="@Color" Variant="Variant.Filled"
+         Icon="@Icon" Style="cursor:pointer;"
+         OnClick="@OpenAsync">
+    @if (string.IsNullOrEmpty(Label))
+    {
+        <em style="opacity:0.7;">@(EmptyLabel ?? "—")</em>
+    }
+    else
+    {
+        @Label
+    }
+</MudChip>
 
-<MudMenu @ref="_menu" PositionAtCursor="true" AnchorOrigin="Origin.BottomLeft"
-         TransformOrigin="Origin.TopLeft" Dense="true">
+<MudMenu @bind-Open="_open" AnchorOrigin="Origin.BottomLeft"
+         TransformOrigin="Origin.TopLeft" Dense="true"
+         PositionAtCursor="true">
     @if (Items != null && Items.Any())
     {
         @foreach (var item in Items)
         {
             var local = item;
-            <MudMenuItem OnClick="@(() => OnSelected.InvokeAsync(local))">
+            <MudMenuItem OnClick="@(() => OnItemSelected(local))">
                 @ItemTitle(local)
             </MudMenuItem>
         }
@@ -57,7 +63,7 @@
     {
         <MudDivider />
         <MudMenuItem Icon="@Icons.Material.Filled.Close"
-                     OnClick="@(() => OnClear.InvokeAsync())">
+                     OnClick="@OnClearClicked">
             @(ClearLabel ?? "Entfernen")
         </MudMenuItem>
     }
@@ -75,11 +81,24 @@
     [Parameter] public string? ClearLabel { get; set; }
     [Parameter] public string? EmptyMenuLabel { get; set; }
 
-    private MudMenu? _menu;
+    private MudChip<string>? _chip;
+    private bool _open;
 
-    private async Task ToggleAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs args)
+    private Task OpenAsync()
     {
-        if (_menu is null) return;
-        await _menu.OpenMenuAsync(args);
+        _open = !_open;
+        return Task.CompletedTask;
+    }
+
+    private async Task OnItemSelected(T item)
+    {
+        _open = false;
+        await OnSelected.InvokeAsync(item);
+    }
+
+    private async Task OnClearClicked()
+    {
+        _open = false;
+        await OnClear.InvokeAsync();
     }
 }
