@@ -2,6 +2,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
+# Injected by the CI workflow; falls back to "dev" for local builds so the
+# version file is always present and never empty.
+ARG APP_VERSION=dev
+ARG BUILD_DATE=unknown
+
 COPY src/THWTicketApp.Shared/*.csproj src/THWTicketApp.Shared/
 COPY src/THWTicketApp.Web/*.csproj src/THWTicketApp.Web/
 RUN dotnet restore src/THWTicketApp.Web/THWTicketApp.Web.csproj
@@ -13,6 +18,10 @@ RUN dotnet publish src/THWTicketApp.Web/THWTicketApp.Web.csproj \
 
 # dotnet publish resets <base href> to "/" — restore the subpath for reverse-proxy deployment
 RUN sed -i 's|<base href="/" />|<base href="/app/" />|g' /app/publish/wwwroot/index.html
+
+# Bake the build identifiers into a static file the PWA fetches at runtime.
+RUN printf '{"version":"%s","builtAt":"%s"}\n' "$APP_VERSION" "$BUILD_DATE" \
+    > /app/publish/wwwroot/version.json
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
