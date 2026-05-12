@@ -121,11 +121,11 @@ public class TrueDeskApiServiceTests
     [Fact]
     public async Task GetTicketTemplatesAsync_callsV2TicketTemplatesEndpoint()
     {
-        // Switch to v2 base URL so CanCallV2 guard passes
-        var settings = (AppSettings)typeof(TrueDeskApiService)
-            .GetField("_settings", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-            .GetValue(_sut)!;
-        settings.ApiBaseUrl = "https://host.test/api/v2";
+        // Authenticate so CanCallV2 (= IsAuthenticated) passes. The base URL
+        // can stay v1 — trudesk's apiv2 middleware accepts the v1 accesstoken.
+        typeof(TrueDeskApiService)
+            .GetField("_authToken", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .SetValue(_sut, "fake-token");
         _handler.SetDefault(HttpStatusCode.OK, "[]");
         await _sut.GetTicketTemplatesAsync();
         Assert.Equal("/api/v2/ticket-templates", LastRequest.RequestUri!.AbsolutePath);
