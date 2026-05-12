@@ -1,6 +1,7 @@
 @page "/sync-conflicts"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using THWTicketApp.Shared.Data
+@using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
 @inject ISyncService SyncService
 @inject ISnackbar Snackbar
@@ -42,7 +43,7 @@ else
                     </MudChip>
                     <MudSpacer />
                     <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                        @conflict.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+                        @conflict.CreatedAt.ToLocalDisplayString("dd.MM.yyyy HH:mm")
                     </MudText>
                 </div>
                 <MudAlert Severity="@branch.AlertSeverity" Dense="true" Class="mb-2">

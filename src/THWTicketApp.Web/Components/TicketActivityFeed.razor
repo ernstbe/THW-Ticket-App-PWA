@@ -110,12 +110,18 @@ else
 
     internal static string FormatRelative(DateTime when)
     {
-        var diff = DateTime.Now - when;
+        var local = when.Kind switch
+        {
+            DateTimeKind.Utc => when.ToLocalTime(),
+            DateTimeKind.Local => when,
+            _ => DateTime.SpecifyKind(when, DateTimeKind.Utc).ToLocalTime()
+        };
+        var diff = DateTime.Now - local;
         if (diff.TotalSeconds < 60) return "gerade eben";
         if (diff.TotalMinutes < 60) return $"vor {(int)diff.TotalMinutes} Min.";
         if (diff.TotalHours < 24) return $"vor {(int)diff.TotalHours} Std.";
         if (diff.TotalDays < 7) return $"vor {(int)diff.TotalDays} Tagen";
-        return when.ToString("dd.MM.yyyy HH:mm");
+        return local.ToString("dd.MM.yyyy HH:mm");
     }
 
     internal enum ActivityKind { Comment, Note, History }

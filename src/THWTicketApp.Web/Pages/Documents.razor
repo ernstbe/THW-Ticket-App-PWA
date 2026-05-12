@@ -63,7 +63,7 @@ else
                 }
             </MudTd>
             <MudTd DataLabel="@L.T("documents.uploaded_by")">@context.UploadedBy</MudTd>
-            <MudTd DataLabel="@L.T("documents.date")">@context.CreatedAt.ToString("dd.MM.yyyy")</MudTd>
+            <MudTd DataLabel="@L.T("documents.date")">@context.CreatedAt.ToLocalDisplayString("dd.MM.yyyy")</MudTd>
             <MudTd DataLabel="@L.T("documents.size")">@FormatSize(context.Size)</MudTd>
             <MudTd>
                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"

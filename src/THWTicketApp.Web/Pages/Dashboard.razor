@@ -189,7 +189,7 @@ else
                     {
                         <div class="d-flex justify-space-between align-center mb-2">
                             <MudText Typo="Typo.body2">@task.Subject</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@task.NextRun?.ToString("dd.MM.yyyy")</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@task.NextRun.ToLocalDisplayString("dd.MM.yyyy")</MudText>
                         </div>
                     }
                 </MudPaper>
