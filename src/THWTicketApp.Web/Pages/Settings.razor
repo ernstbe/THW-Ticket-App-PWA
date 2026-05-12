@@ -357,7 +357,15 @@
                     </div>
                 </div>
                 <MudDivider Class="mb-3" />
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Version: 1.0.0 (PWA)</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Version: @_appVersion
+                </MudText>
+                @if (!string.IsNullOrEmpty(_appBuiltAt))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Build: @_appBuiltAt
+                    </MudText>
+                }
             </MudCardContent>
         </MudCard>
     </MudItem>
@@ -431,10 +439,15 @@
     private List<SyncLogDto> _syncLogEntries = new();
     private bool _loadingSyncLog;
 
+    // App version info — fetched from version.json baked in at Docker build.
+    private string _appVersion = "dev";
+    private string _appBuiltAt = string.Empty;
+
     protected override async Task OnInitializedAsync()
     {
         _apiBaseUrl = AppSettings.ApiBaseUrl;
         _connectionTimeout = AppSettings.ConnectionTimeoutSeconds;
+        await LoadAppVersionAsync();
 
         _isDarkMode = await GetBoolSetting("settings_darkmode", false);
         _isNotificationsEnabled = await GetBoolSetting("settings_notifications", false);
@@ -482,6 +495,34 @@
     {
         var val = await LocalStorage.GetItemAsync(key);
         return val != null ? val == "true" : defaultValue;
+    }
+
+    private async Task LoadAppVersionAsync()
+    {
+        try
+        {
+            // version.json is written by the Dockerfile build step. Local dev
+            // serves no file -> 404 -> we keep the "dev" default.
+            using var doc = await HttpClient.GetFromJsonAsync<System.Text.Json.JsonDocument>("version.json");
+            if (doc == null) return;
+            var root = doc.RootElement;
+            if (root.TryGetProperty("version", out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String)
+                _appVersion = ShortenCommit(v.GetString());
+            if (root.TryGetProperty("builtAt", out var b) && b.ValueKind == System.Text.Json.JsonValueKind.String)
+                _appBuiltAt = b.GetString() ?? string.Empty;
+        }
+        catch
+        {
+            // Local dev or fetch failure — leave defaults in place.
+        }
+    }
+
+    private static string ShortenCommit(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "dev";
+        // Trim long git SHAs down to 7 chars for readability; pass through
+        // semver-like strings unchanged.
+        return value.Length >= 40 ? value[..7] : value;
     }
 
     // ─── Auto-save helpers ──────────────────────────────────────────────
