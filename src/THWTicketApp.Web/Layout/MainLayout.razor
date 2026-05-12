@@ -56,12 +56,19 @@
                         Icon="@Icons.Material.Filled.Add">@L.T("nav.newticket")</MudNavLink>
             <MudNavLink Href="kanban" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.ViewKanban">@L.T("nav.kanban")</MudNavLink>
-            <MudNavLink Href="favorites" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.Star">@L.T("nav.favorites")</MudNavLink>
+            @* Favoriten / Berichte ausgeblendet auf Nutzerwunsch — Pages bleiben im Code. *@
+            @if (false)
+            {
+                <MudNavLink Href="favorites" Match="NavLinkMatch.All"
+                            Icon="@Icons.Material.Filled.Star">@L.T("nav.favorites")</MudNavLink>
+            }
             <MudNavLink Href="team" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Groups">@L.T("nav.team")</MudNavLink>
-            <MudNavLink Href="reports" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.BarChart">@L.T("nav.reports")</MudNavLink>
+            @if (false)
+            {
+                <MudNavLink Href="reports" Match="NavLinkMatch.All"
+                            Icon="@Icons.Material.Filled.BarChart">@L.T("nav.reports")</MudNavLink>
+            }
             <MudNavLink Href="assets" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Inventory2">@L.T("nav.assets")</MudNavLink>
             @* Dokumente-Upload deaktiviert auf Nutzerwunsch — Page bleibt im Code, nur ausgeblendet. *@
@@ -70,14 +77,22 @@
                 <MudNavLink Href="documents" Match="NavLinkMatch.All"
                             Icon="@Icons.Material.Filled.FolderOpen">@L.T("nav.documents")</MudNavLink>
             }
-            <MudNavLink Href="notices" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.Campaign">@L.T("nav.notices")</MudNavLink>
+            @* Ankündigungen ausgeblendet auf Nutzerwunsch — Page bleibt im Code. *@
+            @if (false)
+            {
+                <MudNavLink Href="notices" Match="NavLinkMatch.All"
+                            Icon="@Icons.Material.Filled.Campaign">@L.T("nav.notices")</MudNavLink>
+            }
             <MudNavLink Href="recurring-tasks" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.EventRepeat">@L.T("nav.recurring")</MudNavLink>
             <MudNavLink Href="templates" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Description">@L.T("nav.templates")</MudNavLink>
-            <MudNavLink Href="calendar" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.CalendarMonth">@L.T("nav.calendar")</MudNavLink>
+            @* Kalender ausgeblendet auf Nutzerwunsch — Page bleibt im Code. *@
+            @if (false)
+            {
+                <MudNavLink Href="calendar" Match="NavLinkMatch.All"
+                            Icon="@Icons.Material.Filled.CalendarMonth">@L.T("nav.calendar")</MudNavLink>
+            }
             <MudNavLink Href="scanner" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.QrCodeScanner">@L.T("nav.scanner")</MudNavLink>
             <MudNavLink Href="notifications" Match="NavLinkMatch.All"
@@ -257,16 +272,20 @@
             new PaletteAction { Id="nav-dashboard",     Title=L.T("nav.dashboard"),     Icon=Icons.Material.Filled.Dashboard,         Category=nav, Keywords=new[]{"home","start"},                ExecuteAsync=()=>{ Navigation.NavigateTo("./"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-tickets",       Title=L.T("nav.tickets"),       Icon=Icons.Material.Filled.ConfirmationNumber, Category=nav, Keywords=new[]{"liste","list"},                ExecuteAsync=()=>{ Navigation.NavigateTo("tickets"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-kanban",        Title=L.T("nav.kanban"),        Icon=Icons.Material.Filled.ViewKanban,        Category=nav, Keywords=new[]{"board","spalten"},             ExecuteAsync=()=>{ Navigation.NavigateTo("kanban"); return Task.CompletedTask; } },
-            new PaletteAction { Id="nav-favorites",     Title=L.T("nav.favorites"),     Icon=Icons.Material.Filled.Star,              Category=nav, Keywords=new[]{"stern","favoriten"},           ExecuteAsync=()=>{ Navigation.NavigateTo("favorites"); return Task.CompletedTask; } },
+            // Favoriten ausgeblendet auf Nutzerwunsch — Palette-Eintrag ebenfalls aus.
+            // new PaletteAction { Id="nav-favorites",     Title=L.T("nav.favorites"),     Icon=Icons.Material.Filled.Star,              Category=nav, Keywords=new[]{"stern","favoriten"},           ExecuteAsync=()=>{ Navigation.NavigateTo("favorites"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-team",          Title=L.T("nav.team"),          Icon=Icons.Material.Filled.Groups,            Category=nav, Keywords=new[]{"mitglieder","leute"},          ExecuteAsync=()=>{ Navigation.NavigateTo("team"); return Task.CompletedTask; } },
-            new PaletteAction { Id="nav-reports",       Title=L.T("nav.reports"),       Icon=Icons.Material.Filled.BarChart,          Category=nav, Keywords=new[]{"statistik","report"},          ExecuteAsync=()=>{ Navigation.NavigateTo("reports"); return Task.CompletedTask; } },
+            // Berichte ausgeblendet auf Nutzerwunsch — Palette-Eintrag ebenfalls aus.
+            // new PaletteAction { Id="nav-reports",       Title=L.T("nav.reports"),       Icon=Icons.Material.Filled.BarChart,          Category=nav, Keywords=new[]{"statistik","report"},          ExecuteAsync=()=>{ Navigation.NavigateTo("reports"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-assets",        Title=L.T("nav.assets"),        Icon=Icons.Material.Filled.Inventory2,        Category=nav, Keywords=new[]{"ausrüstung","inventar"},       ExecuteAsync=()=>{ Navigation.NavigateTo("assets"); return Task.CompletedTask; } },
             // Dokumente-Upload deaktiviert auf Nutzerwunsch — Palette-Eintrag ebenfalls ausgeblendet.
             // new PaletteAction { Id="nav-documents",     Title=L.T("nav.documents"),     Icon=Icons.Material.Filled.FolderOpen,        Category=nav, Keywords=new[]{"dateien","docs"},              ExecuteAsync=()=>{ Navigation.NavigateTo("documents"); return Task.CompletedTask; } },
-            new PaletteAction { Id="nav-notices",       Title=L.T("nav.notices"),       Icon=Icons.Material.Filled.Campaign,          Category=nav, Keywords=new[]{"mitteilungen","ankündigung"}, ExecuteAsync=()=>{ Navigation.NavigateTo("notices"); return Task.CompletedTask; } },
+            // Ankündigungen ausgeblendet auf Nutzerwunsch — Palette-Eintrag ebenfalls aus.
+            // new PaletteAction { Id="nav-notices",       Title=L.T("nav.notices"),       Icon=Icons.Material.Filled.Campaign,          Category=nav, Keywords=new[]{"mitteilungen","ankündigung"}, ExecuteAsync=()=>{ Navigation.NavigateTo("notices"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-recurring",     Title=L.T("nav.recurring"),     Icon=Icons.Material.Filled.EventRepeat,       Category=nav, Keywords=new[]{"wiederholend","cron"},         ExecuteAsync=()=>{ Navigation.NavigateTo("recurring-tasks"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-templates",     Title=L.T("nav.templates"),     Icon=Icons.Material.Filled.Description,       Category=nav, Keywords=new[]{"vorlage","template"},          ExecuteAsync=()=>{ Navigation.NavigateTo("templates"); return Task.CompletedTask; } },
-            new PaletteAction { Id="nav-calendar",      Title=L.T("nav.calendar"),      Icon=Icons.Material.Filled.CalendarMonth,     Category=nav, Keywords=new[]{"kalender","termine"},          ExecuteAsync=()=>{ Navigation.NavigateTo("calendar"); return Task.CompletedTask; } },
+            // Kalender ausgeblendet auf Nutzerwunsch — Palette-Eintrag ebenfalls aus.
+            // new PaletteAction { Id="nav-calendar",      Title=L.T("nav.calendar"),      Icon=Icons.Material.Filled.CalendarMonth,     Category=nav, Keywords=new[]{"kalender","termine"},          ExecuteAsync=()=>{ Navigation.NavigateTo("calendar"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-scanner",       Title=L.T("nav.scanner"),       Icon=Icons.Material.Filled.QrCodeScanner,     Category=nav, Keywords=new[]{"qr","barcode"},                ExecuteAsync=()=>{ Navigation.NavigateTo("scanner"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-notifications", Title=L.T("nav.notifications"), Icon=Icons.Material.Filled.Notifications,     Category=nav, Keywords=new[]{"benachrichtigungen"},          ExecuteAsync=()=>{ Navigation.NavigateTo("notifications"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-profile",       Title=L.T("nav.profile"),       Icon=Icons.Material.Filled.AccountCircle,     Category=nav, Keywords=new[]{"benutzer","ich"},              ExecuteAsync=()=>{ Navigation.NavigateTo("profile"); return Task.CompletedTask; } },
