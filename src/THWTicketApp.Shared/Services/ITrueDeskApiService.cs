@@ -21,7 +21,7 @@ public interface ITrueDeskApiService
     Task<string> GetTicketAsync(string ticketUid);
     Task<(int StatusCode, string Body)> GetTicketRawAsync(string ticketUid);
     Task<string> AddTicketAsync(string title, string description, string? assigneeId);
-    Task<bool> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId);
+    Task<bool> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null);
     Task<bool> EditTicketAsync(Ticket ticket);
     Task<bool> DeleteTicketAsync(string ticketId);
     Task<bool> UpdateTicketStatusAsync(string ticketId, string statusId);

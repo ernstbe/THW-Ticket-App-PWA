@@ -45,6 +45,37 @@ public class TemplatesTests
     }
 
     [Fact]
+    public void ParseTemplates_populatedTypeAndPriority_extractsIdAndName()
+    {
+        const string json = """
+        {
+            "ticketTemplates": [{
+                "_id":"1","name":"T","subject":"S",
+                "ticketType":{"_id":"t1","name":"Vorfall"},
+                "priority":{"_id":"p1","name":"High"}
+            }]
+        }
+        """;
+        var result = Templates.ParseTemplates(json);
+        Assert.Equal("t1", result[0].TypeId);
+        Assert.Equal("Vorfall", result[0].TypeName);
+        Assert.Equal("p1", result[0].PriorityId);
+        Assert.Equal("Hoch", result[0].PriorityName);
+    }
+
+    [Fact]
+    public void ParseTemplates_refAsBareString_stillExtractsId()
+    {
+        const string json = """
+        {"ticketTemplates":[{"_id":"1","name":"T","subject":"S","ticketType":"t1","priority":"p1"}]}
+        """;
+        var result = Templates.ParseTemplates(json);
+        Assert.Equal("t1", result[0].TypeId);
+        Assert.Null(result[0].TypeName);
+        Assert.Equal("p1", result[0].PriorityId);
+    }
+
+    [Fact]
     public void ParseTemplates_missingFields_returnsEmptyStrings()
     {
         const string json = "{\"ticketTemplates\":[{\"_id\":\"x\"}]}";
@@ -109,5 +140,21 @@ public class TemplatesTests
     {
         var payload = Templates.BuildPayload("Name", "Subject", null);
         Assert.Null(payload["issue"]);
+    }
+
+    [Fact]
+    public void BuildPayload_typeAndPriority_includedWhenSet()
+    {
+        var payload = Templates.BuildPayload("N", "S", null, "type-1", "prio-1");
+        Assert.Equal("type-1", payload["ticketType"]);
+        Assert.Equal("prio-1", payload["priority"]);
+    }
+
+    [Fact]
+    public void BuildPayload_typeAndPriority_omittedWhenBlank()
+    {
+        var payload = Templates.BuildPayload("N", "S", null, "", "  ");
+        Assert.False(payload.ContainsKey("ticketType"));
+        Assert.False(payload.ContainsKey("priority"));
     }
 }

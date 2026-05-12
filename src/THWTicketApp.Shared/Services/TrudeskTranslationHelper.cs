@@ -65,6 +65,50 @@ public static class TrudeskTranslationHelper
         ["ticket:attachment:removed"] = "Anhang entfernt",
     };
 
+    // Trudesk speichert History-Descriptions auf Englisch (z.B. "Ticket Group
+    // set to: OV Stab"). Da der Action-Label oben („Gruppe geändert") die
+    // Aktion bereits benennt, ist das Verb redundant — wir extrahieren nur
+    // den neuen Wert. Für komplett redundante Descriptions ("Ticket was
+    // created.") wird null zurückgegeben, sodass die UI die Body-Box weglässt.
+    public static string? TranslateHistoryDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description)) return null;
+
+        // Trivial descriptions that just restate the action label.
+        var trimmed = description.Trim();
+        if (trimmed.Equals("Ticket was created.", StringComparison.OrdinalIgnoreCase)) return null;
+        if (trimmed.Equals("Ticket batch-deleted", StringComparison.OrdinalIgnoreCase)) return null;
+        if (trimmed.Equals("Ticket metadata was updated", StringComparison.OrdinalIgnoreCase)) return null;
+        if (trimmed.Equals("Ticket Issue was updated.", StringComparison.OrdinalIgnoreCase)) return null;
+        if (trimmed.Equals("Ticket Subject was updated.", StringComparison.OrdinalIgnoreCase)) return null;
+
+        // "Ticket X set to: Y" → strip the "Ticket X set to:" prefix and
+        // keep just the value. Action label above already names X.
+        var colon = trimmed.IndexOf(':');
+        if (colon > 0 && colon < trimmed.Length - 1)
+        {
+            var prefix = trimmed[..colon].TrimEnd();
+            if (prefix.StartsWith("Ticket ", StringComparison.OrdinalIgnoreCase)
+                && prefix.EndsWith(" set to", StringComparison.OrdinalIgnoreCase))
+            {
+                var value = trimmed[(colon + 1)..].Trim();
+                // Status-Werte sind oft Englisch ("New", "Closed") — übersetzen.
+                return TranslateStatus(value);
+            }
+        }
+
+        // "assignee set to: X" / "status set to: X" / "priority set to: X" —
+        // v2 batch updates use a slightly different wording (no leading "Ticket").
+        if (trimmed.Contains(" set to: ", StringComparison.OrdinalIgnoreCase))
+        {
+            var idx = trimmed.IndexOf(" set to: ", StringComparison.OrdinalIgnoreCase);
+            var value = trimmed[(idx + " set to: ".Length)..].Trim();
+            return TranslateStatus(value);
+        }
+
+        return description;
+    }
+
     public static string TranslateHistoryAction(string? action)
     {
         if (string.IsNullOrEmpty(action)) return action ?? string.Empty;

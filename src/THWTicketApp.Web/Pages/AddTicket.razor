@@ -109,6 +109,12 @@ else
                     }
                 </MudSelect>
             </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_dueDate"
+                               Label="@L.T("detail.due")" Variant="Variant.Outlined"
+                               PickerVariant="PickerVariant.Dialog"
+                               Clearable="true" Editable="false" Class="mb-4" />
+            </MudItem>
         </MudGrid>
 
         <div class="d-flex gap-3 mt-4">
@@ -145,6 +151,7 @@ else
     private Priority? _selectedPriority;
     private Group? _selectedGroup;
     private User? _selectedAssignee;
+    private DateTime? _dueDate;
     private List<TicketType> _ticketTypes = [];
     private List<Priority> _priorities = [];
     private List<Group> _groups = [];
@@ -302,7 +309,8 @@ else
             var success = await ApiService.CreateTicketAsync(
                 _subject, _issue,
                 _selectedType?.Id, _selectedPriority?.Id,
-                _selectedGroup?.Id, _selectedAssignee?.Id);
+                _selectedGroup?.Id, _selectedAssignee?.Id,
+                _dueDate);
 
             if (success)
             {
@@ -334,6 +342,19 @@ else
         if (template == null) return;
         _subject = template.Subject;
         _issue = template.Issue ?? string.Empty;
+        // Apply Type + Priority from the template if they're set AND match a
+        // loaded entry; otherwise leave the current selection so we don't blank
+        // out a valid pre-pick.
+        if (!string.IsNullOrEmpty(template.TypeId))
+        {
+            var match = _ticketTypes.FirstOrDefault(t => t.Id == template.TypeId);
+            if (match != null) _selectedType = match;
+        }
+        if (!string.IsNullOrEmpty(template.PriorityId))
+        {
+            var match = _priorities.FirstOrDefault(p => p.Id == template.PriorityId);
+            if (match != null) _selectedPriority = match;
+        }
         StateHasChanged();
     }
 
@@ -351,7 +372,9 @@ else
                 {
                     Name = el.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
                     Subject = el.TryGetProperty("subject", out var s) ? s.GetString() ?? "" : "",
-                    Issue = el.TryGetProperty("issue", out var i) ? i.GetString() : null
+                    Issue = el.TryGetProperty("issue", out var i) ? i.GetString() : null,
+                    TypeId = ExtractRefId(el, "ticketType"),
+                    PriorityId = ExtractRefId(el, "priority")
                 });
             }
             return list;
@@ -359,10 +382,23 @@ else
         catch { return new(); }
     }
 
+    // trudesk's getAll populates refs as objects ({_id, name}) but raw create
+    // payloads may store them as plain ObjectId strings. Tolerate both.
+    private static string? ExtractRefId(JsonElement parent, string property)
+    {
+        if (!parent.TryGetProperty(property, out var el)) return null;
+        if (el.ValueKind == JsonValueKind.String) return el.GetString();
+        if (el.ValueKind == JsonValueKind.Object && el.TryGetProperty("_id", out var idEl))
+            return idEl.GetString();
+        return null;
+    }
+
     internal sealed class TemplateItem
     {
         public string Name { get; set; } = string.Empty;
         public string Subject { get; set; } = string.Empty;
         public string? Issue { get; set; }
+        public string? TypeId { get; set; }
+        public string? PriorityId { get; set; }
     }
 }

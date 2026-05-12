@@ -8,6 +8,7 @@
 *@
 
 @using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Services
 @using Markdig
 @inject LocalizationService L
 
@@ -101,7 +102,9 @@ else
                 Date = h.Date,
                 AuthorName = h.Owner?.Fullname ?? "System",
                 HistoryAction = h.TranslatedAction,
-                Body = h.Description
+                // Translate the English description and drop it when it just
+                // restates the action label (e.g. "Ticket was created.").
+                Body = TrudeskTranslationHelper.TranslateHistoryDescription(h.Description)
             }));
 
         // Newest first — matches the inline editor at the top of the page.

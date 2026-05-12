@@ -8,6 +8,7 @@
 @using THWTicketApp.Shared.Services
 @using Markdig
 @using Microsoft.AspNetCore.Components.Forms
+@using QRCoder
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -67,6 +68,7 @@ else
         <MudMenu Icon="@Icons.Material.Filled.MoreVert" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
             <MudMenuItem Icon="@Icons.Material.Filled.Print" OnClick="PrintAsync">@L.T("detail.print")</MudMenuItem>
             <MudMenuItem Icon="@Icons.Material.Filled.QrCode2" OnClick="ShowQrCodeAsync">@L.T("detail.show_qr")</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Filled.QrCode" OnClick="PrintQrCodeAsync">@L.T("detail.print_qr")</MudMenuItem>
             <MudDivider />
             <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="DeleteTicketAsync">
                 <MudText Color="Color.Error">@L.T("detail.delete_ticket")</MudText>
@@ -107,6 +109,14 @@ else
                       OnClear="ClearAssigneeAsync"
                       ClearLabel="@L.T("detail.remove_assign")"
                       EmptyMenuLabel="@L.T("detail.no_assignees_available")" />
+        <MudDatePicker Date="@_dueDateLocal"
+                       DateChanged="OnDueDateChangedAsync"
+                       Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Style="max-width: 180px;"
+                       PickerVariant="PickerVariant.Dialog"
+                       Clearable="true"
+                       Editable="false"
+                       Label="@L.T("detail.due")" />
     </div>
 
     @if (_isLoading)
@@ -585,6 +595,7 @@ else
     private bool _editingDescription;
     private string _editSubject = string.Empty;
     private string _editIssue = string.Empty;
+    private DateTime? _dueDateLocal;
 
     // Composer state
     private int _composerTab;
@@ -698,6 +709,7 @@ else
                 TrudeskTranslationHelper.TranslateTicket(_ticket);
                 _editSubject = _ticket.Subject ?? string.Empty;
                 _editIssue = _ticket.Issue ?? string.Empty;
+                _dueDateLocal = _ticket.DueDate == DateTime.MinValue ? null : _ticket.DueDate;
                 _ = RecentTickets.RecordAsync(
                     _ticket.Uid.ToString(),
                     _ticket.Subject ?? string.Empty,
@@ -863,6 +875,28 @@ else
                 await LoadTicketAsync();
             }
             else Snackbar.Add(L.T("detail.assign_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    private async Task OnDueDateChangedAsync(DateTime? newDate)
+    {
+        if (_ticket == null) return;
+        // Treat "no change" as a no-op so a re-render that pushes the same
+        // value through the picker doesn't ping the API every time.
+        var current = _ticket.DueDate == DateTime.MinValue ? (DateTime?)null : _ticket.DueDate.Date;
+        if (current == newDate?.Date) return;
+
+        _dueDateLocal = newDate;
+        _ticket.DueDate = newDate ?? DateTime.MinValue;
+        try
+        {
+            if (await ApiService.EditTicketAsync(_ticket))
+            {
+                Snackbar.Add(L.T("detail.ticket_updated"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
@@ -1098,6 +1132,34 @@ else
         await DialogService.ShowAsync<TicketQrDialog>(L.T("detail.show_qr"), parameters, options);
     }
 
+    private IJSObjectReference? _printQrModule;
+
+    private async Task PrintQrCodeAsync()
+    {
+        // Renders the QR + ticket number into a popup window and triggers
+        // print() — bypasses the dialog so it's one click from the menu.
+        var url = $"{Navigation.BaseUri.TrimEnd('/')}/tickets/{TicketUid}";
+        string svg;
+        using (var generator = new QRCodeGenerator())
+        using (var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q))
+        {
+            svg = new SvgQRCode(data).GetGraphic(8);
+        }
+
+        try
+        {
+            _printQrModule ??= await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./js/print-qr.js");
+            var ok = await _printQrModule.InvokeAsync<bool>("printQr",
+                svg, $"#{TicketUid}", url);
+            if (!ok) Snackbar.Add(L.T("common.popup_blocked"), Severity.Warning);
+        }
+        catch
+        {
+            Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+    }
+
     // ─── Favorites / Subscription ───────────────────────────────────────
 
     private async Task LoadFavoriteStateAsync()
@@ -1299,6 +1361,10 @@ else
         {
             try { await _dropzoneModule.InvokeVoidAsync("unregister", "attachment-dropzone"); } catch { }
             try { await _dropzoneModule.DisposeAsync(); } catch { }
+        }
+        if (_printQrModule != null)
+        {
+            try { await _printQrModule.DisposeAsync(); } catch { }
         }
     }
 
