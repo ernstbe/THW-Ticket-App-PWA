@@ -478,44 +478,49 @@ else
                 </MudPaper>
             }
 
-            @* Linked tickets *@
-            <MudPaper Elevation="1" Class="pa-4 mb-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.linked")</MudText>
-                @if (_linkedTickets.Count > 0)
-                {
-                    <div class="d-flex flex-column gap-1 mb-2">
-                        @foreach (var link in _linkedTickets)
-                        {
-                            var l = link;
-                            <div class="d-flex align-center gap-2">
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@l.LinkType</MudChip>
-                                <MudLink Href="@($"/tickets/{l.Uid}")" Typo="Typo.body2" Style="flex:1; min-width:0;">
-                                    #@l.Uid – @l.Subject
-                                </MudLink>
-                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
-                                               OnClick="@(() => RemoveLinkedTicketAsync(l))" />
-                            </div>
-                        }
+            @* Linked tickets — ausgeblendet auf Nutzerwunsch (war localStorage-only,
+               nicht serverseitig persistiert). Code bleibt für eine spätere
+               serverseitige Reimplementierung erhalten. *@
+            @if (false)
+            {
+                <MudPaper Elevation="1" Class="pa-4 mb-3">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.linked")</MudText>
+                    @if (_linkedTickets.Count > 0)
+                    {
+                        <div class="d-flex flex-column gap-1 mb-2">
+                            @foreach (var link in _linkedTickets)
+                            {
+                                var l = link;
+                                <div class="d-flex align-center gap-2">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@l.LinkType</MudChip>
+                                    <MudLink Href="@($"/tickets/{l.Uid}")" Typo="Typo.body2" Style="flex:1; min-width:0;">
+                                        #@l.Uid – @l.Subject
+                                    </MudLink>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                   OnClick="@(() => RemoveLinkedTicketAsync(l))" />
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">@L.T("detail.no_links")</MudText>
+                    }
+                    <div class="d-flex gap-1 align-center">
+                        <MudNumericField @bind-Value="_linkTicketUid" Placeholder="#" Variant="Variant.Outlined"
+                                         Margin="Margin.Dense" Style="max-width: 80px;" T="int" />
+                        <MudSelect @bind-Value="_linkType" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   Dense="true" T="string" Style="flex:1;">
+                            <MudSelectItem Value="@(L.T("detail.link_related"))">@L.T("detail.link_related")</MudSelectItem>
+                            <MudSelectItem Value="@(L.T("detail.link_blocks"))">@L.T("detail.link_blocks")</MudSelectItem>
+                            <MudSelectItem Value="@(L.T("detail.link_blocked_by"))">@L.T("detail.link_blocked_by")</MudSelectItem>
+                            <MudSelectItem Value="@(L.T("detail.link_duplicate"))">@L.T("detail.link_duplicate")</MudSelectItem>
+                        </MudSelect>
+                        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                                       OnClick="AddLinkedTicketAsync" />
                     </div>
-                }
-                else
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">@L.T("detail.no_links")</MudText>
-                }
-                <div class="d-flex gap-1 align-center">
-                    <MudNumericField @bind-Value="_linkTicketUid" Placeholder="#" Variant="Variant.Outlined"
-                                     Margin="Margin.Dense" Style="max-width: 80px;" T="int" />
-                    <MudSelect @bind-Value="_linkType" Variant="Variant.Outlined" Margin="Margin.Dense"
-                               Dense="true" T="string" Style="flex:1;">
-                        <MudSelectItem Value="@(L.T("detail.link_related"))">@L.T("detail.link_related")</MudSelectItem>
-                        <MudSelectItem Value="@(L.T("detail.link_blocks"))">@L.T("detail.link_blocks")</MudSelectItem>
-                        <MudSelectItem Value="@(L.T("detail.link_blocked_by"))">@L.T("detail.link_blocked_by")</MudSelectItem>
-                        <MudSelectItem Value="@(L.T("detail.link_duplicate"))">@L.T("detail.link_duplicate")</MudSelectItem>
-                    </MudSelect>
-                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
-                                   OnClick="AddLinkedTicketAsync" />
-                </div>
-            </MudPaper>
+                </MudPaper>
+            }
 
             @* Time tracking *@
             <MudPaper Elevation="1" Class="pa-4 mb-3">
