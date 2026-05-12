@@ -49,6 +49,16 @@ html, body {
     background: rgba(0, 51, 153, 0.05);
 }
 
+/* Fälligkeit picker in the ticket-detail chips row: keep the input field
+   compact so it sits next to the chips, but DON'T let max-width cascade
+   into the popover and squash the calendar to ~180px wide. */
+.ticket-due-picker {
+    max-width: 200px;
+}
+.ticket-due-picker .mud-picker-container {
+    max-width: none;
+}
+
 /* Print-only block on TicketDetail. Hidden in screen view; the print
    media query below hides the app shell + tabs and shows this block
    so users can "Save as PDF" from the browser print dialog for paper
