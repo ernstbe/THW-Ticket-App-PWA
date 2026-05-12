@@ -93,8 +93,10 @@
     </MudPaper>
 }
 
-@* Sort selector *@
-<div class="d-flex align-center gap-2 mb-4">
+@* Sort selector. flex-wrap so mobile clients don't get a horizontal
+   scrollbar — Sortier-Select + 3 Icons + Counter + Saved-Filter-Menu
+   together overflow a phone viewport without it. *@
+<div class="d-flex align-center gap-2 mb-4 flex-wrap">
     <MudSelect T="string" @bind-Value="_activeSort" Label="@L.T("tickets.sort")" Variant="Variant.Outlined"
                Dense="true" Style="max-width: 250px;">
         <MudSelectItem Value="@("date_desc")">@L.T("tickets.sort.newest")</MudSelectItem>
