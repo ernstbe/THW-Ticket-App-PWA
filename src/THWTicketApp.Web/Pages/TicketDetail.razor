@@ -16,6 +16,7 @@
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
 @inject IJSRuntime JsRuntime
 @inject THWTicketApp.Web.Services.RecentTicketsService RecentTickets
+@inject IDialogService DialogService
 @implements IAsyncDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
@@ -59,8 +60,13 @@ else
                            Color="@(_isSubscribed ? Color.Info : Color.Default)"
                            OnClick="ToggleSubscriptionAsync" />
         </MudTooltip>
+        <MudTooltip Text="@L.T("detail.show_qr")">
+            <MudIconButton Icon="@Icons.Material.Filled.QrCode2" OnClick="ShowQrCodeAsync"
+                           aria-label="@L.T("detail.show_qr")" />
+        </MudTooltip>
         <MudMenu Icon="@Icons.Material.Filled.MoreVert" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
             <MudMenuItem Icon="@Icons.Material.Filled.Print" OnClick="PrintAsync">@L.T("detail.print")</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Filled.QrCode2" OnClick="ShowQrCodeAsync">@L.T("detail.show_qr")</MudMenuItem>
             <MudDivider />
             <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="DeleteTicketAsync">
                 <MudText Color="Color.Error">@L.T("detail.delete_ticket")</MudText>
@@ -1069,6 +1075,19 @@ else
     {
         try { await JsRuntime.InvokeVoidAsync("window.print"); }
         catch { }
+    }
+
+    private async Task ShowQrCodeAsync()
+    {
+        // Generates fully client-side via QRCoder (no server round-trip,
+        // no JS interop). The QR encodes the absolute /tickets/<uid> URL
+        // so a phone scanning the screen lands on the same ticket.
+        var parameters = new DialogParameters<TicketQrDialog>
+        {
+            { x => x.Uid, TicketUid }
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraSmall };
+        await DialogService.ShowAsync<TicketQrDialog>(L.T("detail.show_qr"), parameters, options);
     }
 
     // ─── Favorites / Subscription ───────────────────────────────────────

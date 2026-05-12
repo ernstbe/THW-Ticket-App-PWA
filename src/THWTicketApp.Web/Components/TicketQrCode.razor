@@ -1,0 +1,39 @@
+@using QRCoder
+@inject NavigationManager Navigation
+
+@* Inline SVG QR code linking to this ticket. Used as the body of a
+   dialog opened from TicketDetail. Generation is fully client-side
+   (QRCoder + SvgQRCode), no JS interop, no server round-trip. *@
+
+<div class="d-flex flex-column align-center gap-3" style="padding: 16px;">
+    <div style="background: white; padding: 16px; border-radius: 8px;">
+        @((MarkupString)_svg)
+    </div>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="word-break: break-all; text-align: center; max-width: 280px;">
+        @_url
+    </MudText>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public int Uid { get; set; }
+    [Parameter] public int PixelsPerModule { get; set; } = 8;
+
+    private string _svg = string.Empty;
+    private string _url = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        // Absolute URL so a phone scanning the QR on a desktop screen
+        // lands in the right place. BaseUri ends with "/" — TicketDetail
+        // routes off "/tickets/<uid>".
+        _url = $"{Navigation.BaseUri.TrimEnd('/')}/tickets/{Uid}";
+
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(_url, QRCodeGenerator.ECCLevel.Q);
+        var qr = new SvgQRCode(data);
+        // sizeInPixels acts as the BOUNDING-BOX size for SvgQRCode; the
+        // module size is derived from it. We keep the SVG viewbox-driven
+        // so it scales cleanly inside the dialog without pixelation.
+        _svg = qr.GetGraphic(PixelsPerModule);
+    }
+}

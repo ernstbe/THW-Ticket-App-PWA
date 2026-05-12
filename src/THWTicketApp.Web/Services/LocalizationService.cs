@@ -362,6 +362,7 @@ public class LocalizationService
         ["tickets.change_status"] = "Status ändern…",
         ["tickets.status_changed"] = "Status auf „{0}“ geändert.",
         ["detail.print"] = "Drucken / Als PDF speichern",
+        ["detail.show_qr"] = "QR-Code anzeigen",
 
         // Profile
         ["nav.profile"] = "Profil",
@@ -1027,6 +1028,7 @@ public class LocalizationService
         ["tickets.change_status"] = "Change status…",
         ["tickets.status_changed"] = "Status changed to '{0}'.",
         ["detail.print"] = "Print / Save as PDF",
+        ["detail.show_qr"] = "Show QR code",
 
         // Profile
         ["nav.profile"] = "Profile",

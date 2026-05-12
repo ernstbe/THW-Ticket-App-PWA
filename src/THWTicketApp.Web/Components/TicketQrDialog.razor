@@ -1,0 +1,17 @@
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<MudDialog>
+    <DialogContent>
+        <TicketQrCode Uid="Uid" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">@L.T("common.close")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter, EditorRequired] public int Uid { get; set; }
+
+    private void Close() => Dialog.Close();
+}
