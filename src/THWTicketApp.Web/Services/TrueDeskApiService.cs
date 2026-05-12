@@ -414,7 +414,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<bool> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId)
+    public async Task<bool> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null)
     {
         if (string.IsNullOrWhiteSpace(subject))
             return false;
@@ -430,6 +430,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         if (!string.IsNullOrEmpty(priorityId)) payload["priority"] = priorityId;
         if (!string.IsNullOrEmpty(groupId)) payload["group"] = groupId;
         if (!string.IsNullOrEmpty(assigneeId)) payload["assignee"] = assigneeId;
+        if (dueDate.HasValue) payload["dueDate"] = dueDate.Value.ToString("O");
 
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");

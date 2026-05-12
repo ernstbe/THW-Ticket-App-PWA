@@ -2,6 +2,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using System.Text.Json
 @using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
@@ -37,12 +38,26 @@ else
         <HeaderContent>
             <MudTh>@L.T("templates.name")</MudTh>
             <MudTh>@L.T("templates.subject")</MudTh>
+            <MudTh>@L.T("tickets.type")</MudTh>
+            <MudTh>@L.T("tickets.priority")</MudTh>
             <MudTh>@L.T("templates.issue_preview")</MudTh>
             <MudTh>@L.T("common.edit")</MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="@L.T("templates.name")">@context.Name</MudTd>
             <MudTd DataLabel="@L.T("templates.subject")">@context.Subject</MudTd>
+            <MudTd DataLabel="@L.T("tickets.type")">
+                @if (!string.IsNullOrEmpty(context.TypeName))
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.TypeName</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="@L.T("tickets.priority")">
+                @if (!string.IsNullOrEmpty(context.PriorityName))
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.PriorityName</MudChip>
+                }
+            </MudTd>
             <MudTd DataLabel="@L.T("templates.issue_preview")">@TrimIssue(context.Issue)</MudTd>
             <MudTd>
                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
@@ -64,6 +79,20 @@ else
                       Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
         <MudTextField @bind-Value="_formSubject" Label="@L.T("templates.subject")"
                       Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+        <MudSelect T="string" @bind-Value="_formTypeId" Label="@L.T("tickets.type")"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Class="mb-2">
+            @foreach (var t in _types)
+            {
+                <MudSelectItem T="string" Value="@t.Id">@t.TranslatedName</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="string" @bind-Value="_formPriorityId" Label="@L.T("tickets.priority")"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Class="mb-2">
+            @foreach (var p in _priorities)
+            {
+                <MudSelectItem T="string" Value="@p.Id">@p.Name</MudSelectItem>
+            }
+        </MudSelect>
         <MudTextField @bind-Value="_formIssue" Label="@L.T("templates.issue")"
                       Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" />
     </DialogContent>
@@ -76,13 +105,44 @@ else
 @code {
     private bool _isLoading;
     private List<TicketTemplateVm> _templates = new();
+    private List<TicketType> _types = new();
+    private List<Priority> _priorities = new();
     private bool _dialogVisible;
     private TicketTemplateVm? _editing;
     private string _formName = string.Empty;
     private string _formSubject = string.Empty;
     private string _formIssue = string.Empty;
+    private string? _formTypeId;
+    private string? _formPriorityId;
 
-    protected override async Task OnInitializedAsync() => await LoadTemplatesAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTypesAndPrioritiesAsync();
+        await LoadTemplatesAsync();
+    }
+
+    private async Task LoadTypesAndPrioritiesAsync()
+    {
+        try
+        {
+            var typesJson = await ApiService.GetTicketTypesAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var types = JsonSerializer.Deserialize<TicketType[]>(typesJson, options);
+            if (types != null)
+            {
+                _types = types.ToList();
+                _priorities = types.SelectMany(t => t.Priorities)
+                    .DistinctBy(p => p.Id).ToList();
+                foreach (var p in _priorities)
+                    p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
+            }
+        }
+        catch
+        {
+            // Backend unreachable — dropdowns stay empty, user can still
+            // create text-only templates.
+        }
+    }
 
     private async Task LoadTemplatesAsync()
     {
@@ -110,6 +170,8 @@ else
     {
         _editing = null;
         _formName = _formSubject = _formIssue = string.Empty;
+        _formTypeId = null;
+        _formPriorityId = null;
         _dialogVisible = true;
     }
 
@@ -119,6 +181,8 @@ else
         _formName = template.Name;
         _formSubject = template.Subject;
         _formIssue = template.Issue ?? string.Empty;
+        _formTypeId = template.TypeId;
+        _formPriorityId = template.PriorityId;
         _dialogVisible = true;
     }
 
@@ -131,7 +195,7 @@ else
             return;
         }
 
-        var data = BuildPayload(_formName, _formSubject, _formIssue);
+        var data = BuildPayload(_formName, _formSubject, _formIssue, _formTypeId, _formPriorityId);
         bool ok;
         try
         {
@@ -204,6 +268,10 @@ else
         public string Name { get; set; } = string.Empty;
         public string Subject { get; set; } = string.Empty;
         public string? Issue { get; set; }
+        public string? TypeId { get; set; }
+        public string? TypeName { get; set; }
+        public string? PriorityId { get; set; }
+        public string? PriorityName { get; set; }
     }
 
     internal static List<TicketTemplateVm> ParseTemplates(string json)
@@ -216,12 +284,20 @@ else
             var list = new List<TicketTemplateVm>();
             foreach (var el in arr.EnumerateArray())
             {
+                var (typeId, typeName) = ExtractRef(el, "ticketType");
+                var (priorityId, priorityName) = ExtractRef(el, "priority");
                 list.Add(new TicketTemplateVm
                 {
                     Id = el.TryGetProperty("_id", out var idEl) ? idEl.GetString() ?? "" : "",
                     Name = el.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "",
                     Subject = el.TryGetProperty("subject", out var subjEl) ? subjEl.GetString() ?? "" : "",
-                    Issue = el.TryGetProperty("issue", out var issueEl) ? issueEl.GetString() : null
+                    Issue = el.TryGetProperty("issue", out var issueEl) ? issueEl.GetString() : null,
+                    TypeId = typeId,
+                    TypeName = typeName,
+                    PriorityId = priorityId,
+                    PriorityName = string.IsNullOrEmpty(priorityName)
+                        ? priorityName
+                        : TrudeskTranslationHelper.TranslatePriority(priorityName)
                 });
             }
             return list;
@@ -232,6 +308,21 @@ else
         }
     }
 
+    // trudesk populiert Refs als Objekt mit _id + name, kann aber auch
+    // ein einfacher ObjectId-String oder null sein. Beide Formen toleriert.
+    private static (string? id, string? name) ExtractRef(JsonElement parent, string property)
+    {
+        if (!parent.TryGetProperty(property, out var el)) return (null, null);
+        if (el.ValueKind == JsonValueKind.String) return (el.GetString(), null);
+        if (el.ValueKind == JsonValueKind.Object)
+        {
+            var id = el.TryGetProperty("_id", out var idEl) ? idEl.GetString() : null;
+            var name = el.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+            return (id, name);
+        }
+        return (null, null);
+    }
+
     internal static string? ValidateForm(string? name, string? subject)
     {
         if (string.IsNullOrWhiteSpace(name)) return "templates.name_required";
@@ -239,11 +330,18 @@ else
         return null;
     }
 
-    internal static Dictionary<string, object?> BuildPayload(string name, string subject, string? issue)
-        => new()
+    internal static Dictionary<string, object?> BuildPayload(
+        string name, string subject, string? issue,
+        string? typeId = null, string? priorityId = null)
+    {
+        var payload = new Dictionary<string, object?>
         {
             ["name"] = name.Trim(),
             ["subject"] = subject.Trim(),
             ["issue"] = string.IsNullOrWhiteSpace(issue) ? null : issue.Trim()
         };
+        if (!string.IsNullOrWhiteSpace(typeId)) payload["ticketType"] = typeId;
+        if (!string.IsNullOrWhiteSpace(priorityId)) payload["priority"] = priorityId;
+        return payload;
+    }
 }

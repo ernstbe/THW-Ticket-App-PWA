@@ -1,11 +1,16 @@
 @inject THWTicketApp.Web.Services.LocalizationService L
+@inject IJSRuntime JsRuntime
+@inject ISnackbar Snackbar
+@implements IAsyncDisposable
 
 <MudDialog>
     <DialogContent>
-        <TicketQrCode Uid="Uid" />
+        <TicketQrCode @ref="_qr" Uid="Uid" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Close">@L.T("common.close")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print"
+                   OnClick="PrintAsync">@L.T("common.print")</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -13,5 +18,33 @@
     [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
     [Parameter, EditorRequired] public int Uid { get; set; }
 
+    private TicketQrCode? _qr;
+    private IJSObjectReference? _printModule;
+
     private void Close() => Dialog.Close();
+
+    private async Task PrintAsync()
+    {
+        if (_qr == null) return;
+        try
+        {
+            _printModule ??= await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./js/print-qr.js");
+            var ok = await _printModule.InvokeAsync<bool>("printQr",
+                _qr.Svg, $"#{Uid}", _qr.Url);
+            if (!ok) Snackbar.Add(L.T("common.popup_blocked"), Severity.Warning);
+        }
+        catch
+        {
+            Snackbar.Add(L.T("common.error"), Severity.Error);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_printModule != null)
+        {
+            try { await _printModule.DisposeAsync(); } catch { }
+        }
+    }
 }

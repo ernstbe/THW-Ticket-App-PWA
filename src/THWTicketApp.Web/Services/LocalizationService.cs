@@ -59,6 +59,8 @@ public class LocalizationService
         ["common.edit"] = "Bearbeiten",
         ["common.close"] = "Schließen",
         ["common.open"] = "Öffnen",
+        ["common.print"] = "Drucken",
+        ["common.popup_blocked"] = "Popup blockiert – bitte Popups für diese Seite erlauben",
         ["common.search"] = "Suchen",
         ["common.filter"] = "Filter",
         ["common.refresh"] = "Aktualisieren",
@@ -363,6 +365,7 @@ public class LocalizationService
         ["tickets.status_changed"] = "Status auf „{0}“ geändert.",
         ["detail.print"] = "Drucken / Als PDF speichern",
         ["detail.show_qr"] = "QR-Code anzeigen",
+        ["detail.print_qr"] = "QR-Code drucken",
 
         // Profile
         ["nav.profile"] = "Profil",
@@ -725,6 +728,8 @@ public class LocalizationService
         ["common.edit"] = "Edit",
         ["common.close"] = "Close",
         ["common.open"] = "Open",
+        ["common.print"] = "Print",
+        ["common.popup_blocked"] = "Popup blocked — please allow popups for this site",
         ["common.search"] = "Search",
         ["common.filter"] = "Filter",
         ["common.refresh"] = "Refresh",
@@ -1029,6 +1034,7 @@ public class LocalizationService
         ["tickets.status_changed"] = "Status changed to '{0}'.",
         ["detail.print"] = "Print / Save as PDF",
         ["detail.show_qr"] = "Show QR code",
+        ["detail.print_qr"] = "Print QR code",
 
         // Profile
         ["nav.profile"] = "Profile",

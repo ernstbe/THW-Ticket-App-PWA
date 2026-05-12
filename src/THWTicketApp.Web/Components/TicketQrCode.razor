@@ -3,14 +3,20 @@
 
 @* Inline SVG QR code linking to this ticket. Used as the body of a
    dialog opened from TicketDetail. Generation is fully client-side
-   (QRCoder + SvgQRCode), no JS interop, no server round-trip. *@
+   (QRCoder + SvgQRCode), no JS interop, no server round-trip.
+
+   Exposes the rendered SVG via `Svg` parameter for callers that want to
+   feed it into a print popup. *@
 
 <div class="d-flex flex-column align-center gap-3" style="padding: 16px;">
     <div style="background: white; padding: 16px; border-radius: 8px;">
-        @((MarkupString)_svg)
+        @((MarkupString)Svg)
     </div>
+    <MudText Typo="Typo.h5" Style="font-weight: 700; text-align: center;">
+        #@Uid
+    </MudText>
     <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="word-break: break-all; text-align: center; max-width: 280px;">
-        @_url
+        @Url
     </MudText>
 </div>
 
@@ -18,22 +24,24 @@
     [Parameter, EditorRequired] public int Uid { get; set; }
     [Parameter] public int PixelsPerModule { get; set; } = 8;
 
-    private string _svg = string.Empty;
-    private string _url = string.Empty;
+    // Exposed so a parent (e.g., TicketQrDialog) can feed them into the
+    // print popup without re-rendering the QR.
+    public string Svg { get; private set; } = string.Empty;
+    public string Url { get; private set; } = string.Empty;
 
     protected override void OnParametersSet()
     {
         // Absolute URL so a phone scanning the QR on a desktop screen
         // lands in the right place. BaseUri ends with "/" — TicketDetail
         // routes off "/tickets/<uid>".
-        _url = $"{Navigation.BaseUri.TrimEnd('/')}/tickets/{Uid}";
+        Url = $"{Navigation.BaseUri.TrimEnd('/')}/tickets/{Uid}";
 
         using var generator = new QRCodeGenerator();
-        using var data = generator.CreateQrCode(_url, QRCodeGenerator.ECCLevel.Q);
+        using var data = generator.CreateQrCode(Url, QRCodeGenerator.ECCLevel.Q);
         var qr = new SvgQRCode(data);
         // sizeInPixels acts as the BOUNDING-BOX size for SvgQRCode; the
         // module size is derived from it. We keep the SVG viewbox-driven
         // so it scales cleanly inside the dialog without pixelation.
-        _svg = qr.GetGraphic(PixelsPerModule);
+        Svg = qr.GetGraphic(PixelsPerModule);
     }
 }
