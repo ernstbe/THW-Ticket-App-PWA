@@ -77,7 +77,7 @@
                 <div class="d-flex justify-space-between align-center mb-2">
                     <div>
                         <MudText>@L.T("settings.notifications_enable")</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
                             @L.T("settings.notifications_desc")
                         </MudText>
                     </div>
@@ -109,7 +109,7 @@
                         <div class="d-flex justify-space-between align-center mb-1">
                             <div>
                                 <MudText Typo="Typo.body2">@L.T("settings.notify_mine")</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
                                     @L.T("settings.notify_mine_desc")
                                 </MudText>
                             </div>
@@ -120,7 +120,7 @@
                         <div class="d-flex justify-space-between align-center">
                             <div>
                                 <MudText Typo="Typo.body2">@L.T("settings.notify_highprio")</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
                                     @L.T("settings.notify_highprio_desc")
                                 </MudText>
                             </div>
@@ -181,7 +181,7 @@
                 <MudText Typo="Typo.h6">@L.T("settings.passkey")</MudText>
             </MudCardHeader>
             <MudCardContent>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
                     @L.T("settings.passkey_desc")
                 </MudText>
 
@@ -222,7 +222,7 @@
                 <MudText Typo="Typo.h6">@L.T("settings.idlelock")</MudText>
             </MudCardHeader>
             <MudCardContent>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
                     @L.T("settings.idlelock_desc")
                 </MudText>
 
@@ -262,7 +262,7 @@
                 <div class="d-flex justify-space-between align-center mb-3">
                     <div>
                         <MudText>@L.T("settings.cache_enable")</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
                             @L.T("settings.cache_desc")
                         </MudText>
                     </div>
@@ -299,7 +299,7 @@
                 </CardHeaderActions>
             </MudCardHeader>
             <MudCardContent>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
                     @L.T("settings.synclog_desc")
                 </MudText>
 
@@ -309,7 +309,7 @@
                 }
                 else if (!_syncLogEntries.Any())
                 {
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">@L.T("settings.synclog_empty")</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@L.T("settings.synclog_empty")</MudText>
                 }
                 else
                 {
@@ -353,16 +353,16 @@
                              Color="Color.Primary" />
                     <div>
                         <MudText Typo="Typo.h6" Color="Color.Primary">THW Ticket App</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Technisches Hilfswerk</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">Technisches Hilfswerk</MudText>
                     </div>
                 </div>
                 <MudDivider Class="mb-3" />
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
                     Version: @_appVersion
                 </MudText>
                 @if (!string.IsNullOrEmpty(_appBuiltAt))
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
                         Build: @_appBuiltAt
                     </MudText>
                 }
@@ -387,7 +387,7 @@
     <div class="d-flex justify-space-between align-center flex-wrap gap-3">
         <div>
             <MudText Typo="Typo.subtitle2" Color="Color.Error">@L.T("settings.danger_zone")</MudText>
-            <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("settings.logout_hint")</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@L.T("settings.logout_hint")</MudText>
         </div>
         <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="LogoutAsync"
                    StartIcon="@Icons.Material.Filled.Logout">
