@@ -80,7 +80,7 @@ else if (_isLoading)
                     @if (task.NextRun.HasValue)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                            @L.T("recurring.next_run"): @task.NextRun.Value.ToString("dd.MM.yyyy")
+                            @L.T("recurring.next_run"): @task.NextRun.ToLocalDisplayString("dd.MM.yyyy")
                         </MudText>
                     }
                 </MudCardContent>

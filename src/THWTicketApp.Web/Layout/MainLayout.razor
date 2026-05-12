@@ -64,8 +64,12 @@
                         Icon="@Icons.Material.Filled.BarChart">@L.T("nav.reports")</MudNavLink>
             <MudNavLink Href="assets" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Inventory2">@L.T("nav.assets")</MudNavLink>
-            <MudNavLink Href="documents" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.FolderOpen">@L.T("nav.documents")</MudNavLink>
+            @* Dokumente-Upload deaktiviert auf Nutzerwunsch — Page bleibt im Code, nur ausgeblendet. *@
+            @if (false)
+            {
+                <MudNavLink Href="documents" Match="NavLinkMatch.All"
+                            Icon="@Icons.Material.Filled.FolderOpen">@L.T("nav.documents")</MudNavLink>
+            }
             <MudNavLink Href="notices" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Campaign">@L.T("nav.notices")</MudNavLink>
             <MudNavLink Href="recurring-tasks" Match="NavLinkMatch.All"
@@ -257,7 +261,8 @@
             new PaletteAction { Id="nav-team",          Title=L.T("nav.team"),          Icon=Icons.Material.Filled.Groups,            Category=nav, Keywords=new[]{"mitglieder","leute"},          ExecuteAsync=()=>{ Navigation.NavigateTo("team"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-reports",       Title=L.T("nav.reports"),       Icon=Icons.Material.Filled.BarChart,          Category=nav, Keywords=new[]{"statistik","report"},          ExecuteAsync=()=>{ Navigation.NavigateTo("reports"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-assets",        Title=L.T("nav.assets"),        Icon=Icons.Material.Filled.Inventory2,        Category=nav, Keywords=new[]{"ausrüstung","inventar"},       ExecuteAsync=()=>{ Navigation.NavigateTo("assets"); return Task.CompletedTask; } },
-            new PaletteAction { Id="nav-documents",     Title=L.T("nav.documents"),     Icon=Icons.Material.Filled.FolderOpen,        Category=nav, Keywords=new[]{"dateien","docs"},              ExecuteAsync=()=>{ Navigation.NavigateTo("documents"); return Task.CompletedTask; } },
+            // Dokumente-Upload deaktiviert auf Nutzerwunsch — Palette-Eintrag ebenfalls ausgeblendet.
+            // new PaletteAction { Id="nav-documents",     Title=L.T("nav.documents"),     Icon=Icons.Material.Filled.FolderOpen,        Category=nav, Keywords=new[]{"dateien","docs"},              ExecuteAsync=()=>{ Navigation.NavigateTo("documents"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-notices",       Title=L.T("nav.notices"),       Icon=Icons.Material.Filled.Campaign,          Category=nav, Keywords=new[]{"mitteilungen","ankündigung"}, ExecuteAsync=()=>{ Navigation.NavigateTo("notices"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-recurring",     Title=L.T("nav.recurring"),     Icon=Icons.Material.Filled.EventRepeat,       Category=nav, Keywords=new[]{"wiederholend","cron"},         ExecuteAsync=()=>{ Navigation.NavigateTo("recurring-tasks"); return Task.CompletedTask; } },
             new PaletteAction { Id="nav-templates",     Title=L.T("nav.templates"),     Icon=Icons.Material.Filled.Description,       Category=nav, Keywords=new[]{"vorlage","template"},          ExecuteAsync=()=>{ Navigation.NavigateTo("templates"); return Task.CompletedTask; } },

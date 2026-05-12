@@ -125,11 +125,11 @@ else
             <tr><th>Zuständig</th><td>@(_ticket.Assignee?.Fullname ?? "Nicht zugewiesen")</td></tr>
             <tr><th>Gruppe</th><td>@(_ticket.Group?.Name ?? "-")</td></tr>
             <tr><th>Typ</th><td>@(_ticket.Type?.TranslatedName ?? "-")</td></tr>
-            <tr><th>Erstellt</th><td>@_ticket.Date.ToString("dd.MM.yyyy HH:mm")</td></tr>
-            <tr><th>Aktualisiert</th><td>@_ticket.Updated.ToString("dd.MM.yyyy HH:mm")</td></tr>
+            <tr><th>Erstellt</th><td>@_ticket.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</td></tr>
+            <tr><th>Aktualisiert</th><td>@_ticket.Updated.ToLocalDisplayString("dd.MM.yyyy HH:mm")</td></tr>
             @if (_ticket.DueDate != DateTime.MinValue)
             {
-                <tr><th>Fällig</th><td>@_ticket.DueDate.ToString("dd.MM.yyyy")</td></tr>
+                <tr><th>Fällig</th><td>@_ticket.DueDate.ToLocalDisplayString("dd.MM.yyyy")</td></tr>
             }
         </table>
         <h3>Beschreibung</h3>
@@ -147,7 +147,7 @@ else
             {
                 <div style="margin-bottom:1em;">
                     <strong>@(c.Owner?.Fullname ?? "?")</strong>
-                    <span>— @c.Date.ToString("dd.MM.yyyy HH:mm")</span>
+                    <span>— @c.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</span>
                     <div>@((MarkupString)Markdown.ToHtml(c.Text ?? string.Empty, _mdPipeline))</div>
                 </div>
             }
@@ -159,7 +159,7 @@ else
             {
                 <div style="margin-bottom:1em;">
                     <strong>@(n.Owner?.Fullname ?? "?")</strong>
-                    <span>— @n.Date.ToString("dd.MM.yyyy HH:mm")</span>
+                    <span>— @n.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</span>
                     <div>@((MarkupString)Markdown.ToHtml(n.Content ?? string.Empty, _mdPipeline))</div>
                 </div>
             }
@@ -338,18 +338,18 @@ else
                     </div>
                     <div>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.created")</MudText>
-                        <MudText Typo="Typo.body2">@_ticket.Date.ToString("dd.MM.yyyy HH:mm")</MudText>
+                        <MudText Typo="Typo.body2">@_ticket.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</MudText>
                     </div>
                     <div>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.updated")</MudText>
-                        <MudText Typo="Typo.body2">@_ticket.Updated.ToString("dd.MM.yyyy HH:mm")</MudText>
+                        <MudText Typo="Typo.body2">@_ticket.Updated.ToLocalDisplayString("dd.MM.yyyy HH:mm")</MudText>
                     </div>
                     @if (_ticket.DueDate != DateTime.MinValue)
                     {
                         <div>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.due")</MudText>
                             <MudText Typo="Typo.body2" Color="@(_ticket.DueDate < DateTime.Now ? Color.Error : Color.Default)">
-                                @_ticket.DueDate.ToString("dd.MM.yyyy HH:mm")
+                                @_ticket.DueDate.ToLocalDisplayString("dd.MM.yyyy HH:mm")
                             </MudText>
                         </div>
                     }
@@ -429,51 +429,54 @@ else
                 </div>
             </MudPaper>
 
-            @* Attachments *@
-            <MudPaper Elevation="1" Class="pa-4 mb-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">
-                    @L.T("attachments.title")
-                    @if (_ticket.Attachments?.Count > 0)
-                    {
-                        <span style="font-weight:normal; opacity:0.7;">(@_ticket.Attachments.Count)</span>
-                    }
-                </MudText>
-                <div id="attachment-dropzone" class="pwa-dropzone pa-2">
-                    @if (_ticket.Attachments != null && _ticket.Attachments.Count > 0)
-                    {
-                        <div class="d-flex flex-column gap-1 mb-2">
-                            @foreach (var att in _ticket.Attachments)
-                            {
-                                var a = att;
-                                <div class="d-flex align-center gap-2">
-                                    <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" />
-                                    <MudLink Typo="Typo.body2" Style="flex:1; min-width:0; word-break:break-all;"
-                                             OnClick="@(() => DownloadAttachment(a))">@a.Name</MudLink>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@a.SizeFormatted</MudText>
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
-                                                   OnClick="() => DeleteAttachmentAsync(a)" />
-                                </div>
-                            }
-                        </div>
-                    }
-                    <div class="d-flex gap-2 align-center">
-                        <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
-                                   accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt,.zip" />
-                        <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
-                                   StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
-                                   Disabled="_isUploading">
-                            @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
-                        </MudButton>
-                        @if (_isUploading)
+            @* Attachments — Upload deaktiviert auf Nutzerwunsch; Panel komplett ausgeblendet, Code bleibt erhalten. *@
+            @if (false)
+            {
+                <MudPaper Elevation="1" Class="pa-4 mb-3">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">
+                        @L.T("attachments.title")
+                        @if (_ticket.Attachments?.Count > 0)
                         {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <span style="font-weight:normal; opacity:0.7;">(@_ticket.Attachments.Count)</span>
                         }
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                            @L.T("attachments.drop_hint")
-                        </MudText>
+                    </MudText>
+                    <div id="attachment-dropzone" class="pwa-dropzone pa-2">
+                        @if (_ticket.Attachments != null && _ticket.Attachments.Count > 0)
+                        {
+                            <div class="d-flex flex-column gap-1 mb-2">
+                                @foreach (var att in _ticket.Attachments)
+                                {
+                                    var a = att;
+                                    <div class="d-flex align-center gap-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" />
+                                        <MudLink Typo="Typo.body2" Style="flex:1; min-width:0; word-break:break-all;"
+                                                 OnClick="@(() => DownloadAttachment(a))">@a.Name</MudLink>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@a.SizeFormatted</MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                       OnClick="() => DeleteAttachmentAsync(a)" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <div class="d-flex gap-2 align-center">
+                            <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
+                                       accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt,.zip" />
+                            <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
+                                       Disabled="_isUploading">
+                                @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
+                            </MudButton>
+                            @if (_isUploading)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            }
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @L.T("attachments.drop_hint")
+                            </MudText>
+                        </div>
                     </div>
-                </div>
-            </MudPaper>
+                </MudPaper>
+            }
 
             @* Linked tickets *@
             <MudPaper Elevation="1" Class="pa-4 mb-3">
@@ -549,7 +552,7 @@ else
                                 @foreach (var entry in _timeEntries.OrderByDescending(e => e.Start))
                                 {
                                     <div class="d-flex align-center gap-2">
-                                        <MudText Typo="Typo.caption">@entry.Start.ToString("dd.MM HH:mm")</MudText>
+                                        <MudText Typo="Typo.caption">@entry.Start.ToLocalDisplayString("dd.MM HH:mm")</MudText>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatMinutes(entry.DurationMinutes)</MudText>
                                         @if (!string.IsNullOrEmpty(entry.Description))
                                         {

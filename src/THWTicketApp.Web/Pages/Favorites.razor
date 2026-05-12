@@ -57,7 +57,7 @@ else
                                     <MudText Typo="Typo.caption">@ticket.Assignee.Fullname</MudText>
                                 }
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    @ticket.Updated.ToString("dd.MM.yyyy HH:mm")
+                                    @ticket.Updated.ToLocalDisplayString("dd.MM.yyyy HH:mm")
                                 </MudText>
                             </div>
                         </div>

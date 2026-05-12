@@ -80,7 +80,7 @@ else
                         @if (n.Date != default)
                         {
                             <MudText Typo="Typo.caption" Color="Color.Tertiary">
-                                @n.Date.ToString("dd.MM.yyyy HH:mm")
+                                @n.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")
                             </MudText>
                         }
                     </div>
