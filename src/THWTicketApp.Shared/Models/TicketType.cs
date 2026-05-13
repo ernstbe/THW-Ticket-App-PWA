@@ -11,6 +11,7 @@ public class TicketType
     [JsonIgnore]
     public string TranslatedName => Translator.Translate(Name);
     public List<Priority> Priorities { get; set; } = [];
+    public List<Status> Statuses { get; set; } = [];
     [JsonPropertyName("__v")]
     public int Version { get; set; }
 }

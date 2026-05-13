@@ -125,7 +125,8 @@ else
                     {
                         var col = column;
                         var visibleCount = FilteredItemsForColumn(col.StatusId).Count();
-                        <MudPaper Class="flex-shrink-0 rounded-lg d-flex flex-column"
+                        var disabledForDrag = IsColumnDisabledForDrag(col.StatusId);
+                        <MudPaper Class="@($"flex-shrink-0 rounded-lg d-flex flex-column kanban-column {(disabledForDrag ? "kanban-column-disabled" : "")}")"
                                   Style="width: 300px; background: var(--mud-palette-surface);"
                                   Elevation="1" role="group"
                                   aria-label="@($"{col.StatusName} — {visibleCount} {L.T("kanban.tickets")}")">
@@ -142,6 +143,9 @@ else
                                 </MudChip>
                             </div>
                             <MudDropZone T="KanbanTicketItem" Identifier="@col.StatusId"
+                                         CanDrop="@(item => IsStatusAllowedForItem(item, col.StatusId))"
+                                         CanDropClass="kanban-zone-allowed"
+                                         NoDropClass="kanban-zone-blocked"
                                          Class="pa-2" Style="min-height: 200px; flex: 1;"
                                          AllowReorder="true" />
                             @if (visibleCount == 0)
@@ -157,7 +161,10 @@ else
                     }
                 </ChildContent>
                 <ItemRenderer>
-                    @CardContent(context, mobileLayout: false)
+                    <div @ondragstart="@(() => OnDragStart(context))"
+                         @ondragend="ClearDragState">
+                        @CardContent(context, mobileLayout: false)
+                    </div>
                 </ItemRenderer>
             </MudDropContainer>
     </MudHidden>
@@ -194,7 +201,8 @@ else
                              AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
                              @onclick:stopPropagation="true"
                              aria-label="@L.T("kanban.move_to")">
-                        @foreach (var target in _columns.Where(c => c.StatusId != item.StatusId))
+                        @foreach (var target in _columns.Where(c => c.StatusId != item.StatusId
+                                                                   && IsStatusAllowedForItem(item, c.StatusId)))
                         {
                             var t = target;
                             <MudMenuItem OnClick="@(() => MoveCardAsync(item, t.StatusId))">
@@ -219,6 +227,24 @@ else
     .kanban-card:hover {
         border-color: var(--mud-palette-primary) !important;
         box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    /* While a card is being dragged, columns whose status isn't allowed
+       for that ticket's type fade out + block pointer events. */
+    .kanban-column {
+        transition: opacity 0.15s ease, filter 0.15s ease;
+    }
+    .kanban-column-disabled {
+        opacity: 0.4;
+        filter: grayscale(0.6);
+        pointer-events: none;
+    }
+    /* Per-zone hover hints driven by MudDropZone's CanDrop callback. */
+    .kanban-zone-allowed {
+        background: rgba(76, 175, 80, 0.08);
+    }
+    .kanban-zone-blocked {
+        background: rgba(244, 67, 54, 0.10);
+        cursor: not-allowed;
     }
 </style>
 
@@ -305,7 +331,11 @@ else
                 PriorityColor = t.Priority?.HtmlColor ?? "#888",
                 PrioritySortOrder = t.Priority?.OverdueIn ?? 0,
                 AssigneeId = t.Assignee?.Id,
-                AssigneeName = t.Assignee?.Fullname
+                AssigneeName = t.Assignee?.Fullname,
+                TypeName = t.Type?.TranslatedName ?? t.Type?.Name,
+                AllowedStatusIds = t.Type?.Statuses is { Count: > 0 } st
+                    ? new HashSet<string>(st.Select(x => x.Id ?? "").Where(id => id.Length > 0))
+                    : []
             }).OrderByDescending(t => t.PrioritySortOrder).ToList();
 
             _allPriorities = _ticketItems
@@ -371,6 +401,9 @@ else
 
     private async Task OnItemDropped(MudItemDropInfo<KanbanTicketItem> dropInfo)
     {
+        var draggedBefore = _draggedItem;
+        ClearDragState();
+
         var item = dropInfo.Item;
         if (item == null) return;
         var newStatusId = dropInfo.DropzoneIdentifier;
@@ -389,7 +422,43 @@ else
             return;
         }
 
+        // Defensive: even though MudDropZone.CanDrop already blocks this
+        // path on desktop, the keyboard/mobile fallback might bypass it.
+        if (!IsStatusAllowedForItem(item, newStatusId))
+        {
+            var targetName = _columns.FirstOrDefault(c => c.StatusId == newStatusId)?.StatusName ?? "?";
+            Snackbar.Add(string.Format(L.T("kanban.status_not_allowed"), targetName, item.TypeName ?? "?"),
+                Severity.Warning);
+            // Force a re-render so the optimistic UI snaps back.
+            RecomputeFiltered();
+            return;
+        }
+
         await MoveCardAsync(item, newStatusId);
+    }
+
+    private bool IsStatusAllowedForItem(KanbanTicketItem item, string statusId)
+        => item.AllowedStatusIds.Count == 0 || item.AllowedStatusIds.Contains(statusId);
+
+    // Disabled-column visual state during drag: a column is disabled iff
+    // there's a card currently being picked up AND that card's type does
+    // not allow the column's status.
+    private bool IsColumnDisabledForDrag(string statusId)
+        => _draggedItem != null && !IsStatusAllowedForItem(_draggedItem, statusId);
+
+    private KanbanTicketItem? _draggedItem;
+
+    private void OnDragStart(KanbanTicketItem item)
+    {
+        _draggedItem = item;
+        StateHasChanged();
+    }
+
+    private void ClearDragState()
+    {
+        if (_draggedItem == null) return;
+        _draggedItem = null;
+        StateHasChanged();
     }
 
     private async Task MoveCardAsync(KanbanTicketItem item, string newStatusId)
@@ -442,5 +511,8 @@ else
         public int PrioritySortOrder { get; set; }
         public string? AssigneeId { get; set; }
         public string? AssigneeName { get; set; }
+        public string? TypeName { get; set; }
+        // Empty set = no per-type restriction → all statuses allowed.
+        public HashSet<string> AllowedStatusIds { get; set; } = [];
     }
 }

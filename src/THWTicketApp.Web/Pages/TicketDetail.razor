@@ -82,7 +82,7 @@ else
                       Label="@_ticket.Status?.TranslatedName"
                       Icon="@Icons.Material.Filled.Circle"
                       Color="@StatusChipColor(_ticket.Status)"
-                      Items="_statuses"
+                      Items="@AllowedStatusesForCurrentType()"
                       ItemTitle="@(s => s.TranslatedName ?? "")"
                       OnSelected="QuickChangeStatusAsync" />
         <ChipWithMenu T="Priority"
@@ -816,6 +816,17 @@ else
     }
 
     // ─── Chip menu actions ──────────────────────────────────────────────
+
+    // Filter the global status list down to those allowed for the ticket's
+    // current type. Empty Statuses[] on a type means "no restriction" — the
+    // backend default after migration, so we fall back to all statuses.
+    private IEnumerable<Status> AllowedStatusesForCurrentType()
+    {
+        var allowed = _ticket?.Type?.Statuses;
+        if (allowed == null || allowed.Count == 0) return _statuses;
+        var allowedIds = new HashSet<string>(allowed.Select(s => s.Id ?? "").Where(id => id.Length > 0));
+        return _statuses.Where(s => s.Id != null && allowedIds.Contains(s.Id));
+    }
 
     private async Task QuickChangeStatusAsync(Status s)
     {
