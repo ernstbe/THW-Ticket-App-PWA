@@ -33,7 +33,11 @@ else if (_ticket == null)
 else
 {
     @* ─── Header ───────────────────────────────────────────────────────── *@
-    <div class="d-flex align-center gap-2 mb-2 pwa-no-print">
+    @* flex-wrap auf mobile, sonst sprengen die sieben Icon-Buttons den
+       Viewport und es erscheint eine horizontale Scrollbar. Title hat
+       flex:1, behält also Vorrang und schiebt die Aktion-Icons bei Bedarf
+       auf eine zweite Zeile. *@
+    <div class="d-flex flex-wrap align-center gap-2 mb-2 pwa-no-print">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("tickets"))"
                        aria-label="@L.T("common.back")" />
         <MudText Typo="Typo.caption" Color="Color.Secondary">#@_ticket.Uid</MudText>

@@ -11,7 +11,7 @@
 
 <PageTitle>@L.T("nav.recurring") - THW Ticket App</PageTitle>
 
-<div class="d-flex justify-space-between align-center mb-4">
+<div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
     <MudText Typo="Typo.h4">@L.T("nav.recurring")</MudText>
     <div class="d-flex gap-2">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
@@ -55,8 +55,8 @@ else if (_isLoading)
             <MudCard Elevation="2">
                 <MudCardHeader>
                     <CardHeaderContent>
-                        <div class="d-flex align-center gap-2">
-                            <MudText Typo="Typo.h6">@task.Name</MudText>
+                        <div class="d-flex align-center flex-wrap gap-2">
+                            <MudText Typo="Typo.h6" Style="word-break: break-word;">@task.Name</MudText>
                             <MudChip T="string" Size="Size.Small"
                                      Color="@(task.Enabled ? Color.Success : Color.Default)">
                                 @(task.Enabled ? L.T("recurring.active") : L.T("recurring.inactive"))
