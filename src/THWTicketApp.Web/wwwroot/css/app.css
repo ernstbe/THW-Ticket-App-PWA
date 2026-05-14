@@ -95,3 +95,22 @@ html, body {
     .pwa-print-only th { text-align: left; padding: 3pt 8pt 3pt 0; font-weight: 600; width: 100pt; vertical-align: top; }
     .pwa-print-only td { padding: 3pt 0; }
 }
+
+/* Settings page masonry — replaces the MudGrid 2-column flex layout
+ * so that cards with very different heights (Passkey is tiny, Sync-Log
+ * has a big table) don't leave fat empty gaps under the short ones. */
+.settings-masonry {
+    column-count: 1;
+    column-gap: 24px;
+}
+@media (min-width: 960px) {
+    .settings-masonry { column-count: 2; }
+}
+.settings-masonry > .settings-cell {
+    break-inside: avoid;
+    margin-bottom: 24px;
+    /* Without `display: inline-block` Chrome/Safari sometimes split a
+     * card across columns even with break-inside: avoid. */
+    display: inline-block;
+    width: 100%;
+}
