@@ -15,6 +15,7 @@
 @inject IIndexedDbService IndexedDb
 @inject IdleLockService IdleLock
 @inject OnboardingService Onboarding
+@inject ISyncService SyncService
 @implements IAsyncDisposable
 
 <PageTitle>@L.T("settings.title") - THW Ticket App</PageTitle>
@@ -344,6 +345,34 @@
         </MudCard>
     </MudItem>
 
+    @* Sync conflicts — surface the conflict count + a deep-link to the
+       full resolution page so users notice unresolved offline writes
+       without keeping the entry in the main nav. *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">@L.T("settings.sync")</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_conflictCount == 0)
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true">@L.T("sync.no_conflicts")</MudAlert>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                        @string.Format(L.T("sync.conflicts_found"), _conflictCount)
+                    </MudAlert>
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                               StartIcon="@Icons.Material.Filled.SyncProblem"
+                               OnClick="@(() => Navigation.NavigateTo("sync-conflicts"))">
+                        @L.T("settings.sync_resolve")
+                    </MudButton>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
     @* About *@
     <MudItem xs="12" md="6">
         <MudCard>
@@ -439,6 +468,10 @@
     private List<SyncLogDto> _syncLogEntries = new();
     private bool _loadingSyncLog;
 
+    // Sync conflicts — pulled once on init; the user pops into
+    // /sync-conflicts to act on them.
+    private int _conflictCount;
+
     // App version info — fetched from version.json baked in at Docker build.
     private string _appVersion = "dev";
     private string _appBuiltAt = string.Empty;
@@ -473,6 +506,20 @@
         _idleLockMinutes = IdleLock.TimeoutMinutes;
 
         await LoadSyncLogAsync();
+        await LoadConflictCountAsync();
+    }
+
+    private async Task LoadConflictCountAsync()
+    {
+        try
+        {
+            var conflicts = await SyncService.GetConflictedActionsAsync();
+            _conflictCount = conflicts.Count;
+        }
+        catch
+        {
+            _conflictCount = 0;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
