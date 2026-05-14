@@ -540,6 +540,32 @@
 
         await LoadSyncLogAsync();
         await LoadConflictCountAsync();
+
+        // Keep the sync-conflicts card honest: refresh the count when
+        // the SyncService detects a fresh conflict, and when the pending
+        // queue changes (resolving or discarding a conflict on the
+        // /sync-conflicts page reduces the count and we want that
+        // reflected here if the user navigates back).
+        SyncService.ConflictDetected += OnConflictDetected;
+        SyncService.PendingCountChanged += OnPendingCountChanged;
+    }
+
+    private void OnConflictDetected(THWTicketApp.Shared.Data.PendingAction action)
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadConflictCountAsync();
+            StateHasChanged();
+        });
+    }
+
+    private void OnPendingCountChanged(int count)
+    {
+        InvokeAsync(async () =>
+        {
+            await LoadConflictCountAsync();
+            StateHasChanged();
+        });
     }
 
     private async Task LoadConflictCountAsync()
@@ -889,6 +915,8 @@
 
     public async ValueTask DisposeAsync()
     {
+        SyncService.ConflictDetected -= OnConflictDetected;
+        SyncService.PendingCountChanged -= OnPendingCountChanged;
         if (_webauthnModule != null)
             await _webauthnModule.DisposeAsync();
     }
