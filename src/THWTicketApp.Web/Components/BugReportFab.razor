@@ -1,0 +1,150 @@
+@*
+   Bug-report FAB — small floating button bottom-right of the app.
+   Opens a dialog that collects a short title + description and
+   attaches client-side context (URL, UA, build SHA, last ~30 console
+   messages from window.__consoleTail) before POSTing to the trudesk
+   backend. Every admin receives a Notification → web push.
+
+   Lives inside MainLayout so it's reachable from every authed page.
+   Hidden from print and from the unauth login layout.
+*@
+
+@using System.Text.Json
+@inject ITrueDeskApiService Api
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject HttpClient HttpClient
+@inject NavigationManager Navigation
+@inject LocalizationService L
+@implements IAsyncDisposable
+
+<MudFab Color="Color.Error"
+        StartIcon="@Icons.Material.Filled.BugReport"
+        Size="Size.Small"
+        Class="bugreport-fab pwa-no-print"
+        title="@L.T("bugreport.fab")"
+        aria-label="@L.T("bugreport.fab")"
+        OnClick="OpenAsync" />
+
+<MudDialog @bind-Visible="_open"
+           Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true }">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@L.T("bugreport.title")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+            @L.T("bugreport.intro")
+        </MudText>
+
+        <MudTextField @bind-Value="_title"
+                      Label="@L.T("bugreport.field_title")"
+                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                      MaxLength="200"
+                      Counter="200"
+                      Class="mb-3" />
+
+        <MudTextField @bind-Value="_description"
+                      Label="@L.T("bugreport.field_description")"
+                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Lines="5"
+                      MaxLength="5000"
+                      Counter="5000" />
+
+        <MudText Typo="Typo.caption" Class="mt-3 mud-text-secondary">
+            @L.T("bugreport.context_hint")
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _open = false)" Disabled="_submitting">@L.T("common.cancel")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Send"
+                   OnClick="SubmitAsync" Disabled="@(_submitting || string.IsNullOrWhiteSpace(_title))">
+            @L.T("bugreport.submit")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _open;
+    private bool _submitting;
+    private string _title = string.Empty;
+    private string _description = string.Empty;
+
+    private async Task OpenAsync()
+    {
+        _title = string.Empty;
+        _description = string.Empty;
+        _open = true;
+        await Task.CompletedTask;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_submitting) return;
+        if (string.IsNullOrWhiteSpace(_title)) return;
+        _submitting = true;
+        try
+        {
+            var context = await BuildContextAsync();
+            var ok = await Api.SubmitBugReportAsync(_title.Trim(), _description?.Trim(), context);
+            if (ok)
+            {
+                Snackbar.Add(L.T("bugreport.sent"), Severity.Success);
+                _open = false;
+            }
+            else
+            {
+                Snackbar.Add(L.T("bugreport.failed"), Severity.Error);
+            }
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task<Dictionary<string, object?>> BuildContextAsync()
+    {
+        var ctx = new Dictionary<string, object?>
+        {
+            ["url"] = Navigation.Uri,
+            ["referrer"] = await TryEvalAsync("document.referrer"),
+            ["userAgent"] = await TryEvalAsync("navigator.userAgent"),
+            ["language"] = await TryEvalAsync("navigator.language"),
+            ["viewport"] = await TryEvalAsync("`${window.innerWidth}x${window.innerHeight}`"),
+            ["timestamp"] = DateTime.UtcNow
+        };
+
+        // Build SHA + builtAt from version.json — baked at Docker build.
+        try
+        {
+            var json = await HttpClient.GetStringAsync("version.json");
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("version", out var v)) ctx["buildSha"] = v.GetString();
+                if (root.TryGetProperty("builtAt", out var b)) ctx["buildDate"] = b.GetString();
+            }
+        }
+        catch { /* version.json not present in dev */ }
+
+        // Console tail — set up in index.html before Blazor boots.
+        try
+        {
+            var tail = await JS.InvokeAsync<object>("eval", "JSON.stringify(window.__consoleTail || [])");
+            ctx["consoleTail"] = tail?.ToString();
+        }
+        catch { /* never block submit on context-gather */ }
+
+        return ctx;
+    }
+
+    private async Task<string?> TryEvalAsync(string expr)
+    {
+        try { return await JS.InvokeAsync<string>("eval", expr); }
+        catch { return null; }
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}

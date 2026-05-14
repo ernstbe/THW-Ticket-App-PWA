@@ -47,6 +47,38 @@
             userId: localStorage.getItem('auth_userid'),
             refreshToken: localStorage.getItem('auth_refresh_token')
         };
+
+        // Console tail — captures the last ~30 console messages so the
+        // bug-report FAB can attach them as context. Wraps the four
+        // common levels and keeps a rolling buffer; nothing else.
+        (function () {
+            const buf = [];
+            const MAX = 30;
+            window.__consoleTail = buf;
+            const levels = ['log', 'info', 'warn', 'error'];
+            for (const level of levels) {
+                const orig = console[level].bind(console);
+                console[level] = function (...args) {
+                    try {
+                        const msg = args.map(a => {
+                            if (typeof a === 'string') return a;
+                            try { return JSON.stringify(a); } catch { return String(a); }
+                        }).join(' ').slice(0, 500);
+                        buf.push({ t: Date.now(), level, msg });
+                        if (buf.length > MAX) buf.shift();
+                    } catch { /* never throw out of console wrapper */ }
+                    orig(...args);
+                };
+            }
+            window.addEventListener('error', (e) => {
+                buf.push({ t: Date.now(), level: 'error', msg: 'window.error: ' + (e.message || '') + ' @ ' + (e.filename || '') + ':' + (e.lineno || 0) });
+                if (buf.length > MAX) buf.shift();
+            });
+            window.addEventListener('unhandledrejection', (e) => {
+                buf.push({ t: Date.now(), level: 'error', msg: 'unhandledrejection: ' + (e.reason && (e.reason.message || e.reason.toString())) });
+                if (buf.length > MAX) buf.shift();
+            });
+        })();
     </script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>

@@ -114,3 +114,16 @@ html, body {
     display: inline-block;
     width: 100%;
 }
+
+/* Bug-report FAB — stacked above the main "+" Quick-Create FAB so the
+ * two don't overlap. Small variant + a bit of nudge to keep the visual
+ * weight balanced under the larger primary FAB. */
+.bugreport-fab {
+    position: fixed !important;
+    bottom: 88px;
+    right: 28px;
+    z-index: 1200;
+}
+@media print {
+    .bugreport-fab { display: none !important; }
+}

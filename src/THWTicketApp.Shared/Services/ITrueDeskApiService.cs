@@ -144,6 +144,12 @@ public interface ITrueDeskApiService
     Task<bool> SubscribeWebPushAsync(string endpoint, string p256dh, string auth, string? deviceId, string? userAgent);
     Task<bool> UnsubscribeWebPushAsync(string endpoint);
 
+    // Bug reports (v1)
+    Task<bool> SubmitBugReportAsync(string title, string? description, Dictionary<string, object?>? context);
+    Task<List<BugReport>> ListBugReportsAsync();
+    Task<bool> SetBugReportResolvedAsync(string id, bool resolved);
+    Task<bool> DeleteBugReportAsync(string id);
+
     // Public registration (v1)
     Task<string?> GetCaptchaSvgAsync();
     Task<(bool Success, bool Exists, string? Error)> CheckEmailAsync(string email, string captcha);
