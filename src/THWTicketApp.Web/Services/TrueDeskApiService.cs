@@ -209,8 +209,24 @@ public class TrueDeskApiService : ITrueDeskApiService
         return false;
     }
 
+    public event Func<Task>? LoggingOut;
+
     public async Task LogoutAsync()
     {
+        // Fire pre-logout hooks while we still have a valid token. Most
+        // important consumer: WebPushService.DisableAsync, which has to
+        // DELETE the subscription server-side BEFORE we drop our auth.
+        // We deliberately run hooks for both the passkey-lock branch and
+        // the plain logout branch — a user that "locks" their session
+        // probably still doesn't want pushes flowing in.
+        if (LoggingOut != null)
+        {
+            foreach (Func<Task> handler in LoggingOut.GetInvocationList().Cast<Func<Task>>())
+            {
+                try { await handler(); } catch { /* don't let a hook break logout */ }
+            }
+        }
+
         // If a passkey is registered on this device, treat logout as "lock":
         // keep the session token in a separate localStorage key that only the
         // explicit biometric-unlock flow reads. AuthStateProvider's auto-restore

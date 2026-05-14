@@ -22,6 +22,18 @@ public class WebPushService : IAsyncDisposable
         _jsRuntime = jsRuntime;
         _api = api;
         _localStorage = localStorage;
+
+        // Tear down on logout so the *next* user logging in on the same
+        // browser doesn't inherit the previous user's push subscription
+        // (the server would otherwise keep pushing the old user's events
+        // to the new user's device). The hook fires while the api still
+        // has a valid token, so the DELETE actually authenticates.
+        _api.LoggingOut += OnLoggingOutAsync;
+    }
+
+    private async Task OnLoggingOutAsync()
+    {
+        try { await DisableAsync(); } catch { /* hook must not break logout */ }
     }
 
     private async Task<IJSObjectReference> GetModuleAsync()
@@ -88,21 +100,36 @@ public class WebPushService : IAsyncDisposable
     }
 
     /// <summary>
-    /// Best-effort disable: tell the backend to forget the subscription,
-    /// then unsubscribe on the browser side. We do server first so a
-    /// transient network error doesn't leave the server pushing to a
-    /// browser that's stopped listening.
+    /// Best-effort disable. Tries to remove the subscription on the
+    /// server first (so the server stops pushing to an endpoint that's
+    /// about to stop listening), then unsubscribes the PushManager
+    /// locally — even if the server step failed. Result is `true` iff
+    /// the LOCAL unsubscribe succeeded; the server state will heal
+    /// itself the next time the server tries to push (404/410 from the
+    /// push service triggers our auto-tombstone in webpush.sendToUser).
     /// </summary>
     public async Task<bool> DisableAsync()
     {
+        IJSObjectReference module;
+        try { module = await GetModuleAsync(); }
+        catch { return false; }
+
+        // Step 1: best-effort server-side delete.
         try
         {
-            var module = await GetModuleAsync();
             var sub = await module.InvokeAsync<SubscriptionDto?>("getCurrentSubscription");
             if (sub != null && !string.IsNullOrEmpty(sub.Endpoint))
             {
                 await _api.UnsubscribeWebPushAsync(sub.Endpoint);
             }
+        }
+        catch { /* server unreachable — fall through to local unsubscribe anyway */ }
+
+        // Step 2: local unsubscribe. If THIS fails the browser keeps
+        // receiving pushes, which is the worse failure mode — so this
+        // is the step we report on.
+        try
+        {
             await module.InvokeAsync<string?>("unsubscribe");
             return true;
         }
@@ -111,6 +138,7 @@ public class WebPushService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _api.LoggingOut -= OnLoggingOutAsync;
         if (_module != null) await _module.DisposeAsync();
     }
 

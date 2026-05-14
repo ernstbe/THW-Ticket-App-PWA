@@ -14,6 +14,15 @@ public interface ITrueDeskApiService
     Task<bool> TryUnlockSessionAsync();
     Task LogoutAsync();
 
+    /// <summary>
+    /// Fires BEFORE LogoutAsync clears tokens or calls /logout. Listeners can
+    /// still make authenticated requests — used to e.g. unregister web-push
+    /// subscriptions server-side while we still have a token. Awaited;
+    /// exceptions from handlers are swallowed so a flaky listener can't
+    /// break logout itself.
+    /// </summary>
+    event Func<Task>? LoggingOut;
+
     Task<string> GetTicketsAsync();
     Task<string> GetTicketsPagedAsync(int page = 0, int limit = 50);
     Task<string> GetTicketsFilteredAsync(string? status = null, bool? assignedSelf = null, int limit = 1000);
