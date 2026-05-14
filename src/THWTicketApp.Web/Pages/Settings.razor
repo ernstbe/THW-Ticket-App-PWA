@@ -27,9 +27,13 @@
     <MudText Typo="Typo.caption">@L.T("settings.autosave_hint")</MudText>
 </MudAlert>
 
-<MudGrid>
+@* CSS-column masonry instead of a flex MudGrid — short cards (Passkey,
+   Sync-Konflikte, About) used to leave huge empty space under them when
+   paired with a taller neighbour. With column-count cards pack
+   vertically, so each column ends up roughly the same height. *@
+<div class="settings-masonry">
     @* Appearance — auto-saves on every change *@
-    <MudItem xs="12" md="6">
+    <div class="settings-cell">
         <MudCard>
             <MudCardHeader>
                 <MudText Typo="Typo.h6">@L.T("settings.appearance")</MudText>
@@ -67,10 +71,10 @@
                 </div>
             </MudCardContent>
         </MudCard>
-    </MudItem>
+    </div>
 
     @* Notifications — split out so it can grow without crowding Appearance *@
-    <MudItem xs="12" md="6">
+    <div class="settings-cell">
         <MudCard>
             <MudCardHeader>
                 <MudText Typo="Typo.h6">@L.T("settings.notifications")</MudText>
@@ -154,11 +158,11 @@
                 }
             </MudCardContent>
         </MudCard>
-    </MudItem>
+    </div>
 
     @* API Configuration — hidden behind an "Erweitert" expander so normal
        users can't accidentally break the app by editing the URL. *@
-    <MudItem xs="12">
+    <div class="settings-cell">
         <MudExpansionPanels Elevation="0">
             <MudExpansionPanel Text="@L.T("settings.advanced")"
                                Style="background: transparent; border: 1px solid var(--mud-palette-lines-default); border-radius: 4px;">
@@ -194,10 +198,10 @@
                 </MudCard>
             </MudExpansionPanel>
         </MudExpansionPanels>
-    </MudItem>
+    </div>
 
     @* Passkey / Biometrics *@
-    <MudItem xs="12" md="6">
+    <div class="settings-cell">
         <MudCard>
             <MudCardHeader>
                 <MudText Typo="Typo.h6">@L.T("settings.passkey")</MudText>
@@ -235,10 +239,10 @@
                 }
             </MudCardContent>
         </MudCard>
-    </MudItem>
+    </div>
 
     @* Auto-Lock *@
-    <MudItem xs="12" md="6">
+    <div class="settings-cell">
         <MudCard>
             <MudCardHeader>
                 <MudText Typo="Typo.h6">@L.T("settings.idlelock")</MudText>
@@ -272,10 +276,10 @@
                 </MudSelect>
             </MudCardContent>
         </MudCard>
-    </MudItem>
+    </div>
 
     @* Cache *@
-    <MudItem xs="12" md="6">
+    <div class="settings-cell">
         <MudCard>
             <MudCardHeader>
                 <MudText Typo="Typo.h6">@L.T("settings.cache")</MudText>
@@ -300,10 +304,10 @@
                 </MudButton>
             </MudCardContent>
         </MudCard>
-    </MudItem>
+    </div>
 
     @* Sync Log *@
-    <MudItem xs="12">
+    <div class="settings-cell">
         <MudCard>
             <MudCardHeader>
                 <CardHeaderContent>
@@ -364,12 +368,12 @@
                 }
             </MudCardContent>
         </MudCard>
-    </MudItem>
+    </div>
 
     @* Sync conflicts — surface the conflict count + a deep-link to the
        full resolution page so users notice unresolved offline writes
        without keeping the entry in the main nav. *@
-    <MudItem xs="12" md="6">
+    <div class="settings-cell">
         <MudCard>
             <MudCardHeader>
                 <MudText Typo="Typo.h6">@L.T("settings.sync")</MudText>
@@ -392,10 +396,10 @@
                 }
             </MudCardContent>
         </MudCard>
-    </MudItem>
+    </div>
 
     @* About *@
-    <MudItem xs="12" md="6">
+    <div class="settings-cell">
         <MudCard>
             <MudCardContent>
                 <div class="d-flex align-center gap-4 mb-3">
@@ -418,8 +422,8 @@
                 }
             </MudCardContent>
         </MudCard>
-    </MudItem>
-</MudGrid>
+    </div>
+</div>
 
 @* Helper actions — non-destructive *@
 <div class="d-flex gap-3 mt-4 flex-wrap">
