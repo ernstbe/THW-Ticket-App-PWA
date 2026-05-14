@@ -155,7 +155,8 @@
 <OnboardingTour />
 
 @* Floating "+" Quick-Create button. Hidden on the AddTicket page itself
-   to avoid covering the form submit button. *@
+   to avoid covering the form submit button. Bug-report FAB stacks
+   above it so both are accessible everywhere. *@
 <AuthorizeView>
     <Authorized>
         @if (!_currentPath.StartsWith("/tickets/add", StringComparison.OrdinalIgnoreCase))
@@ -167,6 +168,7 @@
                     OnClick="@(() => Navigation.NavigateTo("tickets/add"))"
                     Style="position: fixed; bottom: 24px; right: 24px; z-index: 1200;" />
         }
+        <BugReportFab />
     </Authorized>
 </AuthorizeView>
 

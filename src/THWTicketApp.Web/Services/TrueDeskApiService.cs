@@ -1403,6 +1403,63 @@ public class TrueDeskApiService : ITrueDeskApiService
         catch { return false; }
     }
 
+    // ── Bug reports (v1) ────────────────────────────────────────────────
+    public async Task<bool> SubmitBugReportAsync(string title, string? description, Dictionary<string, object?>? context)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return false;
+        var payload = new { title, description, context };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V1BaseUrl}/bug-reports", content));
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<List<BugReport>> ListBugReportsAsync()
+    {
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/bug-reports"));
+            if (!response.IsSuccessStatusCode) return new();
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            if (!doc.RootElement.TryGetProperty("reports", out var arr)) return new();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var list = JsonSerializer.Deserialize<List<BugReport>>(arr.GetRawText(), options) ?? new();
+            return list;
+        }
+        catch { return new(); }
+    }
+
+    public async Task<bool> SetBugReportResolvedAsync(string id, bool resolved)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return false;
+        var payload = new { resolved };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() =>
+            {
+                var req = new HttpRequestMessage(HttpMethod.Patch, $"{V1BaseUrl}/bug-reports/{id}") { Content = content };
+                return _httpClient.SendAsync(req);
+            });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> DeleteBugReportAsync(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return false;
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V1BaseUrl}/bug-reports/{id}"));
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public async Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword)
     {
         if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
