@@ -159,6 +159,13 @@ public interface ITrueDeskApiService
     Task<bool> SetBugReportResolvedAsync(string id, bool resolved);
     Task<bool> DeleteBugReportAsync(string id);
 
+    /// <summary>
+    /// True when the logged-in user has the trudesk "admin" role
+    /// (matched via the populated `role.normalized` field on `/api/v1/login`).
+    /// Result is cached per session — clears on logout.
+    /// </summary>
+    Task<bool> IsCurrentUserAdminAsync();
+
     // Public registration (v1)
     Task<string?> GetCaptchaSvgAsync();
     Task<(bool Success, bool Exists, string? Error)> CheckEmailAsync(string email, string captcha);

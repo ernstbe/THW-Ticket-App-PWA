@@ -255,6 +255,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         _refreshToken = null;
         CurrentUsername = null;
         CurrentUserId = null;
+        _isAdminCached = null;
         SetAuthHeader(null);
         await _localStorage.RemoveItemAsync("auth_token");
         await _localStorage.RemoveItemAsync("auth_refresh_token");
@@ -1474,6 +1475,31 @@ public class TrueDeskApiService : ITrueDeskApiService
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
+    }
+
+    private bool? _isAdminCached;
+
+    public async Task<bool> IsCurrentUserAdminAsync()
+    {
+        if (_isAdminCached.HasValue) return _isAdminCached.Value;
+        if (!IsAuthenticated) return false;
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/login"));
+            if (!response.IsSuccessStatusCode) return false;
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            if (!doc.RootElement.TryGetProperty("user", out var user)) return false;
+            if (!user.TryGetProperty("role", out var role)) return false;
+            string? normalized = null;
+            if (role.ValueKind == JsonValueKind.Object && role.TryGetProperty("normalized", out var n))
+                normalized = n.GetString();
+            _isAdminCached = normalized == "admin";
+            return _isAdminCached.Value;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword)

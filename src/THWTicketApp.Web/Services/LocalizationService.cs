@@ -51,6 +51,7 @@ public class LocalizationService
         ["nav.notifications"] = "Benachrichtigungen",
         ["nav.syncconflicts"] = "Sync-Konflikte",
         ["nav.settings"] = "Einstellungen",
+        ["nav.bugreports"] = "Bug-Reports",
 
         // Common
         ["common.save"] = "Speichern",
@@ -751,6 +752,7 @@ public class LocalizationService
         ["nav.notifications"] = "Notifications",
         ["nav.syncconflicts"] = "Sync Conflicts",
         ["nav.settings"] = "Settings",
+        ["nav.bugreports"] = "Bug Reports",
 
         // Common
         ["common.save"] = "Save",
