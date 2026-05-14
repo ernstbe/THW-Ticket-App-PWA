@@ -32,6 +32,7 @@ builder.Services.AddScoped<SyncService>();
 builder.Services.AddScoped<ISyncService>(sp => sp.GetRequiredService<SyncService>());
 builder.Services.AddScoped<LocalizationService>();
 builder.Services.AddScoped<BrowserNotificationService>();
+builder.Services.AddScoped<WebPushService>();
 builder.Services.AddScoped<IdleLockService>();
 builder.Services.AddScoped<RecentTicketsService>();
 builder.Services.AddScoped<CommandPaletteService>();

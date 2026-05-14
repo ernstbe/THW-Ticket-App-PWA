@@ -8,6 +8,24 @@ self.addEventListener("activate", (event) =>
 );
 self.addEventListener("fetch", (event) => event.respondWith(onFetch(event)));
 
+// Handle inbound Web Push from the trudesk backend. The server sends a
+// JSON payload via web-push (VAPID-signed), parsed here and surfaced as
+// a system notification. URL goes into `data.url` so the click handler
+// below opens or focuses the right page.
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch { /* invalid JSON */ }
+  const title = payload.title || "THW Ticket App";
+  const options = {
+    body: payload.body || "",
+    tag: payload.tag,
+    icon: payload.icon || "/app/icon-512.png",
+    badge: payload.badge || "/app/icon-512.png",
+    data: { url: payload.url || "/app/" }
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
 // Handle notification clicks — navigate to the ticket URL
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

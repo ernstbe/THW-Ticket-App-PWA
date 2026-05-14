@@ -1351,6 +1351,58 @@ public class TrueDeskApiService : ITrueDeskApiService
         catch { return false; }
     }
 
+    // ── Web Push (v1) ───────────────────────────────────────────────────
+    public async Task<string?> GetWebPushVapidPublicKeyAsync()
+    {
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V1BaseUrl}/account/push/vapid-public"));
+            if (!response.IsSuccessStatusCode) return null;
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return doc.RootElement.TryGetProperty("publicKey", out var k) ? k.GetString() : null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> SubscribeWebPushAsync(string endpoint, string p256dh, string auth, string? deviceId, string? userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(p256dh) || string.IsNullOrWhiteSpace(auth))
+            return false;
+        var payload = new
+        {
+            endpoint,
+            keys = new { p256dh, auth },
+            deviceId,
+            userAgent
+        };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V1BaseUrl}/account/push/subscribe", content));
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> UnsubscribeWebPushAsync(string endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint)) return false;
+        var payload = new { endpoint };
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() =>
+            {
+                var req = new HttpRequestMessage(HttpMethod.Delete, $"{V1BaseUrl}/account/push/subscribe")
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+                };
+                return _httpClient.SendAsync(req);
+            });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     public async Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword)
     {
         if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))

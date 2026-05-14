@@ -16,6 +16,7 @@
 @inject IdleLockService IdleLock
 @inject OnboardingService Onboarding
 @inject ISyncService SyncService
+@inject WebPushService WebPush
 @implements IAsyncDisposable
 
 <PageTitle>@L.T("settings.title") - THW Ticket App</PageTitle>
@@ -86,6 +87,26 @@
                                ValueChanged="@(async (bool v) => await SetNotificationsEnabledAsync(v))"
                                Color="Color.Primary" T="bool" />
                 </div>
+                @* Web Push (separate from local-tab notifications) — sub-toggle
+                   that only matters when the master notifications switch is on.
+                   When off, the local-tab Notification API still works while
+                   the tab is open; Web Push adds delivery while the tab is
+                   closed or backgrounded. *@
+                @if (_isNotificationsEnabled && _webPushSupported)
+                {
+                    <div class="d-flex justify-space-between align-center mb-2 ml-4">
+                        <div>
+                            <MudText Typo="Typo.body2">@L.T("settings.push_enable")</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                @L.T("settings.push_desc")
+                            </MudText>
+                        </div>
+                        <MudSwitch Value="@_webPushEnabled"
+                                   ValueChanged="@(async (bool v) => await SetWebPushAsync(v))"
+                                   Disabled="@_webPushBusy"
+                                   Color="Color.Primary" T="bool" />
+                    </div>
+                }
                 @if (_isNotificationsEnabled)
                 {
                     <div class="ml-4">
@@ -472,6 +493,14 @@
     // /sync-conflicts to act on them.
     private int _conflictCount;
 
+    // Web Push state — `_webPushSupported` is checked once after first
+    // render so the sub-toggle only appears in browsers that can
+    // actually subscribe; `_webPushEnabled` reflects whether the
+    // PushManager has a live subscription right now.
+    private bool _webPushSupported;
+    private bool _webPushEnabled;
+    private bool _webPushBusy;
+
     // App version info — fetched from version.json baked in at Docker build.
     private string _appVersion = "dev";
     private string _appBuiltAt = string.Empty;
@@ -532,9 +561,40 @@
                 _webauthnSupported = await _webauthnModule.InvokeAsync<bool>("isWebAuthnSupported");
                 if (_webauthnSupported)
                     _passkeyRegistered = await _webauthnModule.InvokeAsync<bool>("isPasskeyRegistered");
+
+                _webPushSupported = await WebPush.IsSupportedAsync();
+                if (_webPushSupported)
+                    _webPushEnabled = await WebPush.IsSubscribedAsync();
                 StateHasChanged();
             }
             catch { }
+        }
+    }
+
+    private async Task SetWebPushAsync(bool enabled)
+    {
+        if (_webPushBusy) return;
+        _webPushBusy = true;
+        StateHasChanged();
+        try
+        {
+            bool ok;
+            if (enabled)
+            {
+                ok = await WebPush.EnableAsync();
+                if (!ok) Snackbar.Add(L.T("settings.push_enable_failed"), Severity.Warning);
+            }
+            else
+            {
+                ok = await WebPush.DisableAsync();
+                if (!ok) Snackbar.Add(L.T("settings.push_disable_failed"), Severity.Warning);
+            }
+            _webPushEnabled = await WebPush.IsSubscribedAsync();
+        }
+        finally
+        {
+            _webPushBusy = false;
+            StateHasChanged();
         }
     }
 

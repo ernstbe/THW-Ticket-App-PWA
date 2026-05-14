@@ -139,6 +139,11 @@ public interface ITrueDeskApiService
     Task<bool> RevokeAllOtherSessionsAsync();
     Task<bool> UpdatePasswordAsync(string currentPassword, string newPassword, string confirmPassword);
 
+    // Web Push (v1)
+    Task<string?> GetWebPushVapidPublicKeyAsync();
+    Task<bool> SubscribeWebPushAsync(string endpoint, string p256dh, string auth, string? deviceId, string? userAgent);
+    Task<bool> UnsubscribeWebPushAsync(string endpoint);
+
     // Public registration (v1)
     Task<string?> GetCaptchaSvgAsync();
     Task<(bool Success, bool Exists, string? Error)> CheckEmailAsync(string email, string captcha);
