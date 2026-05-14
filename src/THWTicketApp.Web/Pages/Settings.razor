@@ -420,6 +420,13 @@
                         Build: @_appBuiltAt
                     </MudText>
                 }
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.SystemUpdate"
+                           OnClick="CheckForUpdatesAsync"
+                           Disabled="_updateChecking"
+                           Class="mt-3">
+                    @(_updateChecking ? L.T("settings.update_checking") : L.T("settings.update_check"))
+                </MudButton>
             </MudCardContent>
         </MudCard>
     </div>
@@ -508,6 +515,7 @@
     // App version info — fetched from version.json baked in at Docker build.
     private string _appVersion = "dev";
     private string _appBuiltAt = string.Empty;
+    private bool _updateChecking;
 
     protected override async Task OnInitializedAsync()
     {
@@ -566,6 +574,60 @@
             await LoadConflictCountAsync();
             StateHasChanged();
         });
+    }
+
+    /// <summary>
+    /// Force-checks for a new Service Worker right now instead of waiting
+    /// for the hourly reg.update() interval in index.html. If a new SW
+    /// reaches the "waiting" state, post SKIP_WAITING — the
+    /// `controllerchange` listener already wired up at boot reloads the
+    /// page. If nothing new shows up after a short grace window, snackbar
+    /// "up to date".
+    /// </summary>
+    private async Task CheckForUpdatesAsync()
+    {
+        if (_updateChecking) return;
+        _updateChecking = true;
+        StateHasChanged();
+        try
+        {
+            var foundUpdate = await JsRuntime.InvokeAsync<bool>("eval", @"
+                (async () => {
+                    if (!('serviceWorker' in navigator)) return false;
+                    const reg = await navigator.serviceWorker.getRegistration();
+                    if (!reg) return false;
+                    await reg.update();
+                    // After update(), an installing or waiting worker means
+                    // a new bundle was found. Give the install step a moment
+                    // to settle before we look.
+                    await new Promise(r => setTimeout(r, 1500));
+                    const target = reg.waiting || reg.installing;
+                    if (target) {
+                        // controllerchange listener in index.html handles the
+                        // actual page reload once activation happens.
+                        reg.waiting && reg.waiting.postMessage('SKIP_WAITING');
+                        return true;
+                    }
+                    return false;
+                })()
+            ");
+
+            if (!foundUpdate)
+            {
+                Snackbar.Add(L.T("settings.update_uptodate"), Severity.Info);
+            }
+            // If foundUpdate==true, controllerchange will reload the page
+            // for us — no snackbar needed (page is about to unmount).
+        }
+        catch
+        {
+            Snackbar.Add(L.T("settings.update_failed"), Severity.Error);
+        }
+        finally
+        {
+            _updateChecking = false;
+            StateHasChanged();
+        }
     }
 
     private async Task LoadConflictCountAsync()

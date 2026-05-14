@@ -51,6 +51,7 @@ public class LocalizationService
         ["nav.notifications"] = "Benachrichtigungen",
         ["nav.syncconflicts"] = "Sync-Konflikte",
         ["nav.settings"] = "Einstellungen",
+        ["nav.bugreports"] = "Bug-Reports",
 
         // Common
         ["common.save"] = "Speichern",
@@ -367,6 +368,10 @@ public class LocalizationService
         ["bugreport.resolved_ok"] = "Als erledigt markiert.",
         ["bugreport.reopened_ok"] = "Wieder geöffnet.",
         ["bugreport.deleted"] = "Bug-Report gelöscht.",
+        ["settings.update_check"] = "Nach Updates suchen",
+        ["settings.update_checking"] = "Wird geprüft...",
+        ["settings.update_uptodate"] = "Bereits aktuell.",
+        ["settings.update_failed"] = "Update-Prüfung fehlgeschlagen.",
         ["settings.synclog"] = "Sync-Log",
         ["settings.synclog_desc"] = "Protokoll der Offline-Synchronisierung",
         ["settings.synclog_empty"] = "Keine Log-Einträge vorhanden.",
@@ -747,6 +752,7 @@ public class LocalizationService
         ["nav.notifications"] = "Notifications",
         ["nav.syncconflicts"] = "Sync Conflicts",
         ["nav.settings"] = "Settings",
+        ["nav.bugreports"] = "Bug Reports",
 
         // Common
         ["common.save"] = "Save",
@@ -1063,6 +1069,10 @@ public class LocalizationService
         ["bugreport.resolved_ok"] = "Marked as resolved.",
         ["bugreport.reopened_ok"] = "Reopened.",
         ["bugreport.deleted"] = "Bug report deleted.",
+        ["settings.update_check"] = "Check for updates",
+        ["settings.update_checking"] = "Checking...",
+        ["settings.update_uptodate"] = "Already up to date.",
+        ["settings.update_failed"] = "Update check failed.",
         ["settings.synclog"] = "Sync Log",
         ["settings.synclog_desc"] = "Offline synchronization activity log",
         ["settings.synclog_empty"] = "No log entries.",

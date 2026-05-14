@@ -101,6 +101,14 @@
                sondern als Card unter Einstellungen erreichbar. Die Route
                /sync-conflicts bleibt bestehen für Deep-Links. *@
             <MudDivider Class="my-2" />
+            @if (_isAdmin)
+            {
+                @* Only admins reach /bug-reports — backend returns 403 for
+                   everyone else. Surfaced here so they don't have to wait
+                   for a push to find unresolved reports. *@
+                <MudNavLink Href="bug-reports" Match="NavLinkMatch.Prefix"
+                            Icon="@Icons.Material.Filled.BugReport">@L.T("nav.bugreports")</MudNavLink>
+            }
             <MudNavLink Href="profile" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.AccountCircle">@L.T("nav.profile")</MudNavLink>
             <MudNavLink Href="settings" Match="NavLinkMatch.All"
@@ -207,6 +215,7 @@
     private int _unreadNotifications;
     private int _pendingActions;
     private bool _showShortcutHelp;
+    private bool _isAdmin;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private IJSObjectReference? _shortcutModule;
     private string _currentPath = string.Empty;
@@ -262,6 +271,22 @@
         Navigation.LocationChanged += OnLocationChanged;
         RegisterPaletteActions();
         await RealtimeService.ConnectAsync();
+        // Resolve admin status so the Bug-Reports nav entry can appear.
+        // Fire-and-forget — the nav re-renders when this completes; we
+        // don't want to block the rest of the layout on a network roundtrip.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var isAdmin = await ApiService.IsCurrentUserAdminAsync();
+                if (isAdmin != _isAdmin)
+                {
+                    _isAdmin = isAdmin;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch { /* not the end of the world if the nav entry doesn't appear */ }
+        });
     }
 
     private void RegisterPaletteActions()
