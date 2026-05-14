@@ -13,15 +13,27 @@ self.addEventListener("fetch", (event) => event.respondWith(onFetch(event)));
 // a system notification. URL goes into `data.url` so the click handler
 // below opens or focuses the right page.
 self.addEventListener("push", (event) => {
-  let payload = {};
-  try { payload = event.data ? event.data.json() : {}; } catch { /* invalid JSON */ }
-  const title = payload.title || "THW Ticket App";
+  // Robust parse: event.data may be missing, may be a non-JSON blob (e.g.
+  // a malformed test push), or may be valid JSON but with non-object shape.
+  // Whatever happens, we must NOT throw out of the push handler — Chrome
+  // will then surface its own "This site has been updated in the background"
+  // generic notification, which is worse than our fallback.
+  let payload = null;
+  if (event.data) {
+    try { payload = event.data.json(); }
+    catch {
+      try { payload = { body: event.data.text() }; } catch { /* binary or unreadable */ }
+    }
+  }
+  if (!payload || typeof payload !== "object") payload = {};
+
+  const title = (typeof payload.title === "string" && payload.title.trim()) || "THW Ticket App";
   const options = {
-    body: payload.body || "",
-    tag: payload.tag,
-    icon: payload.icon || "/app/icon-512.png",
-    badge: payload.badge || "/app/icon-512.png",
-    data: { url: payload.url || "/app/" }
+    body: typeof payload.body === "string" ? payload.body : "",
+    tag: typeof payload.tag === "string" ? payload.tag : undefined,
+    icon: typeof payload.icon === "string" ? payload.icon : "/app/icon-512.png",
+    badge: typeof payload.badge === "string" ? payload.badge : "/app/icon-512.png",
+    data: { url: typeof payload.url === "string" ? payload.url : "/app/" }
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
