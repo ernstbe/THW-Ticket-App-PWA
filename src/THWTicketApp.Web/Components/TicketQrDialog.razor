@@ -31,7 +31,7 @@
             _printModule ??= await JsRuntime.InvokeAsync<IJSObjectReference>(
                 "import", "./js/print-qr.js");
             var ok = await _printModule.InvokeAsync<bool>("printQr",
-                _qr.Svg, $"#{Uid}", _qr.Url);
+                _qr.Svg, $"#{Uid}");
             if (!ok) Snackbar.Add(L.T("common.popup_blocked"), Severity.Warning);
         }
         catch

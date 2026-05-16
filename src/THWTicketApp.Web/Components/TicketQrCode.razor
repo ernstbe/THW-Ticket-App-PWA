@@ -15,29 +15,25 @@
     <MudText Typo="Typo.h5" Style="font-weight: 700; text-align: center;">
         #@Uid
     </MudText>
-    <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="word-break: break-all; text-align: center; max-width: 280px;">
-        @Url
-    </MudText>
 </div>
 
 @code {
     [Parameter, EditorRequired] public int Uid { get; set; }
     [Parameter] public int PixelsPerModule { get; set; } = 8;
 
-    // Exposed so a parent (e.g., TicketQrDialog) can feed them into the
+    // Exposed so a parent (e.g., TicketQrDialog) can feed the SVG into the
     // print popup without re-rendering the QR.
     public string Svg { get; private set; } = string.Empty;
-    public string Url { get; private set; } = string.Empty;
 
     protected override void OnParametersSet()
     {
         // Absolute URL so a phone scanning the QR on a desktop screen
         // lands in the right place. BaseUri ends with "/" — TicketDetail
         // routes off "/tickets/<uid>".
-        Url = $"{Navigation.BaseUri.TrimEnd('/')}/tickets/{Uid}";
+        var url = $"{Navigation.BaseUri.TrimEnd('/')}/tickets/{Uid}";
 
         using var generator = new QRCodeGenerator();
-        using var data = generator.CreateQrCode(Url, QRCodeGenerator.ECCLevel.Q);
+        using var data = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.Q);
         var qr = new SvgQRCode(data);
         // sizeInPixels acts as the BOUNDING-BOX size for SvgQRCode; the
         // module size is derived from it. We keep the SVG viewbox-driven
