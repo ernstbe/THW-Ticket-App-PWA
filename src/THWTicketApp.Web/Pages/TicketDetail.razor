@@ -112,14 +112,33 @@ else
                       OnClear="ClearAssigneeAsync"
                       ClearLabel="@L.T("detail.remove_assign")"
                       EmptyMenuLabel="@L.T("detail.no_assignees_available")" />
-        <MudDatePicker Date="@_dueDateLocal"
-                       DateChanged="OnDueDateChangedAsync"
-                       Variant="Variant.Outlined" Margin="Margin.Dense"
-                       Class="ticket-due-picker"
-                       PickerVariant="PickerVariant.Dialog"
-                       Clearable="true"
-                       Editable="false"
-                       Label="@L.T("detail.due")" />
+        @* Due date — chip with the same look as Status/Priority/Group/
+           Assignee. The MudDatePicker is rendered off-screen and opened
+           programmatically when the chip is clicked. MudDatePicker has
+           no ActivatorContent slot in MudBlazor 9.1, so wrapping it in a
+           collapsed activator was not an option. *@
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                 Color="@DueDateChipColor(_dueDateLocal)"
+                 Icon="@Icons.Material.Filled.Event"
+                 Style="cursor:pointer;"
+                 OnClick="@OpenDuePickerAsync">
+            @if (_dueDateLocal.HasValue)
+            {
+                @_dueDateLocal.Value.ToString("dd.MM.yyyy")
+            }
+            else
+            {
+                <em style="opacity:0.7;">@L.T("detail.no_due")</em>
+            }
+        </MudChip>
+        <div class="pwa-duepicker-host">
+            <MudDatePicker @ref="_duePicker"
+                           Date="@_dueDateLocal"
+                           DateChanged="OnDueDateChangedAsync"
+                           PickerVariant="PickerVariant.Dialog"
+                           Clearable="true"
+                           Editable="false" />
+        </div>
     </div>
 
     @if (_isLoading)
@@ -630,6 +649,7 @@ else
     private string _editSubject = string.Empty;
     private string _editIssue = string.Empty;
     private DateTime? _dueDateLocal;
+    private MudDatePicker? _duePicker;
 
     // Composer state — hidden behind the toggle icon next to the
     // comments header. Defaults to closed so the conversation stays
@@ -975,6 +995,20 @@ else
         if (n.Contains("hoch") || n.Contains("high") || n.Contains("urgent")) return Color.Error;
         if (n.Contains("normal")) return Color.Info;
         return Color.Default;
+    }
+
+    // Mirrors StatusChipColor / PriorityChipColor: paint red when the
+    // due date has already passed, default otherwise (incl. no date set).
+    private static Color DueDateChipColor(DateTime? due)
+    {
+        if (due == null) return Color.Default;
+        return due.Value < DateTime.Now ? Color.Error : Color.Default;
+    }
+
+    private async Task OpenDuePickerAsync()
+    {
+        if (_duePicker != null)
+            await _duePicker.OpenAsync();
     }
 
     // ─── Tags ───────────────────────────────────────────────────────────
