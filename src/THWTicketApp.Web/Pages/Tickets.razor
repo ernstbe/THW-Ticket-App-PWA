@@ -539,7 +539,13 @@ else
         {
             "date_asc" => source.OrderBy(t => t.Date),
             "updated" => source.OrderByDescending(t => t.Updated),
-            "priority" => source.OrderByDescending(t => t.Priority?.OverdueIn ?? 0),
+            // Sort by Priority.MigrationNum (1=lowest … N=highest), highest first.
+            // The previous key was OverdueIn (minutes until a ticket counts as
+            // overdue), which (a) is the wrong direction — a longer fuse means
+            // *less* urgent — and (b) is set equal across priorities on some
+            // installations (ov-emm-tickets.de uses 2880 min for all three),
+            // so the list didn't reorder at all.
+            "priority" => source.OrderByDescending(t => t.Priority?.MigrationNum ?? 0),
             "subject" => source.OrderBy(t => t.Subject, StringComparer.OrdinalIgnoreCase),
             _ => source.OrderByDescending(t => t.Date)
         };
