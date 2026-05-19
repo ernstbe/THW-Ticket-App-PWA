@@ -34,8 +34,11 @@
               Immediate="true" DebounceInterval="400" TextChanged="OnSearchChanged"
               Class="mb-3" Clearable="true" />
 
-@* Filter chips *@
+@* Filter chips — "Aktiv" (offen + in Bearbeitung, alles außer
+   geschlossen) is the default on user request 2026-05-19. *@
 <div class="d-flex flex-wrap gap-2 mb-3">
+    <MudChip T="string" Color="@(_activeFilter == "active" ? Color.Primary : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("active"))">@L.T("tickets.active")</MudChip>
     <MudChip T="string" Color="@(_activeFilter == "all" ? Color.Primary : Color.Default)"
              Variant="Variant.Filled" OnClick="@(() => SetFilter("all"))">@L.T("common.all")</MudChip>
     <MudChip T="string" Color="@(_activeFilter == "open" ? Color.Info : Color.Default)"
@@ -276,7 +279,7 @@ else
     private const int PageSize = 20;
     private bool _isLoading;
     private string _searchText = string.Empty;
-    private string _activeFilter = "all";
+    private string _activeFilter = "active";
     private string _activeSort = "date_desc";
     private bool _showOnlyMyTickets;
     private string _statusMessage = string.Empty;
@@ -488,6 +491,11 @@ else
     {
         source = _activeFilter switch
         {
+            // "Aktiv" = everything that is NOT closed/resolved. Picks up
+            // "Offen", "In Bearbeitung", and any custom non-resolved
+            // status the trudesk admin may have added.
+            "active" => source.Where(t => !(t.Status?.IsResolved == true
+                || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved")),
             "open" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new"),
             "pending" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "ausstehend" or "pending" or "in bearbeitung" or "in progress"),
             "closed" => source.Where(t => t.Status?.IsResolved == true || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved"),
