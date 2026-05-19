@@ -22,10 +22,10 @@
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1" Color="Color.Primary">
+    <MudAppBar Elevation="1" Color="Color.Primary" Dense="true" Class="pwa-appbar">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
                        OnClick="@ToggleDrawer" aria-label="@L.T("a11y.toggle_menu")" />
-        <MudLink Href="./" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-3" Style="cursor:pointer;">THW Ticket App</MudLink>
+        <MudLink Href="./" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-3 pwa-appbar-title" Style="cursor:pointer;">THW Ticket App</MudLink>
         <MudSpacer />
         @if (_isOffline)
         {
