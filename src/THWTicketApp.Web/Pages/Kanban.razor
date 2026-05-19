@@ -46,6 +46,26 @@
             }
         </MudSelect>
     }
+    @if (_ticketTypes.Any())
+    {
+        @* Type filter — shows the per-type counts in the dropdown
+           labels so users can see at a glance how many tickets are
+           in each type. Selecting a type also collapses the board
+           to only that type's allowed statuses (see _columns build
+           in RecomputeFiltered). *@
+        <MudSelect T="string" @bind-Value="_typeFilter" Placeholder="@L.T("detail.type")"
+                   @bind-Value:after="RecomputeFiltered"
+                   Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Clearable="true" Style="min-width: 170px;">
+            @foreach (var t in _ticketTypes)
+            {
+                var typeId = t.Id ?? "";
+                var typeName = t.TranslatedName ?? t.Name ?? "?";
+                var count = _typeCounts.TryGetValue(typeId, out var c) ? c : 0;
+                <MudSelectItem Value="@typeId">@typeName (@count)</MudSelectItem>
+            }
+        </MudSelect>
+    }
     <MudSpacer />
     <MudText Typo="Typo.body2" Color="Color.Secondary">
         @_ticketItems.Count(MatchesFilter) / @_ticketItems.Count
@@ -260,8 +280,18 @@ else
     private string _searchText = string.Empty;
     private bool _onlyMine;
     private string? _priorityFilter;
+    private string? _typeFilter;
     private List<string> _allPriorities = [];
+    private List<TicketType> _ticketTypes = [];
+    private Dictionary<string, int> _typeCounts = new();
+    private List<KanbanColumn> _allColumns = [];
     private int _mobileTabIndex;
+
+    // "Neu" is the trudesk-default initial status (Uid 0, isLocked=true).
+    // Hidden from the Kanban on user request 2026-05-20 — it represents a
+    // pre-triage state that doesn't belong on the active board.
+    private static readonly HashSet<string> _hiddenStatusNames =
+        new(StringComparer.OrdinalIgnoreCase) { "Neu", "New" };
 
     private CancellationTokenSource? _refreshDebounceCts;
 
@@ -307,18 +337,25 @@ else
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var statusJson = await ApiService.GetStatusesAsync();
             var ticketJson = await ApiService.GetTicketsAsync();
+            var typesJson = await ApiService.GetTicketTypesAsync();
 
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
             var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(ticketJson, "tickets", options);
+            _ticketTypes = JsonSerializer.Deserialize<List<TicketType>>(typesJson, options) ?? [];
 
             foreach (var t in tickets) TrudeskTranslationHelper.TranslateTicket(t);
 
-            _columns = statuses.OrderBy(s => s.Order).Select(s => new KanbanColumn
-            {
-                StatusId = s.Id ?? string.Empty,
-                StatusName = TrudeskTranslationHelper.TranslateStatus(s.Name) ?? s.Name ?? L.T("common.unknown"),
-                StatusColor = s.HtmlColor ?? "#9E9E9E"
-            }).ToList();
+            // Pre-filter the visible column set: drop the "Neu" status so
+            // the pre-triage state doesn't take up board real estate.
+            _allColumns = statuses
+                .OrderBy(s => s.Order)
+                .Where(s => !_hiddenStatusNames.Contains(s.Name ?? ""))
+                .Select(s => new KanbanColumn
+                {
+                    StatusId = s.Id ?? string.Empty,
+                    StatusName = TrudeskTranslationHelper.TranslateStatus(s.Name) ?? s.Name ?? L.T("common.unknown"),
+                    StatusColor = s.HtmlColor ?? "#9E9E9E"
+                }).ToList();
 
             _ticketItems = tickets.Select(t => new KanbanTicketItem
             {
@@ -332,6 +369,7 @@ else
                 PrioritySortOrder = t.Priority?.OverdueIn ?? 0,
                 AssigneeId = t.Assignee?.Id,
                 AssigneeName = t.Assignee?.Fullname,
+                TypeId = t.Type?.Id,
                 TypeName = t.Type?.TranslatedName ?? t.Type?.Name,
                 AllowedStatusIds = t.Type?.Statuses is { Count: > 0 } st
                     ? new HashSet<string>(st.Select(x => x.Id ?? "").Where(id => id.Length > 0))
@@ -345,6 +383,12 @@ else
                 .Cast<string>()
                 .OrderBy(p => p)
                 .ToList();
+
+            // Count tickets per type for the dropdown labels.
+            _typeCounts = _ticketItems
+                .Where(t => !string.IsNullOrEmpty(t.TypeId))
+                .GroupBy(t => t.TypeId!)
+                .ToDictionary(g => g.Key, g => g.Count());
 
             RecomputeFiltered();
         }
@@ -366,6 +410,7 @@ else
     {
         if (_onlyMine && item.AssigneeId != ApiService.CurrentUserId) return false;
         if (!string.IsNullOrEmpty(_priorityFilter) && item.PriorityName != _priorityFilter) return false;
+        if (!string.IsNullOrEmpty(_typeFilter) && item.TypeId != _typeFilter) return false;
         if (!string.IsNullOrWhiteSpace(_searchText))
         {
             var q = _searchText.Trim();
@@ -382,6 +427,28 @@ else
     private void RecomputeFiltered()
     {
         _filteredItems = _ticketItems.Where(MatchesFilter).ToList();
+
+        // If a type filter is active, collapse the column set to only the
+        // statuses that type allows. Otherwise show every non-hidden status
+        // (i.e. _allColumns, which already drops "Neu").
+        if (!string.IsNullOrEmpty(_typeFilter))
+        {
+            var selectedType = _ticketTypes.FirstOrDefault(t => t.Id == _typeFilter);
+            var allowed = selectedType?.Statuses is { Count: > 0 } st
+                ? new HashSet<string>(st.Select(s => s.Id ?? "").Where(id => id.Length > 0))
+                : null;
+            _columns = allowed == null
+                ? new List<KanbanColumn>(_allColumns)
+                : _allColumns.Where(c => allowed.Contains(c.StatusId)).ToList();
+        }
+        else
+        {
+            _columns = new List<KanbanColumn>(_allColumns);
+        }
+
+        // Mobile tabs may now point past the end of the trimmed column list.
+        if (_mobileTabIndex >= _columns.Count) _mobileTabIndex = 0;
+
         // Notify the MudDropContainer that its source list has changed,
         // otherwise it keeps showing the previous filter view.
         _dropContainer?.Refresh();
@@ -511,6 +578,7 @@ else
         public int PrioritySortOrder { get; set; }
         public string? AssigneeId { get; set; }
         public string? AssigneeName { get; set; }
+        public string? TypeId { get; set; }
         public string? TypeName { get; set; }
         // Empty set = no per-type restriction → all statuses allowed.
         public HashSet<string> AllowedStatusIds { get; set; } = [];
