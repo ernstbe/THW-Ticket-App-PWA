@@ -347,32 +347,99 @@ else
             </MudPaper>
             }
 
-            @* History — moved to the bottom of the left column and tucked
-               into a collapsed expansion panel so status/field changes
-               don't crowd the conversation. *@
-            <MudExpansionPanels Elevation="1" Class="mt-6">
+        </MudItem>
+
+        @* ─── Sidebar — order on user request (2026-05-19):
+               Tags → Checklisten (collapsed) → Details (collapsed).
+               History moves OUT of this grid to a full-width panel after
+               the grid so it truly lands at the end of the ticket. ───── *@
+        <MudItem xs="12" md="4">
+            @* Tags *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.tags")</MudText>
+                <div class="d-flex flex-wrap gap-1 align-center">
+                    @if (_ticket.Tags?.Count > 0)
+                    {
+                        @foreach (var tag in _ticket.Tags)
+                        {
+                            var tagId = tag.Id;
+                            <MudChip T="string" Size="Size.Small" OnClose="@(_ => RemoveTagAsync(tagId!))"
+                                     Disabled="_isLoading">@tag.Name</MudChip>
+                        }
+                    }
+                    @if (_availableTags.Any(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                 Dense="true" aria-label="@L.T("detail.add_tag")">
+                            @foreach (var tag in _availableTags.Where(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+                            {
+                                <MudMenuItem OnClick="@(() => AddTagAsync(tag.Id!, tag.Name!))">@tag.Name</MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+                    @if ((_ticket.Tags?.Count ?? 0) == 0 && !_availableTags.Any())
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                    }
+                </div>
+            </MudPaper>
+
+            @* Checklist — collapsed behind the expansion arrow on user
+               request. Header keeps the progress count visible so users
+               can see "3/5 done" without expanding the panel. *@
+            <MudExpansionPanels Elevation="1" Class="mb-3">
                 <MudExpansionPanel>
                     <TitleContent>
                         <div class="d-flex align-center gap-2">
-                            <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
-                            <MudText Typo="Typo.subtitle2">@L.T("detail.activity_history")</MudText>
+                            <MudIcon Icon="@Icons.Material.Filled.CheckBox" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2">@L.T("checklist.title")</MudText>
+                            @if (_ticket.Checklist?.Count > 0)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    (@(_ticket.Checklist.Count(c => c.Completed))/@_ticket.Checklist.Count)
+                                </MudText>
+                            }
                         </div>
                     </TitleContent>
                     <ChildContent>
-                        <TicketActivityFeed Ticket="_ticket"
-                                            Kinds="@(new[] { TicketActivityFeed.ActivityKind.History })" />
+                        @if (_ticket.Checklist?.Count > 0)
+                        {
+                            <div class="d-flex flex-column gap-1 mb-2">
+                                @foreach (var item in _ticket.Checklist)
+                                {
+                                    var itemRef = item;
+                                    <div class="d-flex align-center gap-2">
+                                        <MudCheckBox T="bool" Value="@itemRef.Completed" Dense="true"
+                                                     ValueChanged="@(v => ToggleChecklistItemAsync(itemRef.Id!, v))"
+                                                     Disabled="_isLoading" />
+                                        <MudText Typo="Typo.body2"
+                                                 Style="@(itemRef.Completed ? "text-decoration: line-through; opacity: 0.6; flex:1;" : "flex:1;")">
+                                            @itemRef.Title
+                                        </MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                                       OnClick="@(() => DeleteChecklistItemAsync(itemRef.Id!))"
+                                                       Disabled="_isLoading"
+                                                       aria-label="@L.T("common.delete")" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <div class="d-flex gap-1">
+                            <MudTextField @bind-Value="_newChecklistTitle" Placeholder="@L.T("checklist.new_item")"
+                                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1"
+                                          OnKeyDown="@(async (e) => { if (e.Key == "Enter") await AddChecklistItemAsync(); })" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                                           OnClick="AddChecklistItemAsync"
+                                           Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_newChecklistTitle))" />
+                        </div>
                     </ChildContent>
                 </MudExpansionPanel>
             </MudExpansionPanels>
-        </MudItem>
 
-        @* ─── Sidebar ────────────────────────────────────────────────── *@
-        <MudItem xs="12" md="4">
-            @* Details — collapsible. Open by default so the regular flow is
-               unchanged, but users on small screens can fold it away when
-               they only care about the conversation/checklist. *@
+            @* Details — collapsed by default; sits directly above the
+               full-width History panel that follows after </MudGrid>. *@
             <MudExpansionPanels Elevation="1" Class="mb-3">
-                <MudExpansionPanel Expanded="true">
+                <MudExpansionPanel>
                     <TitleContent>
                         <div class="d-flex align-center gap-2">
                             <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
@@ -414,79 +481,6 @@ else
                     </ChildContent>
                 </MudExpansionPanel>
             </MudExpansionPanels>
-
-            @* Tags *@
-            <MudPaper Elevation="1" Class="pa-4 mb-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.tags")</MudText>
-                <div class="d-flex flex-wrap gap-1 align-center">
-                    @if (_ticket.Tags?.Count > 0)
-                    {
-                        @foreach (var tag in _ticket.Tags)
-                        {
-                            var tagId = tag.Id;
-                            <MudChip T="string" Size="Size.Small" OnClose="@(_ => RemoveTagAsync(tagId!))"
-                                     Disabled="_isLoading">@tag.Name</MudChip>
-                        }
-                    }
-                    @if (_availableTags.Any(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
-                    {
-                        <MudMenu Icon="@Icons.Material.Filled.Add" Size="Size.Small"
-                                 Dense="true" aria-label="@L.T("detail.add_tag")">
-                            @foreach (var tag in _availableTags.Where(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
-                            {
-                                <MudMenuItem OnClick="@(() => AddTagAsync(tag.Id!, tag.Name!))">@tag.Name</MudMenuItem>
-                            }
-                        </MudMenu>
-                    }
-                    @if ((_ticket.Tags?.Count ?? 0) == 0 && !_availableTags.Any())
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
-                    }
-                </div>
-            </MudPaper>
-
-            @* Checklist *@
-            <MudPaper Elevation="1" Class="pa-4 mb-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">
-                    @L.T("checklist.title")
-                    @if (_ticket.Checklist?.Count > 0)
-                    {
-                        <span style="font-weight:normal; opacity:0.7;">
-                            (@(_ticket.Checklist.Count(c => c.Completed))/@_ticket.Checklist.Count)
-                        </span>
-                    }
-                </MudText>
-                @if (_ticket.Checklist?.Count > 0)
-                {
-                    <div class="d-flex flex-column gap-1 mb-2">
-                        @foreach (var item in _ticket.Checklist)
-                        {
-                            var itemRef = item;
-                            <div class="d-flex align-center gap-2">
-                                <MudCheckBox T="bool" Value="@itemRef.Completed" Dense="true"
-                                             ValueChanged="@(v => ToggleChecklistItemAsync(itemRef.Id!, v))"
-                                             Disabled="_isLoading" />
-                                <MudText Typo="Typo.body2"
-                                         Style="@(itemRef.Completed ? "text-decoration: line-through; opacity: 0.6; flex:1;" : "flex:1;")">
-                                    @itemRef.Title
-                                </MudText>
-                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
-                                               OnClick="@(() => DeleteChecklistItemAsync(itemRef.Id!))"
-                                               Disabled="_isLoading"
-                                               aria-label="@L.T("common.delete")" />
-                            </div>
-                        }
-                    </div>
-                }
-                <div class="d-flex gap-1">
-                    <MudTextField @bind-Value="_newChecklistTitle" Placeholder="@L.T("checklist.new_item")"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1"
-                                  OnKeyDown="@(async (e) => { if (e.Key == "Enter") await AddChecklistItemAsync(); })" />
-                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
-                                   OnClick="AddChecklistItemAsync"
-                                   Disabled="@(_isLoading || string.IsNullOrWhiteSpace(_newChecklistTitle))" />
-                </div>
-            </MudPaper>
 
             @* Attachments — Upload deaktiviert auf Nutzerwunsch; Panel komplett ausgeblendet, Code bleibt erhalten. *@
             @if (false)
@@ -587,6 +581,24 @@ else
                liegen, schaden aber nicht. *@
         </MudItem>
     </MudGrid>
+
+    @* Verlauf am Ende des Tickets — volle Breite unter dem Grid, damit
+       Statushistorie etc. wirklich ganz unten landet (Nutzerwunsch
+       2026-05-19). Default zu, damit es nicht stört. *@
+    <MudExpansionPanels Elevation="1" Class="pwa-no-print mt-4">
+        <MudExpansionPanel>
+            <TitleContent>
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                    <MudText Typo="Typo.subtitle2">@L.T("detail.activity_history")</MudText>
+                </div>
+            </TitleContent>
+            <ChildContent>
+                <TicketActivityFeed Ticket="_ticket"
+                                    Kinds="@(new[] { TicketActivityFeed.ActivityKind.History })" />
+            </ChildContent>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
 }
 
 @code {
