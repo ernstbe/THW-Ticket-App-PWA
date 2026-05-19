@@ -354,35 +354,52 @@ else
                History moves OUT of this grid to a full-width panel after
                the grid so it truly lands at the end of the ticket. ───── *@
         <MudItem xs="12" md="4">
-            @* Tags *@
-            <MudPaper Elevation="1" Class="pa-4 mb-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.tags")</MudText>
-                <div class="d-flex flex-wrap gap-1 align-center">
-                    @if (_ticket.Tags?.Count > 0)
-                    {
-                        @foreach (var tag in _ticket.Tags)
-                        {
-                            var tagId = tag.Id;
-                            <MudChip T="string" Size="Size.Small" OnClose="@(_ => RemoveTagAsync(tagId!))"
-                                     Disabled="_isLoading">@tag.Name</MudChip>
-                        }
-                    }
-                    @if (_availableTags.Any(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
-                    {
-                        <MudMenu Icon="@Icons.Material.Filled.Add" Size="Size.Small"
-                                 Dense="true" aria-label="@L.T("detail.add_tag")">
-                            @foreach (var tag in _availableTags.Where(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+            @* Tags — collapsible like the other bottom-of-ticket panels.
+               The current tag count stays visible in the header so users
+               see how many are set without expanding. *@
+            <MudExpansionPanels Elevation="1" Class="mb-3">
+                <MudExpansionPanel>
+                    <TitleContent>
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalOffer" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2">@L.T("detail.tags")</MudText>
+                            @if ((_ticket.Tags?.Count ?? 0) > 0)
                             {
-                                <MudMenuItem OnClick="@(() => AddTagAsync(tag.Id!, tag.Name!))">@tag.Name</MudMenuItem>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    (@_ticket.Tags!.Count)
+                                </MudText>
                             }
-                        </MudMenu>
-                    }
-                    @if ((_ticket.Tags?.Count ?? 0) == 0 && !_availableTags.Any())
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
-                    }
-                </div>
-            </MudPaper>
+                        </div>
+                    </TitleContent>
+                    <ChildContent>
+                        <div class="d-flex flex-wrap gap-1 align-center">
+                            @if (_ticket.Tags?.Count > 0)
+                            {
+                                @foreach (var tag in _ticket.Tags)
+                                {
+                                    var tagId = tag.Id;
+                                    <MudChip T="string" Size="Size.Small" OnClose="@(_ => RemoveTagAsync(tagId!))"
+                                             Disabled="_isLoading">@tag.Name</MudChip>
+                                }
+                            }
+                            @if (_availableTags.Any(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+                            {
+                                <MudMenu Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                         Dense="true" aria-label="@L.T("detail.add_tag")">
+                                    @foreach (var tag in _availableTags.Where(t => !(_ticket.Tags?.Any(tt => tt.Id == t.Id) ?? false)))
+                                    {
+                                        <MudMenuItem OnClick="@(() => AddTagAsync(tag.Id!, tag.Name!))">@tag.Name</MudMenuItem>
+                                    }
+                                </MudMenu>
+                            }
+                            @if ((_ticket.Tags?.Count ?? 0) == 0 && !_availableTags.Any())
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                            }
+                        </div>
+                    </ChildContent>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
 
             @* Checklist — collapsed behind the expansion arrow on user
                request. Header keeps the progress count visible so users
