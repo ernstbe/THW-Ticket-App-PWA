@@ -31,6 +31,13 @@ public class RealtimeService : IAsyncDisposable
     // Convenience fan-in for list-style pages that want to refresh on any ticket change.
     public event Action<string>? AnyTicketChanged;
 
+    // Lets pages that mutate notification state (mark read, mark all read)
+    // poke the same listeners the Socket.IO "notificationUpdate" event would —
+    // the server doesn't emit a socket event on read, so without this the
+    // app-bar bell badge stays stale until a new notification arrives or the
+    // PWA is hard-reloaded.
+    public void RaiseLocalNotificationUpdate() => NotificationUpdate?.Invoke();
+
     public event Action<bool>? ConnectionStateChanged;
     public bool IsConnected { get; private set; }
 
