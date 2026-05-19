@@ -857,7 +857,10 @@ else
 
     private void StartDescriptionEdit()
     {
-        _editIssue = _ticket?.Issue ?? string.Empty;
+        // trudesk stores Issue as HTML (e.g. <p>…</p>), so feed it through
+        // HtmlToPlainText before dropping it into the MudTextField —
+        // otherwise the user sees raw tags when editing.
+        _editIssue = HtmlToPlainText.Convert(_ticket?.Issue);
         _editingDescription = true;
     }
     private void CancelDescriptionEdit() => _editingDescription = false;
