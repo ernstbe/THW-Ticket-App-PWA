@@ -49,14 +49,17 @@ html, body {
     background: rgba(0, 51, 153, 0.05);
 }
 
-/* Fälligkeit picker in the ticket-detail chips row: keep the input field
-   compact so it sits next to the chips, but DON'T let max-width cascade
-   into the popover and squash the calendar to ~180px wide. */
-.ticket-due-picker {
-    max-width: 200px;
-}
-.ticket-due-picker .mud-picker-container {
-    max-width: none;
+/* Hide the off-screen MudDatePicker that backs the due-date chip.
+   We can't use display:none on the host (the picker would not render
+   its popup anchor), so park it off-screen with absolute positioning
+   instead. The popover/dialog renders into the global PopoverProvider
+   container regardless. */
+.pwa-duepicker-host {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
 }
 
 /* Print-only block on TicketDetail. Hidden in screen view; the print
