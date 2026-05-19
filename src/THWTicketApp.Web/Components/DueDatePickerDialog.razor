@@ -1,0 +1,60 @@
+@using MudBlazor
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+@*
+    Wraps a static MudDatePicker inside a MudDialog so we get the standard
+    backdrop-tap-to-close behavior on phones. The previous "off-screen
+    MudDatePicker + ActivatorContent chip" approach did not honor the
+    outside-tap dismissal on touch devices.
+
+    Returns:
+      DialogResult.Ok(DateTime?) — user picked or cleared the date
+      DialogResult.Cancel()      — user dismissed (backdrop / Esc / X)
+*@
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Event" />
+            <MudText Typo="Typo.h6">@L.T("detail.due")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudDatePicker @bind-Date="_picked"
+                       PickerVariant="PickerVariant.Static"
+                       AutoClose="false"
+                       Editable="false" />
+    </DialogContent>
+    <DialogActions>
+        @if (_picked.HasValue || InitialDate.HasValue)
+        {
+            <MudButton Color="Color.Error" OnClick="Clear">
+                @L.T("common.delete")
+            </MudButton>
+        }
+        <MudSpacer />
+        <MudButton OnClick="Cancel">@L.T("common.cancel")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save"
+                   Disabled="@(!_picked.HasValue)">
+            @L.T("common.save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public DateTime? InitialDate { get; set; }
+
+    private DateTime? _picked;
+
+    protected override void OnInitialized()
+    {
+        _picked = InitialDate;
+    }
+
+    private void Save() => MudDialog.Close(DialogResult.Ok<DateTime?>(_picked));
+    private void Clear() => MudDialog.Close(DialogResult.Ok<DateTime?>(null));
+    private void Cancel() => MudDialog.Cancel();
+}

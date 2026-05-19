@@ -49,19 +49,6 @@ html, body {
     background: rgba(0, 51, 153, 0.05);
 }
 
-/* Hide the off-screen MudDatePicker that backs the due-date chip.
-   We can't use display:none on the host (the picker would not render
-   its popup anchor), so park it off-screen with absolute positioning
-   instead. The popover/dialog renders into the global PopoverProvider
-   container regardless. */
-.pwa-duepicker-host {
-    position: absolute;
-    width: 0;
-    height: 0;
-    overflow: hidden;
-    pointer-events: none;
-}
-
 /* Print-only block on TicketDetail. Hidden in screen view; the print
    media query below hides the app shell + tabs and shows this block
    so users can "Save as PDF" from the browser print dialog for paper
