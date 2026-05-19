@@ -237,6 +237,8 @@ else
         {
             notification.IsRead = true;
             _ = ApiService.MarkNotificationReadAsync(notification.Id);
+            // Server has no socket emit on read — poke the bell badge ourselves.
+            Realtime.RaiseLocalNotificationUpdate();
         }
 
         if (!string.IsNullOrEmpty(notification.TicketUid))
@@ -258,6 +260,10 @@ else
             StateHasChanged();
             Snackbar.Add(L.T("notifications.mark_failed"), Severity.Error);
         }
+        else
+        {
+            Realtime.RaiseLocalNotificationUpdate();
+        }
     }
 
     private async Task MarkAllReadAsync()
@@ -267,6 +273,7 @@ else
         {
             var updated = await ApiService.MarkAllNotificationsReadAsync();
             foreach (var n in _notifications) n.IsRead = true;
+            Realtime.RaiseLocalNotificationUpdate();
             Snackbar.Add(string.Format(L.T("notifications.marked_all"), updated), Severity.Success);
         }
         finally
