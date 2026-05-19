@@ -224,12 +224,28 @@ else
                 }
             </MudPaper>
 
-            @* Activity feed *@
-            <MudText Typo="Typo.h6" Class="mb-3">@L.T("detail.activity")</MudText>
-            <TicketActivityFeed Ticket="_ticket" />
+            @* Comments + Notes feed — prominent, with a toggle icon that
+               reveals the composer below. History was previously merged in
+               here but moved into a collapsed expansion panel at the bottom
+               of this column so the conversation stays visible. *@
+            <div class="d-flex align-center justify-space-between mb-3">
+                <MudText Typo="Typo.h6">@L.T("detail.activity_comments_notes")</MudText>
+                <MudTooltip Text="@L.T(_composerOpen ? "detail.composer_close" : "detail.composer_open")">
+                    <MudIconButton Icon="@(_composerOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.AddComment)"
+                                   Color="@(_composerOpen ? Color.Default : Color.Primary)"
+                                   OnClick="@(() => _composerOpen = !_composerOpen)"
+                                   aria-label="@L.T(_composerOpen ? "detail.composer_close" : "detail.composer_open")" />
+                </MudTooltip>
+            </div>
+            <TicketActivityFeed Ticket="_ticket"
+                                Kinds="@(new[] { TicketActivityFeed.ActivityKind.Comment, TicketActivityFeed.ActivityKind.Note })" />
 
-            @* Composer — bottom of the left column, sticky-ish *@
-            <MudPaper Elevation="2" Class="pa-3 mt-6" Style="position: sticky; bottom: 0;">
+            @* Composer — hidden behind the toggle icon above so it doesn't
+               crowd the conversation by default. Reported via in-app bug
+               from b.ernst (2026-05-19): composer was always-on, too loud. *@
+            @if (_composerOpen)
+            {
+            <MudPaper Elevation="2" Class="pa-3 mt-4">
                 <MudTabs Elevation="0" Rounded="false" Border="false"
                          ApplyEffectsToContainer="true" @bind-ActivePanelIndex="_composerTab">
                     <MudTabPanel Text="@L.T("detail.composer_comment")" Icon="@Icons.Material.Filled.Comment">
@@ -329,45 +345,75 @@ else
                     </MudTabPanel>
                 </MudTabs>
             </MudPaper>
+            }
+
+            @* History — moved to the bottom of the left column and tucked
+               into a collapsed expansion panel so status/field changes
+               don't crowd the conversation. *@
+            <MudExpansionPanels Elevation="1" Class="mt-6">
+                <MudExpansionPanel>
+                    <TitleContent>
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2">@L.T("detail.activity_history")</MudText>
+                        </div>
+                    </TitleContent>
+                    <ChildContent>
+                        <TicketActivityFeed Ticket="_ticket"
+                                            Kinds="@(new[] { TicketActivityFeed.ActivityKind.History })" />
+                    </ChildContent>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
         </MudItem>
 
         @* ─── Sidebar ────────────────────────────────────────────────── *@
         <MudItem xs="12" md="4">
-            @* Meta *@
-            <MudPaper Elevation="1" Class="pa-4 mb-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.details")</MudText>
-                <div class="d-flex flex-column gap-1">
-                    <div class="d-flex align-center gap-2">
-                        <UserAvatar Name="@_ticket.Owner?.Fullname" Size="Size.Small" />
-                        <div style="flex:1;">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.creator")</MudText>
-                            <MudText Typo="Typo.body2">@(_ticket.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
+            @* Details — collapsible. Open by default so the regular flow is
+               unchanged, but users on small screens can fold it away when
+               they only care about the conversation/checklist. *@
+            <MudExpansionPanels Elevation="1" Class="mb-3">
+                <MudExpansionPanel Expanded="true">
+                    <TitleContent>
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2">@L.T("detail.details")</MudText>
                         </div>
-                    </div>
-                    <MudDivider Class="my-2" />
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.type")</MudText>
-                        <MudText Typo="Typo.body2">@(_ticket.Type?.TranslatedName ?? "-")</MudText>
-                    </div>
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.created")</MudText>
-                        <MudText Typo="Typo.body2">@_ticket.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</MudText>
-                    </div>
-                    <div>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.updated")</MudText>
-                        <MudText Typo="Typo.body2">@_ticket.Updated.ToLocalDisplayString("dd.MM.yyyy HH:mm")</MudText>
-                    </div>
-                    @if (_ticket.DueDate != DateTime.MinValue)
-                    {
-                        <div>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.due")</MudText>
-                            <MudText Typo="Typo.body2" Color="@(_ticket.DueDate < DateTime.Now ? Color.Error : Color.Default)">
-                                @_ticket.DueDate.ToLocalDisplayString("dd.MM.yyyy HH:mm")
-                            </MudText>
+                    </TitleContent>
+                    <ChildContent>
+                        <div class="d-flex flex-column gap-1">
+                            <div class="d-flex align-center gap-2">
+                                <UserAvatar Name="@_ticket.Owner?.Fullname" Size="Size.Small" />
+                                <div style="flex:1;">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.creator")</MudText>
+                                    <MudText Typo="Typo.body2">@(_ticket.Owner?.Fullname ?? L.T("common.unknown"))</MudText>
+                                </div>
+                            </div>
+                            <MudDivider Class="my-2" />
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.type")</MudText>
+                                <MudText Typo="Typo.body2">@(_ticket.Type?.TranslatedName ?? "-")</MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.created")</MudText>
+                                <MudText Typo="Typo.body2">@_ticket.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</MudText>
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.updated")</MudText>
+                                <MudText Typo="Typo.body2">@_ticket.Updated.ToLocalDisplayString("dd.MM.yyyy HH:mm")</MudText>
+                            </div>
+                            @if (_ticket.DueDate != DateTime.MinValue)
+                            {
+                                <div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.due")</MudText>
+                                    <MudText Typo="Typo.body2" Color="@(_ticket.DueDate < DateTime.Now ? Color.Error : Color.Default)">
+                                        @_ticket.DueDate.ToLocalDisplayString("dd.MM.yyyy HH:mm")
+                                    </MudText>
+                                </div>
+                            }
                         </div>
-                    }
-                </div>
-            </MudPaper>
+                    </ChildContent>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
 
             @* Tags *@
             <MudPaper Elevation="1" Class="pa-4 mb-3">
@@ -535,54 +581,10 @@ else
                 </MudPaper>
             }
 
-            @* Time tracking *@
-            <MudPaper Elevation="1" Class="pa-4 mb-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">
-                    @L.T("time.title")
-                    <span style="font-weight:normal; opacity:0.7;">(@FormatMinutes(_totalTimeMinutes))</span>
-                </MudText>
-                <div class="d-flex align-center gap-2 mb-2">
-                    <MudText Typo="Typo.h6" Style="font-family:monospace; flex:1;"
-                             Color="@(_timerRunning ? Color.Primary : Color.Default)">
-                        @FormatElapsed(_timerElapsed)
-                    </MudText>
-                    @if (!_timerRunning)
-                    {
-                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success"
-                                       OnClick="StartTimer" />
-                    }
-                    else
-                    {
-                        <MudIconButton Icon="@Icons.Material.Filled.Stop" Color="Color.Error"
-                                       OnClick="StopTimer" />
-                    }
-                </div>
-                @if (_timerRunning)
-                {
-                    <MudTextField @bind-Value="_timeEntryDescription" Placeholder="@L.T("time.description")"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
-                }
-                @if (_timeEntries.Count > 0)
-                {
-                    <MudExpansionPanels Elevation="0" Class="mt-2" Dense="true">
-                        <MudExpansionPanel Text="@($"{_timeEntries.Count} {L.T("time.entries_short")}")">
-                            <div class="d-flex flex-column gap-1">
-                                @foreach (var entry in _timeEntries.OrderByDescending(e => e.Start))
-                                {
-                                    <div class="d-flex align-center gap-2">
-                                        <MudText Typo="Typo.caption">@entry.Start.ToLocalDisplayString("dd.MM HH:mm")</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@FormatMinutes(entry.DurationMinutes)</MudText>
-                                        @if (!string.IsNullOrEmpty(entry.Description))
-                                        {
-                                            <MudText Typo="Typo.caption" Style="flex:1;">@entry.Description</MudText>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
-                }
-            </MudPaper>
+            @* Time tracking entfernt auf Nutzerwunsch (2026-05-19) — die
+               Funktion wurde nirgendwo verwendet und hat die Sidebar
+               aufgebläht. localStorage-Keys "time_entries_<uid>" bleiben
+               liegen, schaden aber nicht. *@
         </MudItem>
     </MudGrid>
 }
@@ -600,7 +602,10 @@ else
     private string _editIssue = string.Empty;
     private DateTime? _dueDateLocal;
 
-    // Composer state
+    // Composer state — hidden behind the toggle icon next to the
+    // comments header. Defaults to closed so the conversation stays
+    // visible without a giant text field crowding it.
+    private bool _composerOpen;
     private int _composerTab;
     private string _newComment = string.Empty;
     private bool _commentPreview;
@@ -635,15 +640,6 @@ else
     private int _linkTicketUid;
     private string _linkType = "";
 
-    // Time tracking
-    private bool _timerRunning;
-    private DateTime _timerStart;
-    private TimeSpan _timerElapsed;
-    private string _timeEntryDescription = string.Empty;
-    private List<TimeEntryItem> _timeEntries = [];
-    private int _totalTimeMinutes;
-    private System.Threading.Timer? _timer;
-
     private CancellationTokenSource? _refreshDebounceCts;
 
     // ─── Lifecycle ───────────────────────────────────────────────────────
@@ -655,7 +651,6 @@ else
         _ = LoadReferenceDataAsync();
         await LoadFavoriteStateAsync();
         await LoadLinkedTicketsAsync();
-        await LoadTimeEntriesAsync();
         await LoadQuickRepliesAsync();
         await LoadSubscriptionStateAsync();
         Realtime.AnyTicketChanged += OnRealtimeChange;
@@ -1302,67 +1297,6 @@ else
         Snackbar.Add(L.T("detail.templates_saved"), Severity.Success);
     }
 
-    // ─── Time tracking ──────────────────────────────────────────────────
-
-    private void StartTimer()
-    {
-        _timerStart = DateTime.Now;
-        _timerRunning = true;
-        _timerElapsed = TimeSpan.Zero;
-        _timer = new System.Threading.Timer(_ =>
-        {
-            _timerElapsed = DateTime.Now - _timerStart;
-            InvokeAsync(StateHasChanged);
-        }, null, 0, 1000);
-    }
-
-    private async Task StopTimer()
-    {
-        _timer?.Dispose();
-        _timer = null;
-        _timerRunning = false;
-        var duration = DateTime.Now - _timerStart;
-        if (duration.TotalMinutes >= 0.5)
-        {
-            _timeEntries.Add(new TimeEntryItem
-            {
-                Start = _timerStart,
-                DurationMinutes = (int)Math.Ceiling(duration.TotalMinutes),
-                Description = string.IsNullOrWhiteSpace(_timeEntryDescription) ? null : _timeEntryDescription
-            });
-            _totalTimeMinutes = _timeEntries.Sum(e => e.DurationMinutes);
-            _timeEntryDescription = string.Empty;
-            await SaveTimeEntriesAsync();
-        }
-        _timerElapsed = TimeSpan.Zero;
-    }
-
-    private async Task LoadTimeEntriesAsync()
-    {
-        try
-        {
-            var json = await LocalStorage.GetItemAsync($"time_entries_{TicketUid}");
-            if (!string.IsNullOrEmpty(json))
-            {
-                _timeEntries = JsonSerializer.Deserialize<List<TimeEntryItem>>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
-                _totalTimeMinutes = _timeEntries.Sum(e => e.DurationMinutes);
-            }
-        }
-        catch { }
-    }
-
-    private async Task SaveTimeEntriesAsync()
-        => await LocalStorage.SetItemAsync($"time_entries_{TicketUid}", JsonSerializer.Serialize(_timeEntries));
-
-    internal static string FormatElapsed(TimeSpan ts) => $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
-
-    internal static string FormatMinutes(int minutes)
-    {
-        if (minutes >= 60) return $"{minutes / 60}h {minutes % 60}m";
-        return $"{minutes}m";
-    }
-
     // ─── Disposal ───────────────────────────────────────────────────────
 
     public async ValueTask DisposeAsync()
@@ -1370,7 +1304,6 @@ else
         Realtime.AnyTicketChanged -= OnRealtimeChange;
         _refreshDebounceCts?.Cancel();
         _refreshDebounceCts?.Dispose();
-        _timer?.Dispose();
         if (_dropzoneModule != null)
         {
             try { await _dropzoneModule.InvokeVoidAsync("unregister", "attachment-dropzone"); } catch { }
@@ -1383,13 +1316,6 @@ else
     }
 
     // ─── Local DTOs ─────────────────────────────────────────────────────
-
-    private class TimeEntryItem
-    {
-        public DateTime Start { get; set; }
-        public int DurationMinutes { get; set; }
-        public string? Description { get; set; }
-    }
 
     private class LinkedTicketItem
     {

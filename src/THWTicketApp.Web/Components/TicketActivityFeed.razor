@@ -69,15 +69,21 @@ else
 @code {
     [Parameter, EditorRequired] public Ticket? Ticket { get; set; }
 
-    private List<ActivityEvent> Items => BuildFeed(Ticket);
+    // Limit the feed to a subset of activity kinds. The detail page renders
+    // two feeds: comments+notes prominently, history collapsed below.
+    [Parameter] public ActivityKind[]? Kinds { get; set; }
+
+    private List<ActivityEvent> Items => BuildFeed(Ticket, Kinds);
     private static readonly MarkdownPipeline _md = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
 
-    internal static List<ActivityEvent> BuildFeed(Ticket? ticket)
+    internal static List<ActivityEvent> BuildFeed(Ticket? ticket, ActivityKind[]? kinds = null)
     {
         var list = new List<ActivityEvent>();
         if (ticket == null) return list;
 
-        if (ticket.Comments != null)
+        bool Wants(ActivityKind k) => kinds == null || Array.IndexOf(kinds, k) >= 0;
+
+        if (Wants(ActivityKind.Comment) && ticket.Comments != null)
             list.AddRange(ticket.Comments.Select(c => new ActivityEvent
             {
                 Kind = ActivityKind.Comment,
@@ -86,7 +92,7 @@ else
                 Body = c.Text
             }));
 
-        if (ticket.Notes != null)
+        if (Wants(ActivityKind.Note) && ticket.Notes != null)
             list.AddRange(ticket.Notes.Select(n => new ActivityEvent
             {
                 Kind = ActivityKind.Note,
@@ -95,7 +101,7 @@ else
                 Body = n.Content
             }));
 
-        if (ticket.History != null)
+        if (Wants(ActivityKind.History) && ticket.History != null)
             list.AddRange(ticket.History.Select(h => new ActivityEvent
             {
                 Kind = ActivityKind.History,
@@ -127,7 +133,7 @@ else
         return local.ToString("dd.MM.yyyy HH:mm");
     }
 
-    internal enum ActivityKind { Comment, Note, History }
+    public enum ActivityKind { Comment, Note, History }
 
     internal sealed class ActivityEvent
     {
