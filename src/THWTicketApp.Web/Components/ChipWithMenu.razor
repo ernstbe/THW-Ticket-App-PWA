@@ -27,8 +27,11 @@
 
 @typeparam T
 
-<MudChip @ref="_chip" T="string" Size="Size.Small" Color="@Color" Variant="Variant.Filled"
-         Icon="@Icon" Style="cursor:pointer;"
+<MudChip @ref="_chip" T="string" Size="Size.Small"
+         Color="@(string.IsNullOrEmpty(BackgroundColor) ? Color : MudBlazor.Color.Default)"
+         Variant="Variant.Filled"
+         Icon="@Icon"
+         Style="@ChipStyle"
          OnClick="@OpenAsync">
     @if (string.IsNullOrEmpty(Label))
     {
@@ -74,6 +77,13 @@
     [Parameter] public string? EmptyLabel { get; set; }
     [Parameter] public string? Icon { get; set; }
     [Parameter] public Color Color { get; set; } = Color.Default;
+    /// <summary>
+    /// CSS color used as the chip's background. Overrides the MudBlazor
+    /// <see cref="Color"/> enum when set, so callers can honour the
+    /// trudesk-configured HtmlColor of a Status/Priority/etc. instead of
+    /// mapping it to a coarse palette slot.
+    /// </summary>
+    [Parameter] public string? BackgroundColor { get; set; }
     [Parameter] public IEnumerable<T>? Items { get; set; }
     [Parameter, EditorRequired] public Func<T, string> ItemTitle { get; set; } = _ => "";
     [Parameter] public EventCallback<T> OnSelected { get; set; }
@@ -83,6 +93,10 @@
 
     private MudChip<string>? _chip;
     private bool _open;
+
+    private string ChipStyle => string.IsNullOrEmpty(BackgroundColor)
+        ? "cursor:pointer;"
+        : $"cursor:pointer; background-color: {BackgroundColor}; color: white;";
 
     private Task OpenAsync()
     {
