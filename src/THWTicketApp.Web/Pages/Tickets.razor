@@ -100,7 +100,11 @@
    scrollbar — Sortier-Select + 3 Icons + Counter + Saved-Filter-Menu
    together overflow a phone viewport without it. *@
 <div class="d-flex align-center gap-2 mb-4 flex-wrap">
-    <MudSelect T="string" @bind-Value="_activeSort" Label="@L.T("tickets.sort")" Variant="Variant.Outlined"
+    @* @bind-Value:after re-applies the local sort the moment the user
+       picks a new option, otherwise the list only reflects the change
+       after the next manual refresh / filter click. *@
+    <MudSelect T="string" @bind-Value="_activeSort" @bind-Value:after="ApplyFilters"
+               Label="@L.T("tickets.sort")" Variant="Variant.Outlined"
                Dense="true" Style="max-width: 250px;">
         <MudSelectItem Value="@("date_desc")">@L.T("tickets.sort.newest")</MudSelectItem>
         <MudSelectItem Value="@("date_asc")">@L.T("tickets.sort.oldest")</MudSelectItem>
