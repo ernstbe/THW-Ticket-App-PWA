@@ -84,14 +84,14 @@ else
         <ChipWithMenu T="Status"
                       Label="@_ticket.Status?.TranslatedName"
                       Icon="@Icons.Material.Filled.Circle"
-                      Color="@StatusChipColor(_ticket.Status)"
+                      BackgroundColor="@_ticket.Status?.HtmlColor"
                       Items="@AllowedStatusesForCurrentType()"
                       ItemTitle="@(s => s.TranslatedName ?? "")"
                       OnSelected="QuickChangeStatusAsync" />
         <ChipWithMenu T="Priority"
                       Label="@_ticket.Priority?.TranslatedName"
                       Icon="@Icons.Material.Filled.Flag"
-                      Color="@PriorityChipColor(_ticket.Priority)"
+                      BackgroundColor="@_ticket.Priority?.HtmlColor"
                       Items="_priorities"
                       ItemTitle="@(p => p.TranslatedName ?? "")"
                       OnSelected="QuickChangePriorityAsync" />
@@ -975,30 +975,14 @@ else
 
     // ─── Chip coloring ──────────────────────────────────────────────────
 
-    private static Color StatusChipColor(Status? s)
-    {
-        if (s == null) return Color.Default;
-        if (s.IsResolved) return Color.Success;
-        return s.Uid switch
-        {
-            1 => Color.Info,      // Open
-            2 => Color.Warning,   // Pending
-            _ => Color.Default
-        };
-    }
+    // Status and priority chips honor the trudesk-configured HtmlColor
+    // directly (see ChipWithMenu.BackgroundColor) — no name/UID mapping
+    // here. The earlier helpers only knew the four default statuses and
+    // a couple of priority names, so any admin-defined value rendered
+    // grey. Reported via in-app bug 2026-05-19.
 
-    private static Color PriorityChipColor(Priority? p)
-    {
-        if (p == null) return Color.Default;
-        // Priority.Overdue maps to high — colour by name fallback.
-        var n = (p.Name ?? "").ToLowerInvariant();
-        if (n.Contains("hoch") || n.Contains("high") || n.Contains("urgent")) return Color.Error;
-        if (n.Contains("normal")) return Color.Info;
-        return Color.Default;
-    }
-
-    // Mirrors StatusChipColor / PriorityChipColor: paint red when the
-    // due date has already passed, default otherwise (incl. no date set).
+    // Paint the due-date chip red when the date has already passed,
+    // default otherwise (incl. no date set).
     private static Color DueDateChipColor(DateTime? due)
     {
         if (due == null) return Color.Default;
