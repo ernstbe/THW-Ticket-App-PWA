@@ -120,10 +120,10 @@ else
                       ClearLabel="@L.T("detail.remove_assign")"
                       EmptyMenuLabel="@L.T("detail.no_assignees_available")" />
         @* Due date — chip with the same look as Status/Priority/Group/
-           Assignee. The MudDatePicker is rendered off-screen and opened
-           programmatically when the chip is clicked. MudDatePicker has
-           no ActivatorContent slot in MudBlazor 9.1, so wrapping it in a
-           collapsed activator was not an option. *@
+           Assignee. Click opens a MudDialog that contains a static
+           MudDatePicker, which gives us reliable backdrop-tap-to-close
+           on mobile (the previous off-screen MudDatePicker + ActivatorContent
+           pattern did not dismiss when tapping outside on phones). *@
         <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
                  Color="@DueDateChipColor(_dueDateLocal)"
                  Icon="@Icons.Material.Filled.Event"
@@ -138,14 +138,6 @@ else
                 <em style="opacity:0.7;">@L.T("detail.no_due")</em>
             }
         </MudChip>
-        <div class="pwa-duepicker-host">
-            <MudDatePicker @ref="_duePicker"
-                           Date="@_dueDateLocal"
-                           DateChanged="OnDueDateChangedAsync"
-                           PickerVariant="PickerVariant.Dialog"
-                           Clearable="true"
-                           Editable="false" />
-        </div>
     </div>
 
     @if (_isLoading)
@@ -656,7 +648,6 @@ else
     private string _editSubject = string.Empty;
     private string _editIssue = string.Empty;
     private DateTime? _dueDateLocal;
-    private MudDatePicker? _duePicker;
 
     // Composer state — hidden behind the toggle icon next to the
     // comments header. Defaults to closed so the conversation stays
@@ -1034,8 +1025,18 @@ else
 
     private async Task OpenDuePickerAsync()
     {
-        if (_duePicker != null)
-            await _duePicker.OpenAsync();
+        var parameters = new DialogParameters<DueDatePickerDialog>
+        {
+            { x => x.InitialDate, _dueDateLocal }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DueDatePickerDialog>(L.T("detail.due"), parameters, options);
+        var result = await dialog.Result;
+        if (result == null || result.Canceled) return;
+
+        // DialogResult.Ok(null) = explicit clear, Ok(DateTime) = pick.
+        var newDate = result.Data as DateTime?;
+        await OnDueDateChangedAsync(newDate);
     }
 
     // ─── Tags ───────────────────────────────────────────────────────────
