@@ -127,3 +127,21 @@ html, body {
 @media print {
     .bugreport-fab { display: none !important; }
 }
+
+/* App bar — Dense mode already drops MudAppBar height from 64px to 48px
+ * on every viewport. On phones (≤600px) the title font and the four
+ * trailing icon buttons (bell, dark mode, logout + offline chip) still
+ * crowd the bar, so shrink them further. Reported via in-app bug from
+ * b.ernst (2026-05-19): "HeadBanner ist zu groß auf dem Smartphone". */
+@media (max-width: 600px) {
+    .pwa-appbar .pwa-appbar-title {
+        font-size: 1rem;
+        line-height: 1.25;
+    }
+    .pwa-appbar .mud-icon-button {
+        padding: 6px;
+    }
+    .pwa-appbar .mud-icon-button .mud-icon-root {
+        font-size: 1.25rem;
+    }
+}
