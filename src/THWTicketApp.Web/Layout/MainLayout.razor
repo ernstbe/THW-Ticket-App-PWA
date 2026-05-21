@@ -232,7 +232,11 @@
             PaletteLight = new PaletteLight
             {
                 Primary = _primaryColor,
-                Secondary = "#FFD700",
+                // Secondary wird quer durch die App als Textfarbe für
+                // gedämpfte Hinweise verwendet (Ticket-UIDs, Captions,
+                // Datumsangaben). Auf Weiß braucht das WCAG-AA-Kontrast,
+                // deshalb dunkles Goldenrod statt #FFD700.
+                Secondary = "#8B6914",
                 AppbarBackground = _primaryColor,
                 AppbarText = "#FFFFFF",
             },
