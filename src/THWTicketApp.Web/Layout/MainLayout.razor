@@ -347,7 +347,7 @@
             await BrowserNotifications.InitializeAsync();
 
             // Offline detection
-            _isOffline = !await JsRuntime.InvokeAsync<bool>("eval", "navigator.onLine");
+            _isOffline = !await JsRuntime.InvokeAsync<bool>("pwaHelpers.isOnline");
             _dotNetRef = DotNetObjectReference.Create(this);
             await JsRuntime.InvokeVoidAsync("window.registerConnectivityHandler", _dotNetRef);
 
@@ -362,16 +362,21 @@
 
             // Dark mode: respect user override first, fall back to system preference.
             // The toggle in Settings stores "true" / "false". Anything else (null,
-            // empty) means "follow the OS".
-            var darkMode = await LocalStorage.GetItemAsync("settings_darkmode");
+            // empty) means "follow the OS". Read from the synchronous preload
+            // window.__preloadedDarkMode set in index.html — avoids the async
+            // storage-interop module import that previously caused a Light→Dark
+            // flash on reload (and stuck the user in Light if anything later in
+            // OnAfterRenderAsync threw before StateHasChanged ran).
+            string? darkMode = null;
+            try { darkMode = await JsRuntime.InvokeAsync<string?>("pwaHelpers.getPreloadedDarkMode"); }
+            catch { darkMode = await LocalStorage.GetItemAsync("settings_darkmode"); }
             if (darkMode == "true") _isDarkMode = true;
             else if (darkMode == "false") _isDarkMode = false;
             else
             {
                 try
                 {
-                    _isDarkMode = await JsRuntime.InvokeAsync<bool>(
-                        "eval", "window.matchMedia('(prefers-color-scheme: dark)').matches");
+                    _isDarkMode = await JsRuntime.InvokeAsync<bool>("pwaHelpers.prefersDarkMode");
                 }
                 catch { /* fall through with default */ }
             }
