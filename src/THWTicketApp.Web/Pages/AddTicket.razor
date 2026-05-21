@@ -256,6 +256,10 @@ else
                 _ticketTypes = types.ToList();
                 _priorities = types.SelectMany(t => t.Priorities)
                     .DistinctBy(p => p.Id).ToList();
+                // Match against the original (English) name before the loop below
+                // mutates Name to its German translation.
+                _selectedPriority = _priorities.FirstOrDefault(p =>
+                    string.Equals(p.Name, "Normal", StringComparison.OrdinalIgnoreCase));
                 foreach (var p in _priorities)
                     p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
                 if (_ticketTypes.Count > 0) _selectedType = _ticketTypes[0];
