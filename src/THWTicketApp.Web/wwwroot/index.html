@@ -49,6 +49,12 @@
             refreshToken: localStorage.getItem('auth_refresh_token')
         };
 
+        // Pre-load the dark-mode preference so MudThemeProvider can pick it
+        // up on the very first render — no Light→Dark flash on reload, no
+        // dependency on the async storage-interop module. Null means "follow
+        // OS preference"; the C# side falls back to matchMedia in that case.
+        window.__preloadedDarkMode = localStorage.getItem('settings_darkmode');
+
         // Console tail — captures the last ~30 console messages so the
         // bug-report FAB can attach them as context. Wraps the four
         // common levels and keeps a rolling buffer; nothing else.
@@ -83,6 +89,7 @@
     </script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script src="js/pwa-helpers.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
 
     <!-- PWA update banner: shown when a new service worker is waiting. -->

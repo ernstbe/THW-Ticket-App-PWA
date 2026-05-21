@@ -503,8 +503,7 @@
             // Encode the markdown for a data URL. Base64 keeps non-ASCII safe.
             var bytes = System.Text.Encoding.UTF8.GetBytes(_generatedReport);
             var base64 = Convert.ToBase64String(bytes);
-            var script = $"const a=document.createElement('a');a.href='data:text/markdown;base64,{base64}';a.download='{filename}';a.click();";
-            await JsRuntime.InvokeVoidAsync("eval", script);
+            await JsRuntime.InvokeVoidAsync("pwaHelpers.downloadBase64", "text/markdown", base64, filename);
         }
         catch (Exception ex)
         {

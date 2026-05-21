@@ -108,10 +108,10 @@
         var ctx = new Dictionary<string, object?>
         {
             ["url"] = Navigation.Uri,
-            ["referrer"] = await TryEvalAsync("document.referrer"),
-            ["userAgent"] = await TryEvalAsync("navigator.userAgent"),
-            ["language"] = await TryEvalAsync("navigator.language"),
-            ["viewport"] = await TryEvalAsync("`${window.innerWidth}x${window.innerHeight}`"),
+            ["referrer"] = await TryHelperAsync("pwaHelpers.getReferrer"),
+            ["userAgent"] = await TryHelperAsync("pwaHelpers.getUserAgent"),
+            ["language"] = await TryHelperAsync("pwaHelpers.getLanguage"),
+            ["viewport"] = await TryHelperAsync("pwaHelpers.getViewport"),
             ["timestamp"] = DateTime.UtcNow
         };
 
@@ -132,17 +132,17 @@
         // Console tail — set up in index.html before Blazor boots.
         try
         {
-            var tail = await JS.InvokeAsync<object>("eval", "JSON.stringify(window.__consoleTail || [])");
-            ctx["consoleTail"] = tail?.ToString();
+            var tail = await JS.InvokeAsync<string?>("pwaHelpers.getConsoleTail");
+            ctx["consoleTail"] = tail;
         }
         catch { /* never block submit on context-gather */ }
 
         return ctx;
     }
 
-    private async Task<string?> TryEvalAsync(string expr)
+    private async Task<string?> TryHelperAsync(string identifier)
     {
-        try { return await JS.InvokeAsync<string>("eval", expr); }
+        try { return await JS.InvokeAsync<string?>(identifier); }
         catch { return null; }
     }
 

@@ -591,26 +591,7 @@
         StateHasChanged();
         try
         {
-            var foundUpdate = await JsRuntime.InvokeAsync<bool>("eval", @"
-                (async () => {
-                    if (!('serviceWorker' in navigator)) return false;
-                    const reg = await navigator.serviceWorker.getRegistration();
-                    if (!reg) return false;
-                    await reg.update();
-                    // After update(), an installing or waiting worker means
-                    // a new bundle was found. Give the install step a moment
-                    // to settle before we look.
-                    await new Promise(r => setTimeout(r, 1500));
-                    const target = reg.waiting || reg.installing;
-                    if (target) {
-                        // controllerchange listener in index.html handles the
-                        // actual page reload once activation happens.
-                        reg.waiting && reg.waiting.postMessage('SKIP_WAITING');
-                        return true;
-                    }
-                    return false;
-                })()
-            ");
+            var foundUpdate = await JsRuntime.InvokeAsync<bool>("pwaHelpers.checkForUpdate");
 
             if (!foundUpdate)
             {
@@ -939,8 +920,7 @@
             new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
         var base64 = Convert.ToBase64String(bytes);
-        await JsRuntime.InvokeVoidAsync("eval",
-            $"const a=document.createElement('a');a.href='data:application/json;base64,{base64}';a.download='sync-log.json';a.click()");
+        await JsRuntime.InvokeVoidAsync("pwaHelpers.downloadBase64", "application/json", base64, "sync-log.json");
     }
 
     private async Task ClearSyncLogAsync()
