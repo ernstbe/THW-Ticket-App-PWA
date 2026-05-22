@@ -84,7 +84,7 @@ else
             <MudTextField @bind-Value="_editNotice.Name" Label="@L.T("notices.name")" Variant="Variant.Outlined" Class="mb-3" />
             <MudTextField @bind-Value="_editNotice.Message" Label="@L.T("notices.message")" Variant="Variant.Outlined" Lines="3" Class="mb-3" />
             <MudColorPicker @bind-Value="_pickerColor" Label="@L.T("notices.bg_color")"
-                            ColorPickerView="ColorPickerView.Palette" DisableAlpha="true"
+                            ColorPickerView="ColorPickerView.Palette" ShowAlpha="false"
                             Variant="Variant.Outlined" Class="mb-3" />
         </DialogContent>
         <DialogActions>
