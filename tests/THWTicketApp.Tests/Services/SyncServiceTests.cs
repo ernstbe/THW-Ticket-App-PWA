@@ -140,7 +140,10 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 1, ActionType = "DeleteTicket", TicketId = "t1", TicketUid = 1001
+            Id = 1,
+            ActionType = "DeleteTicket",
+            TicketId = "t1",
+            TicketUid = 1001
         });
         _api.DeleteTicketAsync("t1").Returns(true);
 
@@ -156,9 +159,15 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 2, ActionType = "UpdateTicketFields",
-            TicketId = "t1", TicketUid = 1001,
-            Subject = "updated", Issue = "body", PriorityId = "p1", TypeId = "tt1", GroupId = "g1"
+            Id = 2,
+            ActionType = "UpdateTicketFields",
+            TicketId = "t1",
+            TicketUid = 1001,
+            Subject = "updated",
+            Issue = "body",
+            PriorityId = "p1",
+            TypeId = "tt1",
+            GroupId = "g1"
         });
         _api.EditTicketAsync(Arg.Any<Ticket>()).Returns(true);
 
@@ -180,9 +189,12 @@ public class SyncServiceTests
         var payload = new byte[] { 10, 20, 30 };
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 3, ActionType = "UploadAttachment",
-            TicketId = "t1", TicketUid = 1001,
-            FileName = "a.bin", FileContentType = "application/octet-stream",
+            Id = 3,
+            ActionType = "UploadAttachment",
+            TicketId = "t1",
+            TicketUid = 1001,
+            FileName = "a.bin",
+            FileContentType = "application/octet-stream",
             FileContentBase64 = Convert.ToBase64String(payload)
         });
 
@@ -215,8 +227,12 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 10, ActionType = "AddComment",
-            TicketId = "t1", TicketUid = 42, OwnerId = "u1", Content = "hi",
+            Id = 10,
+            ActionType = "AddComment",
+            TicketId = "t1",
+            TicketUid = 42,
+            OwnerId = "u1",
+            Content = "hi",
             RetryCount = 0
         });
         _api.AddCommentAsync("42", "u1", "hi").Returns(false);
@@ -245,8 +261,11 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 11, ActionType = "AddComment",
-            TicketId = "t1", OwnerId = "u1", Content = "hi",
+            Id = 11,
+            ActionType = "AddComment",
+            TicketId = "t1",
+            OwnerId = "u1",
+            Content = "hi",
             RetryCount = 1,
             NextRetryAt = DateTime.UtcNow.AddMinutes(10).ToString("O")
         });
@@ -263,8 +282,12 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 12, ActionType = "AddComment",
-            TicketId = "t1", TicketUid = 42, OwnerId = "u1", Content = "hi",
+            Id = 12,
+            ActionType = "AddComment",
+            TicketId = "t1",
+            TicketUid = 42,
+            OwnerId = "u1",
+            Content = "hi",
             RetryCount = 1,
             NextRetryAt = DateTime.UtcNow.AddSeconds(-5).ToString("O")
         });
@@ -282,8 +305,12 @@ public class SyncServiceTests
         var lastAttempt = SyncService.RetryDelays.Length; // failing for the (N+1)th time
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 13, ActionType = "AddComment",
-            TicketId = "t1", TicketUid = 42, OwnerId = "u1", Content = "hi",
+            Id = 13,
+            ActionType = "AddComment",
+            TicketId = "t1",
+            TicketUid = 42,
+            OwnerId = "u1",
+            Content = "hi",
             RetryCount = lastAttempt
         });
         _api.AddCommentAsync("42", "u1", "hi").Returns(false);
@@ -300,9 +327,13 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 14, ActionType = "AddComment",
-            TicketId = "t1", OwnerId = "u1", Content = "hi",
-            IsConflicted = true, ConflictReason = "prior conflict"
+            Id = 14,
+            ActionType = "AddComment",
+            TicketId = "t1",
+            OwnerId = "u1",
+            Content = "hi",
+            IsConflicted = true,
+            ConflictReason = "prior conflict"
         });
 
         await _sut.SyncPendingActionsAsync();
@@ -316,7 +347,10 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 15, ActionType = "DeleteTicket", TicketId = "t1", TicketUid = 1001
+            Id = 15,
+            ActionType = "DeleteTicket",
+            TicketId = "t1",
+            TicketUid = 1001
         });
         _api.DeleteTicketAsync("t1").Returns(true);
 
@@ -440,8 +474,12 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 200, ActionType = "AddComment",
-            TicketId = "t1", TicketUid = 1001, OwnerId = "u1", Content = "hi",
+            Id = 200,
+            ActionType = "AddComment",
+            TicketId = "t1",
+            TicketUid = 1001,
+            OwnerId = "u1",
+            Content = "hi",
             TicketUpdatedAt = "2026-04-01T10:00:00.0000000Z"
         });
         _api.GetTicketRawAsync("1001").Returns((404, ""));
@@ -477,8 +515,11 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 300, ActionType = "AddTag",
-            TicketId = "t1", TicketUid = 42, TagId = "tag-abc"
+            Id = 300,
+            ActionType = "AddTag",
+            TicketId = "t1",
+            TicketUid = 42,
+            TagId = "tag-abc"
         });
         _api.AddTagToTicketAsync("t1", "tag-abc").Returns(true);
 
@@ -493,8 +534,11 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 301, ActionType = "RemoveTag",
-            TicketId = "t1", TicketUid = 42, TagId = "tag-xyz"
+            Id = 301,
+            ActionType = "RemoveTag",
+            TicketId = "t1",
+            TicketUid = 42,
+            TagId = "tag-xyz"
         });
         _api.RemoveTagFromTicketAsync("t1", "tag-xyz").Returns(true);
 
@@ -509,8 +553,11 @@ public class SyncServiceTests
     {
         SetupQueuedActions(new PendingActionDto
         {
-            Id = 302, ActionType = "AddTag",
-            TicketId = "t1", TicketUid = 42, TagId = "tag-abc",
+            Id = 302,
+            ActionType = "AddTag",
+            TicketId = "t1",
+            TicketUid = 42,
+            TagId = "tag-abc",
             RetryCount = 0
         });
         _api.AddTagToTicketAsync("t1", "tag-abc").Returns(false);
