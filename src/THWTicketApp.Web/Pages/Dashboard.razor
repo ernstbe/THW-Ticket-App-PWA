@@ -344,8 +344,7 @@ else
         _totalTickets = _allTickets.Count;
         _openTickets = _allTickets.Count(t =>
             t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new");
-        _pendingTickets = _allTickets.Count(t =>
-            t.Status?.Name?.ToLowerInvariant() is "ausstehend" or "pending" or "in bearbeitung" or "in progress" or "wartend" or "on hold");
+        _pendingTickets = _allTickets.Count(t => t.Status?.IsInProgress == true);
         _closedTickets = _allTickets.Count(t =>
             t.Status?.IsResolved == true ||
             t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved");

@@ -501,7 +501,7 @@ else
             "active" => source.Where(t => !(t.Status?.IsResolved == true
                 || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved")),
             "open" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new"),
-            "pending" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "ausstehend" or "pending" or "in bearbeitung" or "in progress"),
+            "pending" => source.Where(t => t.Status?.IsInProgress == true),
             "closed" => source.Where(t => t.Status?.IsResolved == true || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved"),
             _ => source
         };
