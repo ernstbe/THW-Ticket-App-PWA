@@ -17,6 +17,7 @@ public class Status
     public int Order { get; set; }
     public bool Slatimer { get; set; }
     public bool IsResolved { get; set; }
+    public bool IsInProgress { get; set; }
     public bool IsLocked { get; set; }
     [JsonPropertyName("__v")]
     public int Version { get; set; }
