@@ -12,7 +12,7 @@ using THWTicketApp.Web.Services;
 
 namespace THWTicketApp.Tests.Pages;
 
-public class SyncConflictsTests : TestContext
+public class SyncConflictsTests : BunitContext, IAsyncLifetime
 {
     private readonly ISyncService _sync;
 
@@ -34,10 +34,16 @@ public class SyncConflictsTests : TestContext
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
+    // bunit 2.x registers async-only services (e.g. MudBlazor.KeyInterceptorService)
+    // that throw when the container is disposed synchronously. Route xUnit's
+    // cleanup through BunitContext.DisposeAsync so async disposal runs first.
+    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+    Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
+
     [Fact]
     public void Renders_successAlert_whenNoConflicts()
     {
-        var cut = RenderComponent<SyncConflicts>();
+        var cut = Render<SyncConflicts>();
         cut.WaitForAssertion(() =>
             Assert.Contains("Sync-Konflikte", cut.Markup));
     }
@@ -52,7 +58,7 @@ public class SyncConflictsTests : TestContext
             new() { Id = 3, ActionType = "AddNote", ConflictType = ConflictType.TicketDeleted, ConflictReason = "r3", CreatedAt = DateTime.UtcNow, IsConflicted = true }
         });
 
-        var cut = RenderComponent<SyncConflicts>();
+        var cut = Render<SyncConflicts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -74,7 +80,7 @@ public class SyncConflictsTests : TestContext
             new() { Id = 3, ActionType = "UploadAttachment", ConflictType = ConflictType.TicketUpdated, ConflictReason = "r", CreatedAt = DateTime.UtcNow, IsConflicted = true }
         });
 
-        var cut = RenderComponent<SyncConflicts>();
+        var cut = Render<SyncConflicts>();
 
         cut.WaitForAssertion(() =>
         {
@@ -92,7 +98,7 @@ public class SyncConflictsTests : TestContext
     [Fact]
     public void GetConflictBranch_TicketDeleted_disablesForceApply()
     {
-        var cut = RenderComponent<SyncConflicts>();
+        var cut = Render<SyncConflicts>();
         var branch = cut.Instance.GetConflictBranch(ConflictType.TicketDeleted);
         Assert.False(branch.AllowForceApply);
         Assert.Equal(Severity.Error, branch.AlertSeverity);
@@ -101,7 +107,7 @@ public class SyncConflictsTests : TestContext
     [Fact]
     public void GetConflictBranch_PermissionRevoked_disablesForceApply()
     {
-        var cut = RenderComponent<SyncConflicts>();
+        var cut = Render<SyncConflicts>();
         var branch = cut.Instance.GetConflictBranch(ConflictType.PermissionRevoked);
         Assert.False(branch.AllowForceApply);
         Assert.Equal(Severity.Error, branch.AlertSeverity);
@@ -110,7 +116,7 @@ public class SyncConflictsTests : TestContext
     [Fact]
     public void GetConflictBranch_StatusChanged_allowsForceApplyAsWarning()
     {
-        var cut = RenderComponent<SyncConflicts>();
+        var cut = Render<SyncConflicts>();
         var branch = cut.Instance.GetConflictBranch(ConflictType.StatusChanged);
         Assert.True(branch.AllowForceApply);
         Assert.Equal(Severity.Warning, branch.AlertSeverity);
@@ -119,7 +125,7 @@ public class SyncConflictsTests : TestContext
     [Fact]
     public void GetConflictBranch_TicketUpdated_allowsForceApplyAsWarning()
     {
-        var cut = RenderComponent<SyncConflicts>();
+        var cut = Render<SyncConflicts>();
         var branch = cut.Instance.GetConflictBranch(ConflictType.TicketUpdated);
         Assert.True(branch.AllowForceApply);
         Assert.Equal(Severity.Warning, branch.AlertSeverity);
@@ -133,7 +139,7 @@ public class SyncConflictsTests : TestContext
     [InlineData("SomethingUnknown", "SomethingUnknown")]
     public void TranslateActionType_matchesExpectedGermanLabels(string actionType, string expected)
     {
-        var cut = RenderComponent<SyncConflicts>();
+        var cut = Render<SyncConflicts>();
         Assert.Equal(expected, cut.Instance.TranslateActionType(actionType));
     }
 
