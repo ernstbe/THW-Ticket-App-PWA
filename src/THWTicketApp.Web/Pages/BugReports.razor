@@ -204,7 +204,7 @@ else
     [Inject] IJSRuntime JS { get; set; } = default!;
     private async Task ScrollToAsync(string elementId)
     {
-        try { await JS.InvokeVoidAsync("eval", $"document.getElementById('{elementId}')?.scrollIntoView({{ behavior: 'smooth', block: 'start' }})"); }
+        try { await JS.InvokeVoidAsync("pwaHelpers.scrollToElement", elementId); }
         catch { }
     }
 }

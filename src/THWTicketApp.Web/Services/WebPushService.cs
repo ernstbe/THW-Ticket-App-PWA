@@ -95,7 +95,7 @@ public class WebPushService : IAsyncDisposable
         if (sub == null || string.IsNullOrEmpty(sub.Endpoint) || sub.Keys == null) return false;
 
         var deviceId = await _localStorage.GetItemAsync("device_id");
-        var userAgent = await _jsRuntime.InvokeAsync<string>("eval", "navigator.userAgent");
+        var userAgent = await _jsRuntime.InvokeAsync<string>("pwaHelpers.getUserAgent");
         return await _api.SubscribeWebPushAsync(sub.Endpoint, sub.Keys.P256dh ?? "", sub.Keys.Auth ?? "", deviceId, userAgent);
     }
 
