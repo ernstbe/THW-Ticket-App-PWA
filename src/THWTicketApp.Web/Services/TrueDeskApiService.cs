@@ -742,6 +742,13 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
+    public async Task<string> GetTicketStatsForAssigneeAsync(string userId)
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/tickets/stats/assignee/{userId}"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
     // Documents (v2)
     public async Task<string> GetDocumentsAsync()
     {
