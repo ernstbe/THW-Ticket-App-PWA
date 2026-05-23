@@ -447,6 +447,16 @@ public class TrueDeskApiServiceTests
         Assert.Equal("/api/v2/tickets/stats/user/usr1", LastRequest.RequestUri!.AbsolutePath);
     }
 
+    [Fact]
+    public async Task GetTicketStatsForAssigneeAsync_callsV2AssigneeStats()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"ticketCount\":3,\"closedCount\":1,\"avgResponse\":2}");
+        await _sut.GetTicketStatsForAssigneeAsync("usr1");
+
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/stats/assignee/usr1", LastRequest.RequestUri!.AbsolutePath);
+    }
+
     // -----------------------------------------------------------------
     // Checklist (v2)
     // -----------------------------------------------------------------

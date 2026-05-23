@@ -66,6 +66,7 @@ public interface ITrueDeskApiService
     Task<string> GetTicketStatsAsync(int timespan = 30);
     Task<string> GetTicketStatsForGroupAsync(string groupId);
     Task<string> GetTicketStatsForUserAsync(string userId);
+    Task<string> GetTicketStatsForAssigneeAsync(string userId);
 
     // Dashboard (v2)
     Task<string> GetDashboardWidgetsAsync();
