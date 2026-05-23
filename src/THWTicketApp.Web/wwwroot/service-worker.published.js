@@ -101,8 +101,11 @@ async function onInstall(event) {
         new Request(asset.url, { integrity: asset.hash, cache: "no-cache" }),
     );
   await caches.open(cacheName).then((cache) => cache.addAll(assetsRequests));
-  // Stay in "waiting" until the page tells us to activate (via SKIP_WAITING).
-  // index.html shows an update banner; user clicks "Neu laden" to apply.
+  // Skip the "waiting" state — activate immediately so updates land within
+  // seconds instead of waiting for every tab to close (the default lifecycle).
+  // index.html still posts SKIP_WAITING as a belt-and-braces fallback, but
+  // calling it here covers untrained users who keep one tab open for weeks.
+  await self.skipWaiting();
 }
 
 self.addEventListener("message", (event) => {
@@ -125,19 +128,32 @@ async function onActivate(event) {
 }
 
 async function onFetch(event) {
-  let cachedResponse = null;
-  if (event.request.method === "GET") {
-    // For all navigation requests, try to serve index.html from cache,
-    // unless that request is for an offline resource.
-    // If you need some URLs to be server-rendered, edit the following check to exclude those URLs
-    const shouldServeIndexHtml =
-      event.request.mode === "navigate" &&
-      !manifestUrlList.some((url) => url === event.request.url);
+  if (event.request.method !== "GET") return fetch(event.request);
 
-    const request = shouldServeIndexHtml ? "index.html" : event.request;
-    const cache = await caches.open(cacheName);
-    cachedResponse = await cache.match(request);
+  const isNavigation =
+    event.request.mode === "navigate" &&
+    !manifestUrlList.some((url) => url === event.request.url);
+
+  // For top-level navigations, prefer the network so a freshly-deployed
+  // index.html (with its updated SW-registration script) reaches the user
+  // immediately, instead of staying stuck on a months-old cached copy that
+  // an even-older SW once cached. Fall back to the cached index.html only
+  // when the network fails (offline mode).
+  if (isNavigation) {
+    try {
+      return await fetch(event.request);
+    } catch {
+      const cache = await caches.open(cacheName);
+      const fallback = await cache.match("index.html");
+      if (fallback) return fallback;
+      throw new Error("offline and no cached index.html");
+    }
   }
 
+  // Static assets keep the cache-first strategy: integrity-hashed file names
+  // mean the cache is always correct for the current build, and serving from
+  // cache is much faster than the network.
+  const cache = await caches.open(cacheName);
+  const cachedResponse = await cache.match(event.request);
   return cachedResponse || fetch(event.request);
 }
