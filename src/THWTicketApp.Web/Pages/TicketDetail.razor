@@ -838,9 +838,20 @@ else
     {
         if (_ticket == null || string.IsNullOrWhiteSpace(_editSubject)) return;
         _isLoading = true;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var subject = _editSubject;
+        var updatedAt = _ticket.Updated;
         try
         {
-            _ticket.Subject = _editSubject;
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, subject, null, null, null, null, null, updatedAt);
+                _editingTitle = false;
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            _ticket.Subject = subject;
             if (await ApiService.EditTicketAsync(_ticket))
             {
                 _editingTitle = false;
@@ -848,6 +859,12 @@ else
                 await LoadTicketAsync();
             }
             else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, subject, null, null, null, null, null, updatedAt);
+            _editingTitle = false;
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
@@ -867,9 +884,20 @@ else
     {
         if (_ticket == null) return;
         _isLoading = true;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var issue = _editIssue;
+        var updatedAt = _ticket.Updated;
         try
         {
-            _ticket.Issue = _editIssue;
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, issue, null, null, null, null, updatedAt);
+                _editingDescription = false;
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            _ticket.Issue = issue;
             if (await ApiService.EditTicketAsync(_ticket))
             {
                 _editingDescription = false;
@@ -877,6 +905,12 @@ else
                 await LoadTicketAsync();
             }
             else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, issue, null, null, null, null, updatedAt);
+            _editingDescription = false;
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
@@ -898,14 +932,29 @@ else
     private async Task QuickChangeStatusAsync(Status s)
     {
         if (_ticket == null || string.IsNullOrEmpty(s.Id)) return;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var statusId = s.Id;
+        var updatedAt = _ticket.Updated;
         try
         {
-            if (await ApiService.UpdateTicketStatusAsync(_ticket.Id, s.Id))
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueStatusAsync(ticketId, ticketUid, statusId, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            if (await ApiService.UpdateTicketStatusAsync(ticketId, statusId))
             {
                 Snackbar.Add(string.Format(L.T("tickets.status_changed"), s.Name), Severity.Success);
                 await LoadTicketAsync();
             }
             else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueStatusAsync(ticketId, ticketUid, statusId, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
@@ -913,8 +962,18 @@ else
     private async Task QuickChangePriorityAsync(Priority p)
     {
         if (_ticket == null) return;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var priorityId = p.Id;
+        var updatedAt = _ticket.Updated;
         try
         {
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, priorityId, null, null, null, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
             _ticket.Priority = p;
             if (await ApiService.EditTicketAsync(_ticket))
             {
@@ -923,14 +982,29 @@ else
             }
             else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
         }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, priorityId, null, null, null, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
+        }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
     private async Task QuickChangeTypeAsync(TicketType t)
     {
         if (_ticket == null || string.IsNullOrEmpty(t.Id)) return;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var typeId = t.Id;
+        var updatedAt = _ticket.Updated;
         try
         {
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, typeId, null, null, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
             // EditTicketAsync already serialises ticket.Type.Id into the
             // PUT payload. Swap the local reference so the optimistic
             // update sees the new type, then reload to pick up any side
@@ -944,14 +1018,29 @@ else
             }
             else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
         }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, typeId, null, null, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
+        }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
     private async Task QuickChangeGroupAsync(Group g)
     {
         if (_ticket == null) return;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var groupId = g.Id;
+        var updatedAt = _ticket.Updated;
         try
         {
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, null, groupId, null, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
             _ticket.Group = g;
             if (await ApiService.EditTicketAsync(_ticket))
             {
@@ -960,20 +1049,40 @@ else
             }
             else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
         }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, null, groupId, null, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
+        }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
     private async Task QuickAssignAsync(User u)
     {
         if (_ticket == null) return;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var userId = u.Id;
+        var updatedAt = _ticket.Updated;
         try
         {
-            if (await ApiService.AssignTicketAsync(_ticket.Id, u.Id))
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueAssignAsync(ticketId, ticketUid, userId, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            if (await ApiService.AssignTicketAsync(ticketId, userId))
             {
                 Snackbar.Add(L.T("detail.assign_updated"), Severity.Success);
                 await LoadTicketAsync();
             }
             else Snackbar.Add(L.T("detail.assign_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueAssignAsync(ticketId, ticketUid, userId, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
@@ -988,8 +1097,17 @@ else
 
         _dueDateLocal = newDate;
         _ticket.DueDate = newDate ?? DateTime.MinValue;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var updatedAt = _ticket.Updated;
         try
         {
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, null, null, newDate, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
             if (await ApiService.EditTicketAsync(_ticket))
             {
                 Snackbar.Add(L.T("detail.ticket_updated"), Severity.Success);
@@ -997,19 +1115,38 @@ else
             }
             else Snackbar.Add(L.T("detail.update_failed"), Severity.Error);
         }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, null, null, newDate, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
+        }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
     private async Task ClearAssigneeAsync()
     {
         if (_ticket == null) return;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var updatedAt = _ticket.Updated;
         try
         {
-            if (await ApiService.ClearTicketAssigneeAsync(_ticket.Id))
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueClearAssigneeAsync(ticketId, ticketUid, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            if (await ApiService.ClearTicketAssigneeAsync(ticketId))
             {
                 Snackbar.Add(L.T("detail.assign_removed"), Severity.Success);
                 await LoadTicketAsync();
             }
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueClearAssigneeAsync(ticketId, ticketUid, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
@@ -1052,11 +1189,25 @@ else
     {
         if (_ticket == null) return;
         _isLoading = true;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var updatedAt = _ticket.Updated;
         try
         {
-            if (await ApiService.AddTagToTicketAsync(_ticket.Id, tagId))
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueAddTagAsync(ticketId, ticketUid, tagId, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            if (await ApiService.AddTagToTicketAsync(ticketId, tagId))
             { Snackbar.Add($"{L.T("detail.tag_added")}: {tagName}", Severity.Success); await LoadTicketAsync(); }
             else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueAddTagAsync(ticketId, ticketUid, tagId, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
@@ -1066,11 +1217,25 @@ else
     {
         if (_ticket == null) return;
         _isLoading = true;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var updatedAt = _ticket.Updated;
         try
         {
-            if (await ApiService.RemoveTagFromTicketAsync(_ticket.Id, tagId))
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueRemoveTagAsync(ticketId, ticketUid, tagId, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            if (await ApiService.RemoveTagFromTicketAsync(ticketId, tagId))
             { Snackbar.Add(L.T("detail.tag_removed"), Severity.Success); await LoadTicketAsync(); }
             else Snackbar.Add(L.T("detail.delete_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueRemoveTagAsync(ticketId, ticketUid, tagId, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }

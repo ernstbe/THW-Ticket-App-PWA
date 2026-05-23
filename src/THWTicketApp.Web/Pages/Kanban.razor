@@ -4,11 +4,14 @@
 @using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
+@using System.Net.Http
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
 @inject THWTicketApp.Web.Services.LocalizationService L
+@inject ISyncService SyncService
+@inject THWTicketApp.Web.Services.AppStateService AppState
 @implements IDisposable
 
 <PageTitle>@L.T("nav.kanban") - THW Ticket App</PageTitle>
@@ -534,12 +537,23 @@ else
         item.StatusId = newStatusId;
         RecomputeFiltered();
 
+        var ticketId = item.TicketId;
+        var ticketUid = item.Uid;
+        var targetName = _columns.FirstOrDefault(c => c.StatusId == newStatusId)?.StatusName ?? "?";
+
+        // Offline: keep the optimistic swap, queue the status change, stay green.
+        if (!AppState.IsOnline)
+        {
+            await SyncService.EnqueueStatusAsync(ticketId, ticketUid, newStatusId);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
+            return;
+        }
+
         try
         {
-            var success = await ApiService.UpdateTicketStatusAsync(item.TicketId, newStatusId);
+            var success = await ApiService.UpdateTicketStatusAsync(ticketId, newStatusId);
             if (success)
             {
-                var targetName = _columns.FirstOrDefault(c => c.StatusId == newStatusId)?.StatusName ?? "?";
                 Snackbar.Add($"#{item.Uid} → {targetName}", Severity.Success);
             }
             else
@@ -548,6 +562,12 @@ else
                 RecomputeFiltered();
                 Snackbar.Add(L.T("kanban.move_failed"), Severity.Error);
             }
+        }
+        catch (HttpRequestException)
+        {
+            // Network dropped mid-move — keep optimistic swap, queue the change.
+            await SyncService.EnqueueStatusAsync(ticketId, ticketUid, newStatusId);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch
         {

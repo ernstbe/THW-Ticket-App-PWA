@@ -6,6 +6,7 @@
 @using THWTicketApp.Shared.Models.Responses
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
+@using System.Net.Http
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -13,6 +14,8 @@
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
 @inject THWTicketApp.Web.Services.LocalizationService L
 @inject IJSRuntime JsRuntime
+@inject ISyncService SyncService
+@inject THWTicketApp.Web.Services.AppStateService AppState
 @implements IDisposable
 
 <PageTitle>@L.T("tickets.title") - THW Ticket App</PageTitle>
@@ -571,9 +574,19 @@ else
     private async Task QuickChangeStatusAsync((Ticket Ticket, Status Status) args)
     {
         if (string.IsNullOrEmpty(args.Status.Id)) return;
+        var ticketId = args.Ticket.Id;
+        var ticketUid = args.Ticket.Uid;
+        var statusId = args.Status.Id;
+        var updatedAt = args.Ticket.Updated;
         try
         {
-            if (await ApiService.UpdateTicketStatusAsync(args.Ticket.Id, args.Status.Id))
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueStatusAsync(ticketId, ticketUid, statusId, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            if (await ApiService.UpdateTicketStatusAsync(ticketId, statusId))
             {
                 Snackbar.Add(string.Format(L.T("tickets.status_changed"), args.Status.Name), Severity.Success);
                 await LoadTicketsAsync();
@@ -583,6 +596,11 @@ else
                 Snackbar.Add(L.T("tickets.close_failed"), Severity.Error);
             }
         }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueStatusAsync(ticketId, ticketUid, statusId, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
+        }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
@@ -590,6 +608,14 @@ else
     {
         try
         {
+            // Same situation as Dashboard.QuickCloseAsync — we need the live
+            // status catalogue to pick the "resolved" one, which requires the
+            // network. Skip cleanly when offline.
+            if (!AppState.IsOnline)
+            {
+                Snackbar.Add(L.T("offline.action_unavailable"), Severity.Warning);
+                return;
+            }
             var statusJson = await ApiService.GetStatusesAsync();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
@@ -597,6 +623,7 @@ else
             if (closedStatus != null && await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
             { Snackbar.Add(L.T("tickets.closed_success"), Severity.Success); await LoadTicketsAsync(); }
         }
+        catch (HttpRequestException) { Snackbar.Add(L.T("offline.action_unavailable"), Severity.Warning); }
         catch { Snackbar.Add(L.T("tickets.close_failed"), Severity.Error); }
     }
 
