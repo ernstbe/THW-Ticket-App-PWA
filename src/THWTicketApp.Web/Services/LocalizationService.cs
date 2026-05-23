@@ -196,6 +196,7 @@ public class LocalizationService
         ["notes.new"] = "Neue Notiz",
         ["notes.add"] = "Notiz hinzufügen",
         ["notes.added"] = "Notiz hinzugefügt.",
+        ["offline.queued"] = "Offline gespeichert — wird gesendet, sobald die Verbindung wieder steht.",
 
         // Attachments
         ["attachments.title"] = "Anhänge",
@@ -903,6 +904,7 @@ public class LocalizationService
         ["notes.new"] = "New note",
         ["notes.add"] = "Add note",
         ["notes.added"] = "Note added.",
+        ["offline.queued"] = "Saved offline — will sync when the connection is back.",
 
         // Attachments
         ["attachments.title"] = "Attachments",
