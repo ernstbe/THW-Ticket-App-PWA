@@ -92,50 +92,23 @@
     <script src="js/pwa-helpers.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
 
-    <!-- PWA update banner: shown when a new service worker is waiting. -->
-    <div id="pwa-update-banner" hidden
-         style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
-                background:#003399;color:#fff;padding:12px 20px;border-radius:8px;
-                box-shadow:0 4px 12px rgba(0,0,0,0.2);z-index:10000;
-                font-family:Roboto,sans-serif;font-size:14px;
-                align-items:center;gap:12px;">
-        <span id="pwa-update-text">Eine neue Version ist verfügbar.</span>
-        <button id="pwa-update-reload" type="button"
-                style="background:#fff;color:#003399;border:none;padding:6px 14px;
-                       border-radius:4px;font-weight:500;cursor:pointer;font-family:inherit;">
-            Neu laden
-        </button>
-        <button id="pwa-update-dismiss" type="button"
-                aria-label="Schließen"
-                style="background:transparent;color:#fff;border:none;cursor:pointer;
-                       font-size:18px;line-height:1;padding:0 4px;">
-            &times;
-        </button>
-    </div>
-
     <script>
-        // Service worker registration with auto-update detection.
+        // Service worker registration with SILENT auto-update.
         //
         // Flow:
         //   1. Register SW. SW caches the WASM bundle keyed on assetsManifest.version.
         //   2. Periodically (and on focus) call registration.update() to check for new SW.
         //   3. When a new SW reaches "installed" state and there's already a controller,
-        //      a new version is waiting. Show the banner.
-        //   4. User clicks "Neu laden": postMessage SKIP_WAITING -> SW activates ->
-        //      controllerchange fires -> we reload the page once.
+        //      we IMMEDIATELY postMessage SKIP_WAITING — no banner, no click.
+        //   4. New SW activates -> controllerchange fires -> we reload the page once.
         //
-        // This replaces the manual "unregister SW + Strg+Shift+R" dance after every deploy.
+        // Why silent: end users aren't trained on PWA semantics. A "Neu laden"
+        // banner gets dismissed by the X, the app stays on the old bundle, future
+        // deploys break for them silently. The reload disruption is < 1s and only
+        // fires when a new version is genuinely waiting; the upside (always-current
+        // code) outweighs the edge case of losing a half-typed comment.
         (function () {
             if (!('serviceWorker' in navigator)) return;
-
-            const lang = localStorage.getItem('settings_language') || 'de';
-            const texts = {
-                de: { msg: 'Eine neue Version ist verfügbar.', reload: 'Neu laden' },
-                en: { msg: 'A new version is available.', reload: 'Reload' }
-            };
-            const t = texts[lang] || texts.de;
-            document.getElementById('pwa-update-text').textContent = t.msg;
-            document.getElementById('pwa-update-reload').textContent = t.reload;
 
             let refreshing = false;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -145,21 +118,13 @@
             });
 
             navigator.serviceWorker.register('service-worker.js').then((reg) => {
-                const showBanner = (worker) => {
-                    const banner = document.getElementById('pwa-update-banner');
-                    banner.hidden = false;
-                    banner.style.display = 'flex';
-                    document.getElementById('pwa-update-reload').onclick = () => {
-                        worker.postMessage('SKIP_WAITING');
-                    };
-                    document.getElementById('pwa-update-dismiss').onclick = () => {
-                        banner.hidden = true;
-                    };
-                };
+                const autoApply = (worker) => worker.postMessage('SKIP_WAITING');
 
-                // If a worker is already waiting on registration, show the banner immediately.
+                // A worker already waiting on registration → apply now. Covers
+                // the case where the user closed/reopened the tab between a
+                // previous "installed" event and this load.
                 if (reg.waiting && navigator.serviceWorker.controller) {
-                    showBanner(reg.waiting);
+                    autoApply(reg.waiting);
                 }
 
                 reg.addEventListener('updatefound', () => {
@@ -167,7 +132,7 @@
                     if (!installing) return;
                     installing.addEventListener('statechange', () => {
                         if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                            showBanner(installing);
+                            autoApply(installing);
                         }
                     });
                 });
