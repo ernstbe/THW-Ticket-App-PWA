@@ -9,6 +9,7 @@
 @using Markdig
 @using Microsoft.AspNetCore.Components.Forms
 @using QRCoder
+@using System.Net.Http
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -18,6 +19,8 @@
 @inject IJSRuntime JsRuntime
 @inject THWTicketApp.Web.Services.RecentTicketsService RecentTickets
 @inject IDialogService DialogService
+@inject ISyncService SyncService
+@inject THWTicketApp.Web.Services.AppStateService AppState
 @implements IAsyncDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
@@ -1122,16 +1125,36 @@ else
     {
         if (_ticket == null || string.IsNullOrWhiteSpace(_newComment)) return;
         _isLoading = true;
+        var ticketUid = _ticket.Uid;
+        var ticketId = _ticket.Id;
+        var ownerId = _ticket.Owner?.Id ?? string.Empty;
+        var comment = _newComment;
+        var updatedAt = _ticket.Updated;
         try
         {
-            var ownerId = _ticket.Owner?.Id ?? string.Empty;
-            if (await ApiService.AddCommentAsync(_ticket.Uid.ToString(), ownerId, _newComment))
+            // Offline → straight to the sync queue, no network attempt.
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueCommentAsync(ticketId, ticketUid, ownerId, comment, updatedAt);
+                _newComment = string.Empty;
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+
+            if (await ApiService.AddCommentAsync(ticketUid.ToString(), ownerId, comment))
             {
                 _newComment = string.Empty;
                 Snackbar.Add(L.T("comments.added"), Severity.Success);
                 await LoadTicketAsync();
             }
             else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            // Network died between the IsOnline check and the POST — same recovery.
+            await SyncService.EnqueueCommentAsync(ticketId, ticketUid, ownerId, comment, updatedAt);
+            _newComment = string.Empty;
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
@@ -1141,16 +1164,34 @@ else
     {
         if (_ticket == null || string.IsNullOrWhiteSpace(_newNote)) return;
         _isLoading = true;
+        var ticketUid = _ticket.Uid;
+        var ticketId = _ticket.Id;
+        var ownerId = _ticket.Owner?.Id ?? string.Empty;
+        var note = _newNote;
+        var updatedAt = _ticket.Updated;
         try
         {
-            var ownerId = _ticket.Owner?.Id ?? string.Empty;
-            if (await ApiService.AddNoteAsync(_ticket.Uid.ToString(), ownerId, _newNote))
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueNoteAsync(ticketId, ticketUid, ownerId, note, updatedAt);
+                _newNote = string.Empty;
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+
+            if (await ApiService.AddNoteAsync(ticketUid.ToString(), ownerId, note))
             {
                 _newNote = string.Empty;
                 Snackbar.Add(L.T("notes.added"), Severity.Success);
                 await LoadTicketAsync();
             }
             else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueNoteAsync(ticketId, ticketUid, ownerId, note, updatedAt);
+            _newNote = string.Empty;
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
         finally { _isLoading = false; }
