@@ -197,6 +197,7 @@ public class LocalizationService
         ["notes.add"] = "Notiz hinzufügen",
         ["notes.added"] = "Notiz hinzugefügt.",
         ["offline.queued"] = "Offline gespeichert — wird gesendet, sobald die Verbindung wieder steht.",
+        ["offline.action_unavailable"] = "Diese Aktion benötigt eine Online-Verbindung.",
 
         // Attachments
         ["attachments.title"] = "Anhänge",
@@ -905,6 +906,7 @@ public class LocalizationService
         ["notes.add"] = "Add note",
         ["notes.added"] = "Note added.",
         ["offline.queued"] = "Saved offline — will sync when the connection is back.",
+        ["offline.action_unavailable"] = "This action requires an online connection.",
 
         // Attachments
         ["attachments.title"] = "Attachments",

@@ -5,11 +5,14 @@
 @using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
+@using System.Net.Http
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.LocalizationService L
 @inject THWTicketApp.Web.Services.RecentTicketsService RecentTickets
+@inject ISyncService SyncService
+@inject THWTicketApp.Web.Services.AppStateService AppState
 
 <PageTitle>@L.T("nav.dashboard") - THW Ticket App</PageTitle>
 
@@ -387,15 +390,28 @@ else
     {
         try
         {
+            // We need a "resolved" status from the live catalogue to close the
+            // ticket. That catalogue lookup itself needs the network — without
+            // it we can't resolve which status to apply offline.
+            if (!AppState.IsOnline)
+            {
+                Snackbar.Add(L.T("offline.action_unavailable"), Severity.Warning);
+                return;
+            }
             var statusJson = await ApiService.GetStatusesAsync();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
             var closedStatus = statuses.FirstOrDefault(s => s.IsResolved);
-            if (closedStatus != null && await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
+            if (closedStatus == null) return;
+            if (await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
             {
                 Snackbar.Add(L.T("tickets.closed_success"), Severity.Success);
                 await LoadDashboardAsync();
             }
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add(L.T("offline.action_unavailable"), Severity.Warning);
         }
         catch { Snackbar.Add(L.T("tickets.close_failed"), Severity.Error); }
     }
