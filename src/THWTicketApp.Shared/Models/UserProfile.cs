@@ -15,4 +15,13 @@ public sealed class UserProfile
     public string? Title { get; set; }
     public string? WorkNumber { get; set; }
     public string? MobileNumber { get; set; }
+    /// <summary>
+    /// Group ids visible to this user, as resolved server-side by
+    /// trudesk's <c>accountsApi.sessionUser</c>: for admins/agents the
+    /// Team → Department → Groups chain; for customers the direct
+    /// Group memberships (Group.members). Use this — not the public
+    /// <c>/api/v1/groups</c> response — when deciding whether a per-group
+    /// filter UI is meaningful for the current user. May be empty.
+    /// </summary>
+    public List<string> Groups { get; set; } = new();
 }
