@@ -2,6 +2,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using System.Text.Json
 @using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Models.Responses
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
 @using System.Net.Http
@@ -12,6 +13,7 @@
 @inject THWTicketApp.Web.Services.LocalizationService L
 @inject ISyncService SyncService
 @inject THWTicketApp.Web.Services.AppStateService AppState
+@inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
 @implements IDisposable
 
 <PageTitle>@L.T("nav.kanban") - THW Ticket App</PageTitle>
@@ -66,6 +68,24 @@
                 var typeName = t.TranslatedName ?? t.Name ?? "?";
                 var count = _typeCounts.TryGetValue(typeId, out var c) ? c : 0;
                 <MudSelectItem Value="@typeId">@typeName (@count)</MudSelectItem>
+            }
+        </MudSelect>
+    }
+    @if (_allGroups.Count > 1)
+    {
+        @* Group filter — lets users board-view only one team's tickets
+           (e.g. Jugend vs. Stab). Only shown when there are at least
+           two groups; with a single group the filter is meaningless. *@
+        <MudSelect T="string" @bind-Value="_groupFilter" Placeholder="@L.T("detail.group")"
+                   @bind-Value:after="OnGroupFilterChanged"
+                   Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Clearable="true" Style="min-width: 170px;">
+            @foreach (var g in _allGroups)
+            {
+                var gid = g.Id ?? "";
+                var gname = g.Name ?? "?";
+                var count = _groupCounts.TryGetValue(gid, out var c) ? c : 0;
+                <MudSelectItem Value="@gid">@gname (@count)</MudSelectItem>
             }
         </MudSelect>
     }
@@ -284,11 +304,19 @@ else
     private bool _onlyMine;
     private string? _priorityFilter;
     private string? _typeFilter;
+    private string? _groupFilter;
     private List<string> _allPriorities = [];
     private List<TicketType> _ticketTypes = [];
+    private List<Group> _allGroups = [];
     private Dictionary<string, int> _typeCounts = new();
+    private Dictionary<string, int> _groupCounts = new();
     private List<KanbanColumn> _allColumns = [];
     private int _mobileTabIndex;
+
+    // Persist the group filter across sessions — once a Jugend user picks
+    // their group, the board should keep showing only their tickets on
+    // every visit instead of resetting to "everything" each reload.
+    private const string GroupFilterStorageKey = "kanban_group_filter";
 
     // "Neu" is the trudesk-default initial status (Uid 0, isLocked=true).
     // Hidden from the Kanban on user request 2026-05-20 — it represents a
@@ -300,6 +328,10 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Restore the persisted group filter before LoadBoardAsync runs —
+        // LoadBoardAsync clears it again if the saved id no longer matches
+        // any group the user can see (e.g. they were removed from Jugend).
+        _groupFilter = await LocalStorage.GetItemAsync(GroupFilterStorageKey);
         await LoadBoardAsync();
         Realtime.AnyTicketChanged += OnRealtimeChange;
     }
@@ -341,10 +373,16 @@ else
             var statusJson = await ApiService.GetStatusesAsync();
             var ticketJson = await ApiService.GetTicketsAsync();
             var typesJson = await ApiService.GetTicketTypesAsync();
+            var groupsJson = await ApiService.GetGroupsAsync();
 
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
             var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(ticketJson, "tickets", options);
             _ticketTypes = JsonSerializer.Deserialize<List<TicketType>>(typesJson, options) ?? [];
+            var groupResp = JsonSerializer.Deserialize<GetGroupResponse>(groupsJson, options);
+            _allGroups = (groupResp?.Groups ?? [])
+                .Where(g => !string.IsNullOrEmpty(g.Id))
+                .OrderBy(g => g.Name)
+                .ToList();
 
             foreach (var t in tickets) TrudeskTranslationHelper.TranslateTicket(t);
 
@@ -374,6 +412,8 @@ else
                 AssigneeName = t.Assignee?.Fullname,
                 TypeId = t.Type?.Id,
                 TypeName = t.Type?.TranslatedName ?? t.Type?.Name,
+                GroupId = t.Group?.Id,
+                GroupName = t.Group?.Name,
                 AllowedStatusIds = t.Type?.Statuses is { Count: > 0 } st
                     ? new HashSet<string>(st.Select(x => x.Id ?? "").Where(id => id.Length > 0))
                     : []
@@ -392,6 +432,21 @@ else
                 .Where(t => !string.IsNullOrEmpty(t.TypeId))
                 .GroupBy(t => t.TypeId!)
                 .ToDictionary(g => g.Key, g => g.Count());
+
+            // Same per-group, used by the group filter dropdown.
+            _groupCounts = _ticketItems
+                .Where(t => !string.IsNullOrEmpty(t.GroupId))
+                .GroupBy(t => t.GroupId!)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            // If the persisted group filter points at a group that's no
+            // longer visible (membership change, group deleted), drop it
+            // and clean up storage so the next load starts fresh.
+            if (!string.IsNullOrEmpty(_groupFilter) && !_allGroups.Any(g => g.Id == _groupFilter))
+            {
+                _groupFilter = null;
+                _ = LocalStorage.RemoveItemAsync(GroupFilterStorageKey);
+            }
 
             RecomputeFiltered();
         }
@@ -414,6 +469,7 @@ else
         if (_onlyMine && item.AssigneeId != ApiService.CurrentUserId) return false;
         if (!string.IsNullOrEmpty(_priorityFilter) && item.PriorityName != _priorityFilter) return false;
         if (!string.IsNullOrEmpty(_typeFilter) && item.TypeId != _typeFilter) return false;
+        if (!string.IsNullOrEmpty(_groupFilter) && item.GroupId != _groupFilter) return false;
         if (!string.IsNullOrWhiteSpace(_searchText))
         {
             var q = _searchText.Trim();
@@ -462,6 +518,15 @@ else
         _onlyMine = !_onlyMine;
         RecomputeFiltered();
         StateHasChanged();
+    }
+
+    private async Task OnGroupFilterChanged()
+    {
+        if (string.IsNullOrEmpty(_groupFilter))
+            await LocalStorage.RemoveItemAsync(GroupFilterStorageKey);
+        else
+            await LocalStorage.SetItemAsync(GroupFilterStorageKey, _groupFilter);
+        RecomputeFiltered();
     }
 
     // Live re-filter as the user types or toggles select.
@@ -600,6 +665,8 @@ else
         public string? AssigneeName { get; set; }
         public string? TypeId { get; set; }
         public string? TypeName { get; set; }
+        public string? GroupId { get; set; }
+        public string? GroupName { get; set; }
         // Empty set = no per-type restriction → all statuses allowed.
         public HashSet<string> AllowedStatusIds { get; set; } = [];
     }
