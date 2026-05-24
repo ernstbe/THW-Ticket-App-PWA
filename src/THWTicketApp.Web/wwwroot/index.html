@@ -130,17 +130,18 @@
 
             const lang = localStorage.getItem('settings_language') || 'de';
             const texts = {
-                de: { msg: (s) => `Neue Version verfügbar — wird in ${s}s automatisch geladen…`, reload: 'Jetzt laden' },
-                en: { msg: (s) => `New version available — applying in ${s}s…`, reload: 'Apply now' }
+                de: { msg: (s) => `Neue Version verfügbar — wird in ${s}s automatisch geladen…`, reload: 'Jetzt laden', applying: 'Lade neu…' },
+                en: { msg: (s) => `New version available — applying in ${s}s…`, reload: 'Apply now', applying: 'Reloading…' }
             };
             const t = texts[lang] || texts.de;
 
             let refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
+            const doReload = () => {
                 if (refreshing) return;
                 refreshing = true;
                 window.location.reload();
-            });
+            };
+            navigator.serviceWorker.addEventListener('controllerchange', doReload);
 
             const showBannerAndApply = (worker, seconds = 5) => {
                 const banner = document.getElementById('pwa-update-banner');
@@ -148,7 +149,8 @@
                 const reloadBtn = document.getElementById('pwa-update-reload');
                 if (!banner || !textEl || !reloadBtn) {
                     // Banner DOM missing for some reason — fall back to silent apply
-                    worker.postMessage('SKIP_WAITING');
+                    try { worker.postMessage('SKIP_WAITING'); } catch { /* worker may already be redundant */ }
+                    setTimeout(doReload, 600);
                     return;
                 }
                 reloadBtn.textContent = t.reload;
@@ -162,7 +164,17 @@
                     if (applied) return;
                     applied = true;
                     clearInterval(tick);
-                    worker.postMessage('SKIP_WAITING');
+                    textEl.textContent = t.applying;
+                    // The SW's onInstall already calls skipWaiting(), so the new
+                    // worker is usually past 'waiting' by the time we get here —
+                    // this postMessage is then a no-op and controllerchange never
+                    // fires (especially on installed PWAs on Android, where the
+                    // event is unreliable). Post for the rare still-waiting case,
+                    // then force-reload after a short grace so the banner doesn't
+                    // sit stuck on '1s' forever. The refreshing flag prevents a
+                    // double-reload if controllerchange does fire first.
+                    try { worker.postMessage('SKIP_WAITING'); } catch { /* worker may already be redundant */ }
+                    setTimeout(doReload, 600);
                 };
                 const tick = setInterval(() => {
                     remaining -= 1;
