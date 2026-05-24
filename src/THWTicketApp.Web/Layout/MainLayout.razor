@@ -57,14 +57,14 @@
             <MudNavLink Href="kanban" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.ViewKanban">@L.T("nav.kanban")</MudNavLink>
             @* Favoriten / Berichte ausgeblendet auf Nutzerwunsch — Pages bleiben im Code. *@
-            @if (false)
+            @if (_showHiddenNavLinks)
             {
                 <MudNavLink Href="favorites" Match="NavLinkMatch.All"
                             Icon="@Icons.Material.Filled.Star">@L.T("nav.favorites")</MudNavLink>
             }
             <MudNavLink Href="team" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Groups">@L.T("nav.team")</MudNavLink>
-            @if (false)
+            @if (_showHiddenNavLinks)
             {
                 <MudNavLink Href="reports" Match="NavLinkMatch.All"
                             Icon="@Icons.Material.Filled.BarChart">@L.T("nav.reports")</MudNavLink>
@@ -72,13 +72,13 @@
             <MudNavLink Href="assets" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Inventory2">@L.T("nav.assets")</MudNavLink>
             @* Dokumente-Upload deaktiviert auf Nutzerwunsch — Page bleibt im Code, nur ausgeblendet. *@
-            @if (false)
+            @if (_showHiddenNavLinks)
             {
                 <MudNavLink Href="documents" Match="NavLinkMatch.All"
                             Icon="@Icons.Material.Filled.FolderOpen">@L.T("nav.documents")</MudNavLink>
             }
             @* Ankündigungen ausgeblendet auf Nutzerwunsch — Page bleibt im Code. *@
-            @if (false)
+            @if (_showHiddenNavLinks)
             {
                 <MudNavLink Href="notices" Match="NavLinkMatch.All"
                             Icon="@Icons.Material.Filled.Campaign">@L.T("nav.notices")</MudNavLink>
@@ -88,7 +88,7 @@
             <MudNavLink Href="templates" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Description">@L.T("nav.templates")</MudNavLink>
             @* Kalender ausgeblendet auf Nutzerwunsch — Page bleibt im Code. *@
-            @if (false)
+            @if (_showHiddenNavLinks)
             {
                 <MudNavLink Href="calendar" Match="NavLinkMatch.All"
                             Icon="@Icons.Material.Filled.CalendarMonth">@L.T("nav.calendar")</MudNavLink>
@@ -216,6 +216,16 @@
     private int _pendingActions;
     private bool _showShortcutHelp;
     private bool _isAdmin;
+    // Single re-enable switch for the nav entries that were hidden on
+    // user request (Favoriten / Berichte / Dokumente / Ankündigungen /
+    // Kalender). Kept as a non-const field so the Razor source generator
+    // doesn't fold the `@if (...)` to constant-false and trip CS0162 in
+    // the generated `.g.cs`. Never assigned anywhere — flip the literal
+    // to `true` when re-enabling.
+#pragma warning disable CS0649
+    private readonly bool _showHiddenNavLinks;
+#pragma warning restore CS0649
+
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private IJSObjectReference? _shortcutModule;
     private string _currentPath = string.Empty;
