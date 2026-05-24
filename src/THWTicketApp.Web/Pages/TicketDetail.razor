@@ -525,7 +525,7 @@ else
             </MudExpansionPanels>
 
             @* Attachments — Upload deaktiviert auf Nutzerwunsch; Panel komplett ausgeblendet, Code bleibt erhalten. *@
-            @if (false)
+            @if (_showDisabledTicketSections)
             {
                 <MudPaper Elevation="1" Class="pa-4 mb-3">
                     <MudText Typo="Typo.subtitle2" Class="mb-2">
@@ -576,7 +576,7 @@ else
             @* Linked tickets — ausgeblendet auf Nutzerwunsch (war localStorage-only,
                nicht serverseitig persistiert). Code bleibt für eine spätere
                serverseitige Reimplementierung erhalten. *@
-            @if (false)
+            @if (_showDisabledTicketSections)
             {
                 <MudPaper Elevation="1" Class="pa-4 mb-3">
                     <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.linked")</MudText>
@@ -685,6 +685,14 @@ else
     // Attachments
     private bool _isUploading;
     private IJSObjectReference? _dropzoneModule;
+    // Single re-enable switch for the Attachments panel + the linked-tickets
+    // panel that were disabled on user request but kept in markup. Held as a
+    // non-const field so the Razor source generator doesn't fold the `@if`
+    // away and trip CS0162 in the generated `.g.cs`. Never assigned anywhere —
+    // flip the literal to `true` when re-enabling.
+#pragma warning disable CS0649
+    private readonly bool _showDisabledTicketSections;
+#pragma warning restore CS0649
 
     // Quick replies
     private List<string> _quickReplyTemplates = new();
