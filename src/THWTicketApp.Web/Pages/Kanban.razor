@@ -71,11 +71,17 @@
             }
         </MudSelect>
     }
-    @if (_allGroups.Count > 1)
+    @if (_myMembershipCount > 1)
     {
         @* Group filter — lets users board-view only one team's tickets
-           (e.g. Jugend vs. Stab). Only shown when there are at least
-           two groups; with a single group the filter is meaningless. *@
+           (e.g. Jugend vs. Stab). Visibility is gated on the user's
+           server-resolved group count from `/api/v2/login` (sessionUser),
+           NOT on `_allGroups.Count`: `/api/v1/groups` returns every
+           group to admins/agents and adds public groups to customer
+           responses, which would always over-count. sessionUser already
+           does the right thing — admins/agents get the Team → Department
+           → Group chain, customers get their direct memberships. <=1
+           means the dropdown has nothing meaningful to switch between. *@
         <MudSelect T="string" @bind-Value="_groupFilter" Placeholder="@L.T("detail.group")"
                    @bind-Value:after="OnGroupFilterChanged"
                    Variant="Variant.Outlined" Margin="Margin.Dense"
@@ -308,6 +314,11 @@ else
     private List<string> _allPriorities = [];
     private List<TicketType> _ticketTypes = [];
     private List<Group> _allGroups = [];
+    // Count of groups the current user can act on, resolved server-side
+    // by trudesk's `accountsApi.sessionUser` (Team→Department chain for
+    // admin/agent, direct Group.members for customer). Drives the group
+    // filter's visibility — see the `@if` above the MudSelect.
+    private int _myMembershipCount;
     private Dictionary<string, int> _typeCounts = new();
     private Dictionary<string, int> _groupCounts = new();
     private List<KanbanColumn> _allColumns = [];
@@ -384,6 +395,22 @@ else
                 .OrderBy(g => g.Name)
                 .ToList();
 
+            // Resolve the user's actionable group count via sessionUser
+            // (Team → Department → Group chain for admin/agent, direct
+            // memberships for customer). Hides the group filter when the
+            // user has <=1 group to pick between — see the @if above.
+            // GetCurrentUserProfileAsync returns null on failure; we
+            // treat that as 0 (hide).
+            try
+            {
+                var profile = await ApiService.GetCurrentUserProfileAsync();
+                _myMembershipCount = profile?.Groups.Count ?? 0;
+            }
+            catch
+            {
+                _myMembershipCount = 0;
+            }
+
             foreach (var t in tickets) TrudeskTranslationHelper.TranslateTicket(t);
 
             // Pre-filter the visible column set: drop the "Neu" status so
@@ -439,10 +466,15 @@ else
                 .GroupBy(t => t.GroupId!)
                 .ToDictionary(g => g.Key, g => g.Count());
 
-            // If the persisted group filter points at a group that's no
-            // longer visible (membership change, group deleted), drop it
-            // and clean up storage so the next load starts fresh.
-            if (!string.IsNullOrEmpty(_groupFilter) && !_allGroups.Any(g => g.Id == _groupFilter))
+            // Drop the persisted filter if the user can no longer reach
+            // the dropdown to clear it themselves — either because the
+            // saved group is gone from the visible list (membership
+            // change, group deleted) or because the dropdown is now
+            // hidden entirely (`_myMembershipCount <= 1`). Otherwise
+            // the board would stay silently scoped to one group with
+            // no UI to undo it.
+            if (!string.IsNullOrEmpty(_groupFilter) &&
+                (_myMembershipCount <= 1 || !_allGroups.Any(g => g.Id == _groupFilter)))
             {
                 _groupFilter = null;
                 _ = LocalStorage.RemoveItemAsync(GroupFilterStorageKey);
