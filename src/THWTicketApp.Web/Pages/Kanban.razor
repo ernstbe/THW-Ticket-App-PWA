@@ -71,7 +71,7 @@
             }
         </MudSelect>
     }
-    @if (_allGroups.Count > 1)
+    @if (_myMembershipCount > 1)
     {
         @* Group filter — lets users board-view only one team's tickets
            (e.g. Jugend vs. Stab). Only shown when there are at least
@@ -308,6 +308,13 @@ else
     private List<string> _allPriorities = [];
     private List<TicketType> _ticketTypes = [];
     private List<Group> _allGroups = [];
+    // How many of `_allGroups` the current user is an actual MEMBER of —
+    // not how many are visible to them. /api/v1/groups returns every group
+    // to admins/agents (so a single-OV admin would still see Count == 2)
+    // and customers' lists include public groups they're not a member of
+    // either. Use this number to decide whether the group filter has any
+    // meaningful pick to offer: 0 or 1 → hide the dropdown entirely.
+    private int _myMembershipCount;
     private Dictionary<string, int> _typeCounts = new();
     private Dictionary<string, int> _groupCounts = new();
     private List<KanbanColumn> _allColumns = [];
@@ -384,6 +391,19 @@ else
                 .OrderBy(g => g.Name)
                 .ToList();
 
+            // Personal-membership count for the filter visibility check.
+            // Each Group in the response carries the populated members[],
+            // so we can match against the logged-in user's id without an
+            // extra request. Admins are typically members of 0 customer
+            // groups (PR #87 strips them on role promotion), customers
+            // of 1, so the filter only surfaces for the rare user who is
+            // in more than one customer group.
+            var myId = ApiService.CurrentUserId;
+            _myMembershipCount = string.IsNullOrEmpty(myId)
+                ? 0
+                : _allGroups.Count(g => g.MembersList.Any(m =>
+                    !string.IsNullOrEmpty(m.Id) && m.Id == myId));
+
             foreach (var t in tickets) TrudeskTranslationHelper.TranslateTicket(t);
 
             // Pre-filter the visible column set: drop the "Neu" status so
@@ -439,10 +459,13 @@ else
                 .GroupBy(t => t.GroupId!)
                 .ToDictionary(g => g.Key, g => g.Count());
 
-            // If the persisted group filter points at a group that's no
-            // longer visible (membership change, group deleted), drop it
-            // and clean up storage so the next load starts fresh.
-            if (!string.IsNullOrEmpty(_groupFilter) && !_allGroups.Any(g => g.Id == _groupFilter))
+            // Drop the persisted filter if the user can no longer reach
+            // the dropdown to clear it themselves — either because the
+            // saved group is gone from the visible list (membership
+            // change, group deleted) or because the dropdown is now
+            // hidden entirely (<=1 personal membership).
+            if (!string.IsNullOrEmpty(_groupFilter) &&
+                (_myMembershipCount <= 1 || !_allGroups.Any(g => g.Id == _groupFilter)))
             {
                 _groupFilter = null;
                 _ = LocalStorage.RemoveItemAsync(GroupFilterStorageKey);
