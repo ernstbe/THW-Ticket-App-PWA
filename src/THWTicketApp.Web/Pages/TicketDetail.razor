@@ -524,54 +524,94 @@ else
                 </MudExpansionPanel>
             </MudExpansionPanels>
 
-            @* Attachments — Upload deaktiviert auf Nutzerwunsch; Panel komplett ausgeblendet, Code bleibt erhalten. *@
-            @if (_showDisabledTicketSections)
-            {
-                <MudPaper Elevation="1" Class="pa-4 mb-3">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">
-                        @L.T("attachments.title")
-                        @if (_ticket.Attachments?.Count > 0)
-                        {
-                            <span style="font-weight:normal; opacity:0.7;">(@_ticket.Attachments.Count)</span>
-                        }
-                    </MudText>
-                    <div id="attachment-dropzone" class="pwa-dropzone pa-2">
-                        @if (_ticket.Attachments != null && _ticket.Attachments.Count > 0)
-                        {
-                            <div class="d-flex flex-column gap-1 mb-2">
-                                @foreach (var att in _ticket.Attachments)
-                                {
-                                    var a = att;
-                                    <div class="d-flex align-center gap-2">
-                                        <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" />
-                                        <MudLink Typo="Typo.body2" Style="flex:1; min-width:0; word-break:break-all;"
-                                                 OnClick="@(() => DownloadAttachment(a))">@a.Name</MudLink>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@a.SizeFormatted</MudText>
-                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
-                                                       OnClick="() => DeleteAttachmentAsync(a)" />
-                                    </div>
-                                }
-                            </div>
-                        }
-                        <div class="d-flex gap-2 align-center">
-                            <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
-                                       accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.txt,.zip" />
-                            <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
-                                       StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
-                                       Disabled="_isUploading">
-                                @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
-                            </MudButton>
-                            @if (_isUploading)
+            @* Attachments — Bilder als Thumbnail-Grid, sonstige Dateien als Liste.
+               Foto-Aufnahme nutzt `capture="environment"` (Smartphone öffnet die
+               Rück-Kamera direkt; Desktop ignoriert das Attribut). *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                    @L.T("attachments.title")
+                    @if (_ticket.Attachments?.Count > 0)
+                    {
+                        <span style="font-weight:normal; opacity:0.7;">(@_ticket.Attachments.Count)</span>
+                    }
+                </MudText>
+
+                @if (_ticket.Attachments != null && _ticket.Attachments.Count > 0)
+                {
+                    var images = _ticket.Attachments.Where(a => a.IsImage).ToList();
+                    var docs = _ticket.Attachments.Where(a => !a.IsImage).ToList();
+
+                    @if (images.Count > 0)
+                    {
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            @foreach (var img in images)
                             {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                var a = img;
+                                var url = ApiService.GetAttachmentUrl(a.Path ?? string.Empty);
+                                <div style="position:relative; width:96px; height:96px;">
+                                    <a href="@url" target="_blank" rel="noopener" aria-label="@a.Name">
+                                        <img src="@url" alt="@a.Name"
+                                             style="width:100%; height:100%; object-fit:cover; border-radius:4px; border:1px solid var(--mud-palette-lines-default);" />
+                                    </a>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                   Size="Size.Small"
+                                                   Style="position:absolute; top:-6px; right:-6px; background:var(--mud-palette-surface); border:1px solid var(--mud-palette-lines-default);"
+                                                   OnClick="@(() => DeleteAttachmentAsync(a))"
+                                                   aria-label="@L.T("common.delete")" />
+                                </div>
                             }
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @L.T("attachments.drop_hint")
-                            </MudText>
                         </div>
+                    }
+                    @if (docs.Count > 0)
+                    {
+                        <div class="d-flex flex-column gap-1 mb-2">
+                            @foreach (var doc in docs)
+                            {
+                                var a = doc;
+                                <div class="d-flex align-center gap-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" />
+                                    <MudLink Typo="Typo.body2" Style="flex:1; min-width:0; word-break:break-all;"
+                                             OnClick="@(() => DownloadAttachment(a))">@a.Name</MudLink>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@a.SizeFormatted</MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="() => DeleteAttachmentAsync(a)" />
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+
+                @* Wrapping div carries id="attachment-dropzone" so the
+                   dropzone-interop module can wire drag-and-drop. Drops are
+                   forwarded into the `attachment-upload` InputFile which
+                   then triggers OnFileSelectedAsync — same code path as
+                   the click-to-pick flow. *@
+                <div id="attachment-dropzone" class="pwa-dropzone pa-2">
+                    <div class="d-flex gap-2 align-center flex-wrap">
+                        <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
+                                   accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.txt,.zip,.mp3,.wav" />
+                        <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
+                                   Disabled="_isUploading">
+                            @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
+                        </MudButton>
+                        <InputFile id="attachment-camera" OnChange="OnFileSelectedAsync" hidden
+                                   accept="image/*" capture="environment" />
+                        <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.CameraAlt" for="attachment-camera"
+                                   Disabled="_isUploading">
+                            @L.T("attachments.take_photo")
+                        </MudButton>
+                        @if (_isUploading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
                     </div>
-                </MudPaper>
-            }
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
+                    @L.T("attachments.dsgvo_hint")
+                </MudText>
+            </MudPaper>
 
             @* Linked tickets — ausgeblendet auf Nutzerwunsch (war localStorage-only,
                nicht serverseitig persistiert). Code bleibt für eine spätere
@@ -685,11 +725,11 @@ else
     // Attachments
     private bool _isUploading;
     private IJSObjectReference? _dropzoneModule;
-    // Single re-enable switch for the Attachments panel + the linked-tickets
-    // panel that were disabled on user request but kept in markup. Held as a
-    // non-const field so the Razor source generator doesn't fold the `@if`
-    // away and trip CS0162 in the generated `.g.cs`. Never assigned anywhere —
-    // flip the literal to `true` when re-enabling.
+    // Re-enable switch for the linked-tickets panel that was disabled on
+    // user request but kept in markup. Held as a non-const field so the
+    // Razor source generator doesn't fold the `@if` away and trip CS0162
+    // in the generated `.g.cs`. Never assigned anywhere — flip the literal
+    // to `true` when re-enabling.
 #pragma warning disable CS0649
     private readonly bool _showDisabledTicketSections;
 #pragma warning restore CS0649
@@ -1400,7 +1440,25 @@ else
         try
         {
             var file = e.File;
-            using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+            // Match the server-side 25 MB pre-resize ceiling so we fail-fast
+            // on the client instead of wasting bandwidth on an upload the
+            // backend will reject. The sync-queue path below uses
+            // SyncService.MaxAttachmentBytes (5 MB) — smaller because the
+            // file gets base64'd into IndexedDB.
+            if (!AppState.IsOnline)
+            {
+                using var memStream = new MemoryStream();
+                await file.OpenReadStream(maxAllowedSize: THWTicketApp.Web.Services.SyncService.MaxAttachmentBytes)
+                    .CopyToAsync(memStream);
+                await SyncService.EnqueueUploadAttachmentAsync(
+                    _ticket.Id, _ticket.Uid, file.Name, memStream.ToArray(),
+                    string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                    _ticket.Updated);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+
+            using var stream = file.OpenReadStream(maxAllowedSize: 25 * 1024 * 1024);
             if (await ApiService.UploadAttachmentAsync(_ticket.Id, stream, file.Name))
             {
                 Snackbar.Add(L.T("attachments.uploaded"), Severity.Success);

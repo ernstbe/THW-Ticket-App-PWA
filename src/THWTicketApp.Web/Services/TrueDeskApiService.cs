@@ -551,11 +551,12 @@ public class TrueDeskApiService : ITrueDeskApiService
         var streamContent = new StreamContent(fileStream);
         streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(GetMimeType(fileName));
         content.Add(streamContent, "file", fileName);
-        content.Add(new StringContent(ticketId), "ticketId");
-        content.Add(new StringContent(CurrentUserId ?? string.Empty), "ownerId");
 
-        // Upload is a traditional route (not under /api/), requires session cookie or token in form
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{ServerUrl}/tickets/uploadattachment", content));
+        // Token-authenticated endpoint added in trudesk-thw PR #96.
+        // Ticket id is in the URL, ownerId is taken from req.user server-side —
+        // we don't pass them as form fields (would be ignored anyway).
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync(
+            $"{V1BaseUrl}/tickets/{ticketId}/attachments", content));
         return response.IsSuccessStatusCode;
     }
 
