@@ -581,25 +581,32 @@ else
                     }
                 }
 
-                <div class="d-flex gap-2 align-center flex-wrap">
-                    <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
-                               accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.txt,.zip,.mp3,.wav" />
-                    <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
-                               Disabled="_isUploading">
-                        @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
-                    </MudButton>
-                    <InputFile id="attachment-camera" OnChange="OnFileSelectedAsync" hidden
-                               accept="image/*" capture="environment" />
-                    <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.CameraAlt" for="attachment-camera"
-                               Disabled="_isUploading">
-                        @L.T("attachments.take_photo")
-                    </MudButton>
-                    @if (_isUploading)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                    }
+                @* Wrapping div carries id="attachment-dropzone" so the
+                   dropzone-interop module can wire drag-and-drop. Drops are
+                   forwarded into the `attachment-upload` InputFile which
+                   then triggers OnFileSelectedAsync — same code path as
+                   the click-to-pick flow. *@
+                <div id="attachment-dropzone" class="pwa-dropzone pa-2">
+                    <div class="d-flex gap-2 align-center flex-wrap">
+                        <InputFile id="attachment-upload" OnChange="OnFileSelectedAsync" hidden
+                                   accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.txt,.zip,.mp3,.wav" />
+                        <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.CloudUpload" for="attachment-upload"
+                                   Disabled="_isUploading">
+                            @(_isUploading ? L.T("attachments.uploading") : L.T("attachments.upload"))
+                        </MudButton>
+                        <InputFile id="attachment-camera" OnChange="OnFileSelectedAsync" hidden
+                                   accept="image/*" capture="environment" />
+                        <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.CameraAlt" for="attachment-camera"
+                                   Disabled="_isUploading">
+                            @L.T("attachments.take_photo")
+                        </MudButton>
+                        @if (_isUploading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                        }
+                    </div>
                 </div>
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">
                     @L.T("attachments.dsgvo_hint")
