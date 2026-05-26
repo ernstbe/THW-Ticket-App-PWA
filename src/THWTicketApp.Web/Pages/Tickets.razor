@@ -82,6 +82,15 @@
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" @bind-Value="_filterType" Label="@L.T("detail.type")"
+                           Variant="Variant.Outlined" Clearable="true" Margin="Margin.Dense">
+                    @foreach (var t in _allTypes)
+                    {
+                        <MudSelectItem Value="@t">@t</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
                 <MudDatePicker @bind-Date="_filterDateFrom" Label="@L.T("search.date_from")"
                                Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
             </MudItem>
@@ -309,11 +318,13 @@ else
     private bool _showAdvancedFilter;
     private string? _filterPriority;
     private string? _filterGroup;
+    private string? _filterType;
     private DateTime? _filterDateFrom;
     private DateTime? _filterDateTo;
-    private bool _hasAdvancedFilter => _filterPriority != null || _filterGroup != null || _filterDateFrom != null || _filterDateTo != null;
+    private bool _hasAdvancedFilter => _filterPriority != null || _filterGroup != null || _filterType != null || _filterDateFrom != null || _filterDateTo != null;
     private List<string> _allPriorities = [];
     private List<string> _allGroups = [];
+    private List<string> _allTypes = [];
 
     private CancellationTokenSource? _refreshDebounceCts;
     private IJSObjectReference? _ptrModule;
@@ -427,6 +438,10 @@ else
                 .Where(t => t.Group?.Name != null)
                 .Select(t => t.Group!.Name!)
                 .Distinct().OrderBy(n => n).ToList();
+            _allTypes = _allTickets
+                .Where(t => t.Type?.Name != null)
+                .Select(t => t.Type!.TranslatedName)
+                .Distinct().OrderBy(n => n).ToList();
 
             ApplyFilters();
         }
@@ -516,6 +531,8 @@ else
             source = source.Where(t => t.Priority?.Name == _filterPriority);
         if (!string.IsNullOrEmpty(_filterGroup))
             source = source.Where(t => t.Group?.Name == _filterGroup);
+        if (!string.IsNullOrEmpty(_filterType))
+            source = source.Where(t => t.Type?.TranslatedName == _filterType);
         if (_filterDateFrom.HasValue)
             source = source.Where(t => t.Date >= _filterDateFrom.Value);
         if (_filterDateTo.HasValue)
@@ -530,6 +547,7 @@ else
     {
         _filterPriority = null;
         _filterGroup = null;
+        _filterType = null;
         _filterDateFrom = null;
         _filterDateTo = null;
         _currentPage = 1;
