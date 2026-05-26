@@ -1286,6 +1286,28 @@ public class TrueDeskApiService : ITrueDeskApiService
             else if (root.TryGetProperty("account", out var a)) userEl = a;
             else userEl = root;
 
+            // Group ids resolved server-side: admins/agents get the
+            // Department-chain-derived list; customers get direct
+            // Group.members. Either way the resulting count is what the
+            // Kanban group-filter UI should base its visibility on.
+            var groupIds = new List<string>();
+            if (userEl.TryGetProperty("groups", out var grEl) && grEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var g in grEl.EnumerateArray())
+                {
+                    if (g.ValueKind == JsonValueKind.String)
+                    {
+                        var s = g.GetString();
+                        if (!string.IsNullOrEmpty(s)) groupIds.Add(s);
+                    }
+                    else if (g.ValueKind == JsonValueKind.Object && g.TryGetProperty("_id", out var gIdEl))
+                    {
+                        var s = gIdEl.GetString();
+                        if (!string.IsNullOrEmpty(s)) groupIds.Add(s);
+                    }
+                }
+            }
+
             return new UserProfile
             {
                 Id = userEl.TryGetProperty("_id", out var idEl) ? idEl.GetString() : null,
@@ -1295,6 +1317,7 @@ public class TrueDeskApiService : ITrueDeskApiService
                 Title = userEl.TryGetProperty("title", out var tEl) ? tEl.GetString() : null,
                 WorkNumber = userEl.TryGetProperty("workNumber", out var wnEl) ? wnEl.GetString() : null,
                 MobileNumber = userEl.TryGetProperty("mobileNumber", out var mnEl) ? mnEl.GetString() : null,
+                Groups = groupIds,
             };
         }
         catch
