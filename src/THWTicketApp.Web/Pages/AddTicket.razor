@@ -98,6 +98,12 @@ else
                         <MudSelectItem Value="group">@group.Name</MudSelectItem>
                     }
                 </MudSelect>
+                @if (_noVisibleGroups)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
+                        @L.T("tickets.no_visible_groups")
+                    </MudAlert>
+                }
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudSelect T="User" @bind-Value="_selectedAssignee" Label="@L.T("detail.assignee")" Variant="Variant.Outlined"
@@ -157,6 +163,10 @@ else
     private List<Group> _groups = [];
     private List<User> _users = [];
     private List<TemplateItem> _templates = [];
+    // True when the user profile resolved to zero reachable groups —
+    // surface a warning instead of letting them pick a group that the
+    // server-side check (trudesk PR #97) would 403 anyway.
+    private bool _noVisibleGroups;
 
     protected override async Task OnInitializedAsync()
     {
@@ -245,9 +255,16 @@ else
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
             // Core data: types and groups are essential for ticket creation.
+            // Profile is loaded in parallel to scope the group dropdown to
+            // the user's reachable groups (Team→Department for admin/agent,
+            // direct membership for customer) — same source the kanban
+            // filter uses (see PR #144). Server-side enforcement landed in
+            // trudesk PR #97; this just stops users from picking a group
+            // that would 403 on submit.
             var typesTask = ApiService.GetTicketTypesAsync();
             var groupsTask = ApiService.GetGroupsAsync();
-            await Task.WhenAll(typesTask, groupsTask);
+            var profileTask = ApiService.GetCurrentUserProfileAsync();
+            await Task.WhenAll(typesTask, groupsTask, profileTask);
 
             // Types + Priorities
             var types = JsonSerializer.Deserialize<TicketType[]>(typesTask.Result, options);
@@ -265,13 +282,15 @@ else
                 if (_ticketTypes.Count > 0) _selectedType = _ticketTypes[0];
             }
 
-            // Groups
+            // Groups — filter to the visible set when we have a profile;
+            // fall back to the raw list if the profile lookup failed so the
+            // form still works (the server check is the real gate).
             var groupResponse = JsonSerializer.Deserialize<GetGroupResponse>(groupsTask.Result, options);
-            if (groupResponse?.Groups != null)
-            {
-                _groups = groupResponse.Groups;
-                if (_groups.Count > 0) _selectedGroup = _groups[0];
-            }
+            var rawGroups = groupResponse?.Groups ?? new List<Group>();
+            var visibleGroupIds = profileTask.Result?.Groups;
+            _groups = FilterGroupsByVisibility(rawGroups, visibleGroupIds);
+            _noVisibleGroups = visibleGroupIds != null && _groups.Count == 0;
+            if (_groups.Count > 0) _selectedGroup = _groups[0];
 
             // Optional data: assignees (requires Agent/Admin role) and templates
             // (v2 endpoint, fails with v1 accesstoken). Fetched separately so a
@@ -360,6 +379,19 @@ else
             if (match != null) _selectedPriority = match;
         }
         StateHasChanged();
+    }
+
+    // Pure helper: keep the filter logic out of the async LoadDataAsync
+    // so it can be unit-tested without bUnit. `visibleIds == null` means
+    // "profile lookup failed — trust the raw list, server will gate";
+    // an empty `visibleIds` means "profile loaded but resolved zero
+    // groups" and we surface the warning.
+    internal static List<Group> FilterGroupsByVisibility(List<Group> raw, List<string>? visibleIds)
+    {
+        if (visibleIds == null) return raw;
+        if (visibleIds.Count == 0) return new List<Group>();
+        var allowed = new HashSet<string>(visibleIds, StringComparer.Ordinal);
+        return raw.Where(g => g.Id != null && allowed.Contains(g.Id)).ToList();
     }
 
     internal static List<TemplateItem> ParseTemplates(string json)
