@@ -28,7 +28,8 @@
 </div>
 
 <div class="d-flex align-center gap-2 mb-3 flex-wrap">
-    <MudTextField @bind-Value="_searchText" Placeholder="@L.T("tickets.search")"
+    <MudTextField @bind-Value="_searchText" @bind-Value:after="RecomputeFiltered"
+                  Placeholder="@L.T("tickets.search")"
                   Variant="Variant.Outlined" Margin="Margin.Dense"
                   Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                   Immediate="true" DebounceInterval="200"
@@ -43,6 +44,7 @@
     @if (_allPriorities.Any())
     {
         <MudSelect T="string" @bind-Value="_priorityFilter" Placeholder="@L.T("detail.priority")"
+                   @bind-Value:after="RecomputeFiltered"
                    Variant="Variant.Outlined" Margin="Margin.Dense"
                    Clearable="true" Style="min-width: 140px;">
             @foreach (var p in _allPriorities)
