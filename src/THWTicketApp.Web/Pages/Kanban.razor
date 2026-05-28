@@ -446,7 +446,15 @@ else
                 AllowedStatusIds = t.Type?.Statuses is { Count: > 0 } st
                     ? new HashSet<string>(st.Select(x => x.Id ?? "").Where(id => id.Length > 0))
                     : []
-            }).OrderByDescending(t => t.PrioritySortOrder).ToList();
+            })
+            // Sort by priority urgency first, newest within the same priority.
+            // `PrioritySortOrder` is trudesk's `priority.overdueIn` (minutes
+            // until overdue) — LOWER values = MORE urgent. Tickets without a
+            // resolved priority fall to the bottom (int.MaxValue), then by
+            // descending Uid so the newest still surface first.
+            .OrderBy(t => t.PrioritySortOrder > 0 ? t.PrioritySortOrder : int.MaxValue)
+            .ThenByDescending(t => t.Uid)
+            .ToList();
 
             _allPriorities = _ticketItems
                 .Select(t => t.PriorityName)
