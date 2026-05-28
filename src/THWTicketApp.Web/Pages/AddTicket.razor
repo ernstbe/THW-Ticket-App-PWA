@@ -1,6 +1,7 @@
 @page "/tickets/add"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using MudBlazor
+@using Microsoft.AspNetCore.Components.Forms
 @using System.Text.Json
 @using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Models.Responses
@@ -123,6 +124,47 @@ else
             </MudItem>
         </MudGrid>
 
+        @* Attachment picker — pre-create. Files are kept in memory and
+           pushed to the new ticket *after* the create succeeds. This
+           was bug-report #2 from the PWA: customers couldn't add a
+           photo at the moment they were filing the ticket. We allow
+           multiple files; each is size-checked client-side against the
+           same 25 MB ceiling the server enforces. *@
+        <MudText Typo="Typo.body2" Class="mb-2">@L.T("tickets.attachments_label")</MudText>
+        <div class="d-flex gap-2 align-center flex-wrap mb-4">
+            <InputFile id="new-ticket-attachments" OnChange="OnFilesPicked" hidden multiple
+                       accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.txt,.zip,.mp3,.wav" />
+            <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.AttachFile" for="new-ticket-attachments"
+                       Disabled="_isLoading">
+                @L.T("tickets.attachments_pick")
+            </MudButton>
+            @if (_pendingAttachments.Count > 0)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @string.Format(L.T("tickets.attachments_selected"), _pendingAttachments.Count)
+                </MudText>
+            }
+        </div>
+        @if (_pendingAttachments.Count > 0)
+        {
+            <div class="d-flex flex-column gap-1 mb-4">
+                @foreach (var (file, idx) in _pendingAttachments.Select((f, i) => (f, i)))
+                {
+                    var capturedIdx = idx;
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Style="flex:1; overflow:hidden; text-overflow:ellipsis;">
+                            @file.Name <span style="color:var(--mud-palette-text-secondary);">(@FormatBytes(file.Size))</span>
+                        </MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                       OnClick="@(() => RemovePendingAttachment(capturedIdx))"
+                                       aria-label="@L.T("tickets.attachments_remove")" />
+                    </div>
+                }
+            </div>
+        }
+
         <div class="d-flex gap-3 mt-4">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        OnClick="CreateTicketAsync" Disabled="_isLoading">
@@ -167,6 +209,13 @@ else
     // surface a warning instead of letting them pick a group that the
     // server-side check (trudesk PR #97) would 403 anyway.
     private bool _noVisibleGroups;
+
+    // Files the user picked before saving. Uploaded after the create POST
+    // returns the new ticket id. Capped per file at the same 25 MB
+    // ceiling TicketDetail uses; the server compresses images to 2400 px
+    // after receiving them.
+    private const long MaxAttachmentBytes = 25L * 1024 * 1024;
+    private readonly List<IBrowserFile> _pendingAttachments = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -329,25 +378,54 @@ else
 
         try
         {
-            var success = await ApiService.CreateTicketAsync(
+            var ticketId = await ApiService.CreateTicketAsync(
                 _subject, _issue,
                 _selectedType?.Id, _selectedPriority?.Id,
                 _selectedGroup?.Id, _selectedAssignee?.Id,
                 _dueDate);
 
-            if (success)
+            if (ticketId == null)
             {
-                // Successful submit — drop the draft so the next /tickets/add
-                // visit starts fresh.
-                _saveDebounce?.Dispose();
-                await LocalStorage.RemoveItemAsync(DraftKey);
-                Snackbar.Add(L.T("tickets.created"), Severity.Success);
-                Navigation.NavigateTo("tickets");
+                Snackbar.Add($"{L.T("common.error")}: {ApiService.LastError ?? L.T("tickets.server_rejected")}", Severity.Error);
+                return;
+            }
+
+            // Successful submit — drop the draft so the next /tickets/add
+            // visit starts fresh.
+            _saveDebounce?.Dispose();
+            await LocalStorage.RemoveItemAsync(DraftKey);
+
+            // Upload any pre-picked attachments before we navigate. If the
+            // server didn't echo back an id (older trudesk or malformed
+            // response) we skip the upload step — the ticket itself is
+            // created, the user just can't attach via this flow. Partial
+            // failures still let the create stand.
+            var failedUploads = 0;
+            if (_pendingAttachments.Count > 0 && !string.IsNullOrEmpty(ticketId))
+            {
+                Snackbar.Add(L.T("tickets.attachments_uploading"), Severity.Info);
+                foreach (var file in _pendingAttachments)
+                {
+                    try
+                    {
+                        using var stream = file.OpenReadStream(MaxAttachmentBytes);
+                        if (!await ApiService.UploadAttachmentAsync(ticketId, stream, file.Name))
+                            failedUploads++;
+                    }
+                    catch { failedUploads++; }
+                }
+            }
+
+            if (failedUploads > 0)
+            {
+                Snackbar.Add(string.Format(L.T("tickets.attachments_partial"),
+                    failedUploads, _pendingAttachments.Count), Severity.Warning);
             }
             else
             {
-                Snackbar.Add($"{L.T("common.error")}: {ApiService.LastError ?? L.T("tickets.server_rejected")}", Severity.Error);
+                Snackbar.Add(L.T("tickets.created"), Severity.Success);
             }
+            Navigation.NavigateTo("tickets");
         }
         catch
         {
@@ -358,6 +436,37 @@ else
             _isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private void OnFilesPicked(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles(maximumFileCount: 20))
+        {
+            if (file.Size > MaxAttachmentBytes)
+            {
+                Snackbar.Add(string.Format(L.T("tickets.attachments_too_large"), file.Name), Severity.Warning);
+                continue;
+            }
+            _pendingAttachments.Add(file);
+        }
+        StateHasChanged();
+    }
+
+    private void RemovePendingAttachment(int index)
+    {
+        if (index < 0 || index >= _pendingAttachments.Count) return;
+        _pendingAttachments.RemoveAt(index);
+        StateHasChanged();
+    }
+
+    // Small humanizer for the file-size hint next to each picked file.
+    // Kept inline because no existing helper does exactly this and it's
+    // a 6-line tail formatter — abstracting it would obscure intent.
+    internal static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:0.#} KB";
+        return $"{bytes / (1024.0 * 1024):0.#} MB";
     }
 
     private void OnTemplateSelected(TemplateItem? template)
