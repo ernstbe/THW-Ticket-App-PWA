@@ -317,7 +317,7 @@ public class SyncService : ISyncService
         "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!),
         "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.StatusId!),
         "CreateTicket" => await _apiService.CreateTicketAsync(
-            action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId),
+            action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId) != null,
         "UpdateTicketFields" => await ApplyUpdateTicketFieldsAsync(action),
         "DeleteTicket" => await _apiService.DeleteTicketAsync(action.TicketId!),
         "UploadAttachment" => await ApplyUploadAttachmentAsync(action),
