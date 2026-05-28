@@ -30,7 +30,13 @@ public interface ITrueDeskApiService
     Task<string> GetTicketAsync(string ticketUid);
     Task<(int StatusCode, string Body)> GetTicketRawAsync(string ticketUid);
     Task<string> AddTicketAsync(string title, string description, string? assigneeId);
-    Task<bool> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null);
+    /// <summary>
+    /// Creates a ticket and returns its id on success, or null on failure.
+    /// Used by AddTicket to chain follow-up calls (e.g. attachment uploads
+    /// from the same form submission). Offline queue replay treats any
+    /// non-null result as success.
+    /// </summary>
+    Task<string?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null);
     Task<bool> EditTicketAsync(Ticket ticket);
     Task<bool> DeleteTicketAsync(string ticketId);
     Task<bool> UpdateTicketStatusAsync(string ticketId, string statusId);

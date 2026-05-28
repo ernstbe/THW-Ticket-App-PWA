@@ -536,6 +536,13 @@ public class LocalizationService
         ["tickets.server_rejected"] = "Server hat das Ticket abgelehnt.",
         ["tickets.draft_restored"] = "Entwurf wiederhergestellt — du kannst da weitermachen, wo du aufgehört hast.",
         ["tickets.draft_discard"] = "Verwerfen",
+        ["tickets.attachments_label"] = "Anhänge (optional)",
+        ["tickets.attachments_pick"] = "Dateien auswählen",
+        ["tickets.attachments_selected"] = "{0} Datei(en) ausgewählt",
+        ["tickets.attachments_remove"] = "Entfernen",
+        ["tickets.attachments_too_large"] = "{0} ist zu groß (max. 25 MB).",
+        ["tickets.attachments_uploading"] = "Lade Anhänge hoch…",
+        ["tickets.attachments_partial"] = "Ticket erstellt, aber {0} von {1} Anhängen konnten nicht hochgeladen werden.",
 
         // Dashboard
         ["dashboard.total"] = "Gesamt",
@@ -1248,6 +1255,13 @@ public class LocalizationService
         ["tickets.server_rejected"] = "Server rejected the ticket.",
         ["tickets.draft_restored"] = "Draft restored — pick up where you left off.",
         ["tickets.draft_discard"] = "Discard",
+        ["tickets.attachments_label"] = "Attachments (optional)",
+        ["tickets.attachments_pick"] = "Choose files",
+        ["tickets.attachments_selected"] = "{0} file(s) selected",
+        ["tickets.attachments_remove"] = "Remove",
+        ["tickets.attachments_too_large"] = "{0} is too large (max. 25 MB).",
+        ["tickets.attachments_uploading"] = "Uploading attachments…",
+        ["tickets.attachments_partial"] = "Ticket created, but {0} of {1} attachments failed to upload.",
 
         // Dashboard
         ["dashboard.total"] = "Total",

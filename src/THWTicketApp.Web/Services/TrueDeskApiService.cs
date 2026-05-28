@@ -431,10 +431,10 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<bool> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null)
+    public async Task<string?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null)
     {
         if (string.IsNullOrWhiteSpace(subject))
-            return false;
+            return null;
 
         var payload = new Dictionary<string, object?>
         {
@@ -454,12 +454,28 @@ public class TrueDeskApiService : ITrueDeskApiService
         // v1 uses /tickets/create, v2 uses /tickets
         var endpoint = IsV2 ? $"{BaseUrl}/tickets" : $"{BaseUrl}/tickets/create";
         var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync(endpoint, content));
+        var responseBody = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync();
-            LastError = $"{(int)response.StatusCode}: {body}";
+            LastError = $"{(int)response.StatusCode}: {responseBody}";
+            return null;
         }
-        return response.IsSuccessStatusCode;
+        // Both v1 (`{ success, ticket: { _id, ... } }`) and v2 wrap the
+        // created ticket under `ticket`. Surface the id so callers can chain
+        // follow-ups (attachments, navigate-to-detail). On parse trouble we
+        // still treat the create as a success and return an empty id —
+        // callers that need the id check for null explicitly.
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            if (doc.RootElement.TryGetProperty("ticket", out var ticket) &&
+                ticket.TryGetProperty("_id", out var idEl))
+            {
+                return idEl.GetString() ?? string.Empty;
+            }
+        }
+        catch { /* malformed body — fall through to empty id */ }
+        return string.Empty;
     }
 
     public async Task<bool> EditTicketAsync(Ticket ticket)
