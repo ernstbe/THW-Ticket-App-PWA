@@ -164,7 +164,7 @@ else
             <tr><th>Gruppe</th><td>@(_ticket.Group?.Name ?? "-")</td></tr>
             <tr><th>Typ</th><td>@(_ticket.Type?.TranslatedName ?? "-")</td></tr>
             <tr><th>Erstellt</th><td>@_ticket.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</td></tr>
-            <tr><th>Aktualisiert</th><td>@_ticket.Updated.ToLocalDisplayString("dd.MM.yyyy HH:mm")</td></tr>
+            <tr><th>Aktualisiert</th><td>@_ticket.LastActivityAt.ToLocalDisplayString("dd.MM.yyyy HH:mm")</td></tr>
             @if (_ticket.DueDate != DateTime.MinValue)
             {
                 <tr><th>Fällig</th><td>@_ticket.DueDate.ToLocalDisplayString("dd.MM.yyyy")</td></tr>
@@ -508,7 +508,7 @@ else
                             </div>
                             <div>
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.updated")</MudText>
-                                <MudText Typo="Typo.body2">@_ticket.Updated.ToLocalDisplayString("dd.MM.yyyy HH:mm")</MudText>
+                                <MudText Typo="Typo.body2">@_ticket.LastActivityAt.ToLocalDisplayString("dd.MM.yyyy HH:mm")</MudText>
                             </div>
                             @if (_ticket.DueDate != DateTime.MinValue)
                             {

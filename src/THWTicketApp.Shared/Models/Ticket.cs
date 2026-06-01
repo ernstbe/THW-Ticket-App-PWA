@@ -50,4 +50,13 @@ public class Ticket
     public DateTime? ClosedDate { get; set; }
     public Assignee? Assignee { get; set; }
     public DateTime Updated { get; set; }
+
+    /// <summary>
+    /// Falls back to <see cref="Date"/> when <see cref="Updated"/> is
+    /// unset (DateTime.MinValue). Pre-PR-100 tickets and older trudesk
+    /// versions never stamped `updated`, which would otherwise dump them
+    /// to the bottom of "Zuletzt aktualisiert" sorting.
+    /// </summary>
+    [JsonIgnore]
+    public DateTime LastActivityAt => Updated == DateTime.MinValue ? Date : Updated;
 }

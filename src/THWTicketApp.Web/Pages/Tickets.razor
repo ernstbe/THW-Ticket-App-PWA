@@ -296,7 +296,7 @@ else
     private bool _isLoading;
     private string _searchText = string.Empty;
     private string _activeFilter = "active";
-    private string _activeSort = "date_desc";
+    private string _activeSort = "updated";
     private bool _showOnlyMyTickets;
     private string _statusMessage = string.Empty;
     private List<Ticket> _allTickets = [];
@@ -559,7 +559,7 @@ else
         return _activeSort switch
         {
             "date_asc" => source.OrderBy(t => t.Date),
-            "updated" => source.OrderByDescending(t => t.Updated),
+            "updated" => source.OrderByDescending(t => t.LastActivityAt),
             // Sort by Priority.MigrationNum (1=lowest … N=highest), highest first.
             // The previous key was OverdueIn (minutes until a ticket counts as
             // overdue), which (a) is the wrong direction — a longer fuse means
