@@ -39,6 +39,15 @@
                             @Ticket.Group.Name
                         </MudText>
                     }
+                    @if (Ticket.DueDate != DateTime.MinValue)
+                    {
+                        var overdue = Ticket.DueDate < DateTime.Now && Ticket.Status?.IsResolved != true;
+                        <MudText Typo="Typo.caption" Color="@(overdue ? Color.Error : Color.Default)"
+                                 Style="@(overdue ? "font-weight:600;" : null)">
+                            <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Class="mr-1" />
+                            @Ticket.DueDate.ToLocalDisplayString("dd.MM.yyyy")
+                        </MudText>
+                    }
                     <MudText Typo="Typo.caption" Color="Color.Default">
                         @Ticket.LastActivityAt.ToLocalDisplayString("dd.MM.yyyy HH:mm")
                     </MudText>
