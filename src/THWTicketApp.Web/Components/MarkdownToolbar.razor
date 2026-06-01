@@ -18,8 +18,13 @@
     <MudIconButton Icon="@Icons.Material.Filled.FormatItalic" Size="Size.Small"
                    OnClick="@(() => WrapAsync("*", "*", L.T("editor.italic_placeholder")))"
                    aria-label="@L.T("editor.italic")" />
+    @* Underline uses raw <u> instead of Markdig's ++…++ syntax: comments
+       go through trudesk's marked.js before storage and marked has no
+       Inserted/Underline extension, so ++…++ would stay as literal
+       characters. <u> survives both sanitizeHtml on the server and the
+       Markdig HTML pass-through on the client. *@
     <MudIconButton Icon="@Icons.Material.Filled.FormatUnderlined" Size="Size.Small"
-                   OnClick="@(() => WrapAsync("++", "++", L.T("editor.underline_placeholder")))"
+                   OnClick="@(() => WrapAsync("<u>", "</u>", L.T("editor.underline_placeholder")))"
                    aria-label="@L.T("editor.underline")" />
     <MudIconButton Icon="@Icons.Material.Filled.StrikethroughS" Size="Size.Small"
                    OnClick="@(() => WrapAsync("~~", "~~", L.T("editor.strike_placeholder")))"
