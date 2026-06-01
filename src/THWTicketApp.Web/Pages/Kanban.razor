@@ -239,6 +239,15 @@ else
                 }
             </div>
             <MudText Typo="Typo.body2" Style="font-weight: 600;" Class="mb-2">@item.Subject</MudText>
+            @if (item.DueDate != DateTime.MinValue)
+            {
+                var overdue = item.DueDate < DateTime.Now && !item.StatusIsResolved;
+                <MudText Typo="Typo.caption" Color="@(overdue ? Color.Error : Color.Secondary)" Class="mb-1 d-flex align-center"
+                         Style="@(overdue ? "font-weight:600;" : null)">
+                    <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Class="mr-1" />
+                    @item.DueDate.ToLocalDisplayString("dd.MM.yyyy")
+                </MudText>
+            }
             <div class="d-flex align-center gap-2">
                 <UserAvatar Name="@item.AssigneeName" Size="Size.Small"
                             Style="width: 20px; height: 20px; font-size: 10px;" />
@@ -445,7 +454,9 @@ else
                 GroupName = t.Group?.Name,
                 AllowedStatusIds = t.Type?.Statuses is { Count: > 0 } st
                     ? new HashSet<string>(st.Select(x => x.Id ?? "").Where(id => id.Length > 0))
-                    : []
+                    : [],
+                DueDate = t.DueDate,
+                StatusIsResolved = t.Status?.IsResolved == true
             })
             // Sort by priority urgency first, newest within the same priority.
             // `PrioritySortOrder` is trudesk's `priority.overdueIn` (minutes
@@ -711,5 +722,7 @@ else
         public string? GroupName { get; set; }
         // Empty set = no per-type restriction → all statuses allowed.
         public HashSet<string> AllowedStatusIds { get; set; } = [];
+        public DateTime DueDate { get; set; }
+        public bool StatusIsResolved { get; set; }
     }
 }
