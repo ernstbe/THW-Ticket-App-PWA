@@ -57,7 +57,7 @@ else
                                     <MudText Typo="Typo.caption">@ticket.Assignee.Fullname</MudText>
                                 }
                                 <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                    @ticket.Updated.ToLocalDisplayString("dd.MM.yyyy HH:mm")
+                                    @ticket.LastActivityAt.ToLocalDisplayString("dd.MM.yyyy HH:mm")
                                 </MudText>
                             </div>
                         </div>
@@ -105,7 +105,7 @@ else
 
             _favorites = allTickets
                 .Where(t => favUids.Contains(t.Uid))
-                .OrderByDescending(t => t.Updated)
+                .OrderByDescending(t => t.LastActivityAt)
                 .ToList();
 
             foreach (var t in _favorites)

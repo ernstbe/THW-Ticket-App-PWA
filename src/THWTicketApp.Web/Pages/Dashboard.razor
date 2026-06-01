@@ -286,7 +286,7 @@ else
                 TrudeskTranslationHelper.TranslateTicket(t);
 
             ComputeStatistics();
-            _recentTickets = _allTickets.OrderByDescending(t => t.Updated).Take(5).ToList();
+            _recentTickets = _allTickets.OrderByDescending(t => t.LastActivityAt).Take(5).ToList();
         }
         catch (Exception ex)
         {
