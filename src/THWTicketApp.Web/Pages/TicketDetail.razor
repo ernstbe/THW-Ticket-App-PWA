@@ -224,8 +224,9 @@ else
                 </div>
                 @if (_editingDescription)
                 {
+                    <MarkdownToolbar TextAreaId="description-editor" />
                     <MudTextField @bind-Value="_editIssue" Variant="Variant.Outlined" Lines="6"
-                                  Immediate="true" Class="mb-2" />
+                                  Immediate="true" Class="mb-2" InputId="description-editor" />
                     <div class="d-flex gap-2">
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                                    OnClick="SaveDescriptionAsync" Disabled="_isLoading">
@@ -346,8 +347,10 @@ else
                         }
                         else
                         {
+                            <MarkdownToolbar TextAreaId="comment-editor" />
                             <MudTextField @bind-Value="_newComment" Placeholder="@L.T("comments.new")"
-                                          Variant="Variant.Outlined" Lines="3" Class="mb-2" />
+                                          Variant="Variant.Outlined" Lines="3" Class="mb-2"
+                                          InputId="comment-editor" />
                         }
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="false"
                                    StartIcon="@Icons.Material.Filled.Send"
@@ -360,8 +363,10 @@ else
                         <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
                             @L.T("detail.note_visible_internal")
                         </MudAlert>
+                        <MarkdownToolbar TextAreaId="note-editor" />
                         <MudTextField @bind-Value="_newNote" Placeholder="@L.T("notes.new")"
-                                      Variant="Variant.Outlined" Lines="3" Class="mb-2" />
+                                      Variant="Variant.Outlined" Lines="3" Class="mb-2"
+                                      InputId="note-editor" />
                         <MudButton Variant="Variant.Filled" Color="Color.Warning"
                                    StartIcon="@Icons.Material.Filled.NoteAdd"
                                    OnClick="AddNoteAsync"

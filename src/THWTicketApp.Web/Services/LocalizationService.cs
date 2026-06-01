@@ -147,6 +147,21 @@ public class LocalizationService
         ["tickets.deletefilter"] = "Filter löschen",
         ["tickets.filtername"] = "Filtername",
 
+        // Markdown editor toolbar
+        ["editor.toolbar"] = "Textformatierung",
+        ["editor.bold"] = "Fett",
+        ["editor.italic"] = "Kursiv",
+        ["editor.underline"] = "Unterstrichen",
+        ["editor.strike"] = "Durchgestrichen",
+        ["editor.code"] = "Code",
+        ["editor.list"] = "Liste",
+        ["editor.bold_placeholder"] = "fetter Text",
+        ["editor.italic_placeholder"] = "kursiver Text",
+        ["editor.underline_placeholder"] = "unterstrichener Text",
+        ["editor.strike_placeholder"] = "durchgestrichener Text",
+        ["editor.code_placeholder"] = "Code",
+        ["editor.list_placeholder"] = "Listenpunkt",
+
         // Ticket Detail
         ["detail.description"] = "Beschreibung",
         ["detail.no_description"] = "Keine Beschreibung.",
@@ -865,6 +880,21 @@ public class LocalizationService
         ["tickets.loadfilter"] = "Saved Filters",
         ["tickets.deletefilter"] = "Delete Filter",
         ["tickets.filtername"] = "Filter name",
+
+        // Markdown editor toolbar
+        ["editor.toolbar"] = "Text formatting",
+        ["editor.bold"] = "Bold",
+        ["editor.italic"] = "Italic",
+        ["editor.underline"] = "Underline",
+        ["editor.strike"] = "Strikethrough",
+        ["editor.code"] = "Code",
+        ["editor.list"] = "List",
+        ["editor.bold_placeholder"] = "bold text",
+        ["editor.italic_placeholder"] = "italic text",
+        ["editor.underline_placeholder"] = "underlined text",
+        ["editor.strike_placeholder"] = "strikethrough text",
+        ["editor.code_placeholder"] = "code",
+        ["editor.list_placeholder"] = "list item",
 
         // Ticket Detail
         ["detail.description"] = "Description",
