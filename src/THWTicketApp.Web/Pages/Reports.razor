@@ -248,7 +248,10 @@
     private string? _generatedReport;
     private string _generatedReportTitle = string.Empty;
     private DateTime _generatedReportTimestamp;
-    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .UseSoftlineBreakAsHardlineBreak()
+        .Build();
     private List<WeeklyCount> _weeklyTrend = [];
     private string _avgResolutionTime = "-";
     private string _fastestResolution = "-";

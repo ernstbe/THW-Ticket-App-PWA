@@ -74,7 +74,13 @@ else
     [Parameter] public ActivityKind[]? Kinds { get; set; }
 
     private List<ActivityEvent> Items => BuildFeed(Ticket, Kinds);
-    private static readonly MarkdownPipeline _md = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+    // UseSoftlineBreakAsHardlineBreak: keep single newlines visible as <br>
+    // (matches TicketDetail/Reports — trudesk stores plain-text edits with
+    // raw \n, which Markdig would otherwise collapse to spaces).
+    private static readonly MarkdownPipeline _md = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .UseSoftlineBreakAsHardlineBreak()
+        .Build();
 
     internal static List<ActivityEvent> BuildFeed(Ticket? ticket, ActivityKind[]? kinds = null)
     {

@@ -713,7 +713,14 @@ else
     private List<Tag> _availableTags = [];
     private List<TicketType> _ticketTypes = [];
 
-    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+    // Soft breaks → <br>: trudesk's UPDATE endpoint stores plain text with
+    // raw newlines (CREATE wraps them in <br>, UPDATE does not), so the
+    // first edit-and-save round-trip turns multi-line descriptions into
+    // Markdig's default "newline = space" Fließtext without this option.
+    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .UseSoftlineBreakAsHardlineBreak()
+        .Build();
 
     // Checklist
     private string _newChecklistTitle = string.Empty;
