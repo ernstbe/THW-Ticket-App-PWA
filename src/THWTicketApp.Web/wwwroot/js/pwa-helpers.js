@@ -51,6 +51,32 @@
             document.body.removeChild(a);
         },
 
+        // Wrap the current selection in a textarea (or insert at caret) with
+        // the given prefix/suffix. Used by the Markdown toolbar to apply
+        // **bold**, *italic*, etc. without eval'ing strings from C#.
+        // placeholder is inserted between prefix+suffix when nothing is
+        // selected, so the user immediately sees what was added.
+        // Returns true if the textarea was found and updated.
+        wrapSelection: function (textareaId, prefix, suffix, placeholder) {
+            var el = document.getElementById(textareaId);
+            if (!el || typeof el.selectionStart !== 'number') return false;
+            var start = el.selectionStart;
+            var end = el.selectionEnd;
+            var value = el.value;
+            var selected = value.substring(start, end);
+            var inner = selected.length > 0 ? selected : (placeholder || '');
+            var newValue = value.substring(0, start) + prefix + inner + suffix + value.substring(end);
+            // Use the input setter so React/Blazor's value tracker still sees a change.
+            var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+            setter.call(el, newValue);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            // Re-focus and place the caret around the inserted content.
+            var caret = start + prefix.length + inner.length;
+            el.focus();
+            el.setSelectionRange(caret - inner.length, caret);
+            return true;
+        },
+
         // Service worker update check. Returns true if a new bundle is
         // installing or waiting. The controllerchange listener in index.html
         // handles the reload; we just nudge the SW.

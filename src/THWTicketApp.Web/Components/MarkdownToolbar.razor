@@ -1,0 +1,43 @@
+@using MudBlazor
+@inject IJSRuntime JsRuntime
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+@*
+    Mini Markdown toolbar shown above a MudTextField. Wraps the current
+    selection in the equivalent Markdown markup; if nothing is selected,
+    a placeholder is inserted so the user sees what was applied.
+
+    Underlines use ++text++ from Markdig's EmphasisExtras (active via
+    UseAdvancedExtensions in the rendering pipelines).
+*@
+
+<div class="d-flex gap-1 mb-1 flex-wrap" role="toolbar" aria-label="@L.T("editor.toolbar")">
+    <MudIconButton Icon="@Icons.Material.Filled.FormatBold" Size="Size.Small"
+                   OnClick="@(() => WrapAsync("**", "**", L.T("editor.bold_placeholder")))"
+                   aria-label="@L.T("editor.bold")" />
+    <MudIconButton Icon="@Icons.Material.Filled.FormatItalic" Size="Size.Small"
+                   OnClick="@(() => WrapAsync("*", "*", L.T("editor.italic_placeholder")))"
+                   aria-label="@L.T("editor.italic")" />
+    <MudIconButton Icon="@Icons.Material.Filled.FormatUnderlined" Size="Size.Small"
+                   OnClick="@(() => WrapAsync("++", "++", L.T("editor.underline_placeholder")))"
+                   aria-label="@L.T("editor.underline")" />
+    <MudIconButton Icon="@Icons.Material.Filled.StrikethroughS" Size="Size.Small"
+                   OnClick="@(() => WrapAsync("~~", "~~", L.T("editor.strike_placeholder")))"
+                   aria-label="@L.T("editor.strike")" />
+    <MudIconButton Icon="@Icons.Material.Filled.Code" Size="Size.Small"
+                   OnClick="@(() => WrapAsync("`", "`", L.T("editor.code_placeholder")))"
+                   aria-label="@L.T("editor.code")" />
+    <MudIconButton Icon="@Icons.Material.Filled.FormatListBulleted" Size="Size.Small"
+                   OnClick="@(() => WrapAsync("- ", string.Empty, L.T("editor.list_placeholder")))"
+                   aria-label="@L.T("editor.list")" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string TextAreaId { get; set; } = string.Empty;
+
+    private async Task WrapAsync(string prefix, string suffix, string placeholder)
+    {
+        if (string.IsNullOrEmpty(TextAreaId)) return;
+        await JsRuntime.InvokeVoidAsync("pwaHelpers.wrapSelection", TextAreaId, prefix, suffix, placeholder);
+    }
+}
