@@ -50,6 +50,8 @@
              Variant="Variant.Filled" OnClick="@(() => SetFilter("pending"))">@L.T("tickets.pending")</MudChip>
     <MudChip T="string" Color="@(_activeFilter == "closed" ? Color.Success : Color.Default)"
              Variant="Variant.Filled" OnClick="@(() => SetFilter("closed"))">@L.T("tickets.closed")</MudChip>
+    <MudChip T="string" Color="@(_activeFilter == "overdue" ? Color.Error : Color.Default)"
+             Variant="Variant.Filled" OnClick="@(() => SetFilter("overdue"))">@L.T("dashboard.overdue")</MudChip>
     <MudChip T="string" Color="@(_showOnlyMyTickets ? Color.Secondary : Color.Default)"
              Variant="Variant.Filled" OnClick="ToggleMyTickets">@L.T("tickets.mytickets")</MudChip>
     <MudSpacer />
@@ -521,6 +523,7 @@ else
             "open" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new"),
             "pending" => source.Where(t => t.Status?.IsInProgress == true),
             "closed" => source.Where(t => t.Status?.IsResolved == true || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved"),
+            "overdue" => source.Where(t => t.DueDate != DateTime.MinValue && t.DueDate < DateTime.Now && t.Status?.IsResolved != true),
             _ => source
         };
         if (_showOnlyMyTickets && !string.IsNullOrEmpty(ApiService.CurrentUserId))

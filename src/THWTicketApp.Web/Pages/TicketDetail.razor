@@ -21,6 +21,7 @@
 @inject IDialogService DialogService
 @inject ISyncService SyncService
 @inject THWTicketApp.Web.Services.AppStateService AppState
+@inject THWTicketApp.Web.Services.NavigationHistoryService NavHistory
 @implements IAsyncDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
@@ -41,7 +42,7 @@ else
        flex:1, behält also Vorrang und schiebt die Aktion-Icons bei Bedarf
        auf eine zweite Zeile. *@
     <div class="d-flex flex-wrap align-center gap-2 mb-2 pwa-no-print">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("tickets"))"
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo(NavHistory.LastListUri))"
                        aria-label="@L.T("common.back")" />
         <MudText Typo="Typo.caption" Color="Color.Secondary">#@_ticket.Uid</MudText>
         @if (_editingTitle)
@@ -713,7 +714,14 @@ else
     private List<Tag> _availableTags = [];
     private List<TicketType> _ticketTypes = [];
 
-    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+    // Soft breaks → <br>: trudesk's UPDATE endpoint stores plain text with
+    // raw newlines (CREATE wraps them in <br>, UPDATE does not), so the
+    // first edit-and-save round-trip turns multi-line descriptions into
+    // Markdig's default "newline = space" Fließtext without this option.
+    private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .UseSoftlineBreakAsHardlineBreak()
+        .Build();
 
     // Checklist
     private string _newChecklistTitle = string.Empty;
