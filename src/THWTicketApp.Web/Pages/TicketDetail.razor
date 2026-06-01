@@ -21,6 +21,7 @@
 @inject IDialogService DialogService
 @inject ISyncService SyncService
 @inject THWTicketApp.Web.Services.AppStateService AppState
+@inject THWTicketApp.Web.Services.NavigationHistoryService NavHistory
 @implements IAsyncDisposable
 
 <PageTitle>@(_ticket?.Subject ?? "Ticket") - THW Ticket App</PageTitle>
@@ -41,7 +42,7 @@ else
        flex:1, behält also Vorrang und schiebt die Aktion-Icons bei Bedarf
        auf eine zweite Zeile. *@
     <div class="d-flex flex-wrap align-center gap-2 mb-2 pwa-no-print">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("tickets"))"
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo(NavHistory.LastListUri))"
                        aria-label="@L.T("common.back")" />
         <MudText Typo="Typo.caption" Color="Color.Secondary">#@_ticket.Uid</MudText>
         @if (_editingTitle)

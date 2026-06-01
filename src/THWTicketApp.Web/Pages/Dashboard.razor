@@ -61,7 +61,8 @@ else
         </MudItem>
         <MudItem xs="6" md="3">
             <StatCard Icon="@Icons.Material.Filled.Warning" IconColor="Color.Error"
-                      Value="_overdueTickets" Label="@L.T("dashboard.overdue")" ValueColor="Color.Error" />
+                      Value="_overdueTickets" Label="@L.T("dashboard.overdue")" ValueColor="Color.Error"
+                      OnClick="@(() => Navigation.NavigateTo("tickets?filter=overdue"))" />
         </MudItem>
     </MudGrid>
 }
