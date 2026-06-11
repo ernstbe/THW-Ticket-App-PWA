@@ -44,7 +44,14 @@ else
             <MudTh>@L.T("common.edit")</MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="@L.T("templates.name")">@context.Name</MudTd>
+            <MudTd DataLabel="@L.T("templates.name")">
+                @context.Name
+                @if (context.Checklist.Count > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2"
+                             Icon="@Icons.Material.Filled.Checklist">@context.Checklist.Count</MudChip>
+                }
+            </MudTd>
             <MudTd DataLabel="@L.T("templates.subject")">@context.Subject</MudTd>
             <MudTd DataLabel="@L.T("tickets.type")">
                 @if (!string.IsNullOrEmpty(context.TypeName))
@@ -94,7 +101,37 @@ else
             }
         </MudSelect>
         <MudTextField @bind-Value="_formIssue" Label="@L.T("templates.issue")"
-                      Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                      Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" />
+
+        <MudText Typo="Typo.subtitle2">@L.T("templates.checklist")</MudText>
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
+            @L.T("templates.checklist_hint")
+        </MudText>
+        @if (_formChecklist.Count > 0)
+        {
+            <div class="d-flex flex-column gap-1 mb-2">
+                @foreach (var (item, idx) in _formChecklist.Select((c, i) => (c, i)))
+                {
+                    var capturedIdx = idx;
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Style="flex:1; overflow:hidden; text-overflow:ellipsis;">@item</MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       OnClick="@(() => RemoveChecklistItem(capturedIdx))"
+                                       aria-label="@L.T("common.delete")" />
+                    </div>
+                }
+            </div>
+        }
+        <div class="d-flex gap-1">
+            <MudTextField @bind-Value="_newChecklistTitle" Placeholder="@L.T("templates.checklist_add")"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" Immediate="true"
+                          OnKeyDown="@((e) => { if (e.Key == "Enter") AddChecklistItem(); })" />
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                           OnClick="AddChecklistItem"
+                           Disabled="@(string.IsNullOrWhiteSpace(_newChecklistTitle))"
+                           aria-label="@L.T("templates.checklist_add")" />
+        </div>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="() => _dialogVisible = false">@L.T("common.cancel")</MudButton>
@@ -114,6 +151,8 @@ else
     private string _formIssue = string.Empty;
     private string? _formTypeId;
     private string? _formPriorityId;
+    private List<string> _formChecklist = new();
+    private string _newChecklistTitle = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -172,6 +211,8 @@ else
         _formName = _formSubject = _formIssue = string.Empty;
         _formTypeId = null;
         _formPriorityId = null;
+        _formChecklist = new();
+        _newChecklistTitle = string.Empty;
         _dialogVisible = true;
     }
 
@@ -183,7 +224,23 @@ else
         _formIssue = template.Issue ?? string.Empty;
         _formTypeId = template.TypeId;
         _formPriorityId = template.PriorityId;
+        _formChecklist = new List<string>(template.Checklist);
+        _newChecklistTitle = string.Empty;
         _dialogVisible = true;
+    }
+
+    private void AddChecklistItem()
+    {
+        var title = _newChecklistTitle.Trim();
+        if (title.Length == 0) return;
+        _formChecklist.Add(title);
+        _newChecklistTitle = string.Empty;
+    }
+
+    private void RemoveChecklistItem(int index)
+    {
+        if (index < 0 || index >= _formChecklist.Count) return;
+        _formChecklist.RemoveAt(index);
     }
 
     private async Task SaveAsync()
@@ -195,7 +252,7 @@ else
             return;
         }
 
-        var data = BuildPayload(_formName, _formSubject, _formIssue, _formTypeId, _formPriorityId);
+        var data = BuildPayload(_formName, _formSubject, _formIssue, _formTypeId, _formPriorityId, _formChecklist);
         bool ok;
         try
         {
@@ -272,6 +329,7 @@ else
         public string? TypeName { get; set; }
         public string? PriorityId { get; set; }
         public string? PriorityName { get; set; }
+        public List<string> Checklist { get; set; } = new();
     }
 
     internal static List<TicketTemplateVm> ParseTemplates(string json)
@@ -297,7 +355,8 @@ else
                     PriorityId = priorityId,
                     PriorityName = string.IsNullOrEmpty(priorityName)
                         ? priorityName
-                        : TrudeskTranslationHelper.TranslatePriority(priorityName)
+                        : TrudeskTranslationHelper.TranslatePriority(priorityName),
+                    Checklist = ExtractChecklistTitles(el)
                 });
             }
             return list;
@@ -323,6 +382,25 @@ else
         return (null, null);
     }
 
+    // Templates created before the checklist feature have no `checklist`
+    // key — treat missing/non-array as empty.
+    private static List<string> ExtractChecklistTitles(JsonElement parent)
+    {
+        var titles = new List<string>();
+        if (!parent.TryGetProperty("checklist", out var arr) || arr.ValueKind != JsonValueKind.Array)
+            return titles;
+        foreach (var item in arr.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object) continue;
+            if (item.TryGetProperty("title", out var titleEl) && titleEl.ValueKind == JsonValueKind.String)
+            {
+                var title = titleEl.GetString();
+                if (!string.IsNullOrWhiteSpace(title)) titles.Add(title);
+            }
+        }
+        return titles;
+    }
+
     internal static string? ValidateForm(string? name, string? subject)
     {
         if (string.IsNullOrWhiteSpace(name)) return "templates.name_required";
@@ -332,13 +410,20 @@ else
 
     internal static Dictionary<string, object?> BuildPayload(
         string name, string subject, string? issue,
-        string? typeId = null, string? priorityId = null)
+        string? typeId = null, string? priorityId = null,
+        List<string>? checklist = null)
     {
         var payload = new Dictionary<string, object?>
         {
             ["name"] = name.Trim(),
             ["subject"] = subject.Trim(),
-            ["issue"] = string.IsNullOrWhiteSpace(issue) ? null : issue.Trim()
+            ["issue"] = string.IsNullOrWhiteSpace(issue) ? null : issue.Trim(),
+            // Always send the checklist (even empty): the server replaces the
+            // whole array on update, so omitting the key would make "delete
+            // all items" silently not stick.
+            ["checklist"] = (checklist ?? new List<string>())
+                .Select(t => new Dictionary<string, object?> { ["title"] = t })
+                .ToList()
         };
         if (!string.IsNullOrWhiteSpace(typeId)) payload["ticketType"] = typeId;
         if (!string.IsNullOrWhiteSpace(priorityId)) payload["priority"] = priorityId;

@@ -12,6 +12,7 @@
 @inject THWTicketApp.Web.Services.LocalizationService L
 @inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
 @inject IJSRuntime JsRuntime
+@inject THWTicketApp.Web.Services.AppStateService AppState
 @using Microsoft.JSInterop
 @implements IDisposable
 
@@ -47,6 +48,12 @@ else
                 <MudSelectItem Value="tpl">@tpl.Name</MudSelectItem>
             }
         </MudSelect>
+        @if (_templateChecklist.Count > 0)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-4" Style="margin-top:-8px;">
+                @string.Format(L.T("tickets.template_checklist_info"), _templateChecklist.Count)
+            </MudText>
+        }
     }
 
     @if (_draftRestoredBanner)
@@ -213,6 +220,10 @@ else
     private List<Group> _groups = [];
     private List<User> _users = [];
     private List<TemplateItem> _templates = [];
+    // Checklist titles of the currently selected template. Applied to the
+    // new ticket right after the create succeeds (the checklist endpoint
+    // needs the ticket uid, so this can't be part of the create payload).
+    private List<string> _templateChecklist = [];
     // True when the user profile resolved to zero reachable groups —
     // surface a warning instead of letting them pick a group that the
     // server-side check (trudesk PR #97) would 403 anyway.
@@ -411,13 +422,13 @@ else
 
         try
         {
-            var ticketId = await ApiService.CreateTicketAsync(
+            var created = await ApiService.CreateTicketAsync(
                 _subject, _issue,
                 _selectedType?.Id, _selectedPriority?.Id,
                 _selectedGroup?.Id, _selectedAssignee?.Id,
                 _dueDate);
 
-            if (ticketId == null)
+            if (created == null)
             {
                 Snackbar.Add($"{L.T("common.error")}: {ApiService.LastError ?? L.T("tickets.server_rejected")}", Severity.Error);
                 return;
@@ -434,7 +445,7 @@ else
             // created, the user just can't attach via this flow. Partial
             // failures still let the create stand.
             var failedUploads = 0;
-            if (_pendingAttachments.Count > 0 && !string.IsNullOrEmpty(ticketId))
+            if (_pendingAttachments.Count > 0 && !string.IsNullOrEmpty(created.Id))
             {
                 Snackbar.Add(L.T("tickets.attachments_uploading"), Severity.Info);
                 foreach (var file in _pendingAttachments)
@@ -442,10 +453,49 @@ else
                     try
                     {
                         using var stream = file.OpenReadStream(MaxAttachmentBytes);
-                        if (!await ApiService.UploadAttachmentAsync(ticketId, stream, file.Name))
+                        if (!await ApiService.UploadAttachmentAsync(created.Id, stream, file.Name))
                             failedUploads++;
                     }
                     catch { failedUploads++; }
+                }
+            }
+
+            // Apply the template checklist after the create. The checklist
+            // endpoint is keyed by uid, which only exists once the server
+            // assigned it — so this can't ride along in the create payload.
+            // Offline: no sync-queue path for this (by design), just tell
+            // the user the checklist didn't make it onto the ticket.
+            if (_templateChecklist.Count > 0)
+            {
+                if (!AppState.IsOnline)
+                {
+                    Snackbar.Add(L.T("tickets.template_checklist_offline"), Severity.Info);
+                }
+                else
+                {
+                    var failedItems = 0;
+                    if (created.Uid > 0)
+                    {
+                        foreach (var title in _templateChecklist)
+                        {
+                            try
+                            {
+                                if (!await ApiService.AddChecklistItemAsync(created.Uid.ToString(), title))
+                                    failedItems++;
+                            }
+                            catch { failedItems++; }
+                        }
+                    }
+                    else
+                    {
+                        // Server didn't echo back a uid — nothing to target.
+                        failedItems = _templateChecklist.Count;
+                    }
+                    if (failedItems > 0)
+                    {
+                        Snackbar.Add(string.Format(L.T("tickets.template_checklist_partial"),
+                            failedItems, _templateChecklist.Count), Severity.Warning);
+                    }
                 }
             }
 
@@ -504,7 +554,14 @@ else
 
     private void OnTemplateSelected(TemplateItem? template)
     {
-        if (template == null) return;
+        if (template == null)
+        {
+            // Selection cleared — drop the stashed checklist so we don't
+            // apply items from a template the user backed out of.
+            _templateChecklist = [];
+            StateHasChanged();
+            return;
+        }
         _subject = template.Subject;
         _issue = template.Issue ?? string.Empty;
         // Apply Type + Priority from the template if they're set AND match a
@@ -520,6 +577,7 @@ else
             var match = _priorities.FirstOrDefault(p => p.Id == template.PriorityId);
             if (match != null) _selectedPriority = match;
         }
+        _templateChecklist = new List<string>(template.Checklist);
         StateHasChanged();
     }
 
@@ -552,7 +610,8 @@ else
                     Subject = el.TryGetProperty("subject", out var s) ? s.GetString() ?? "" : "",
                     Issue = el.TryGetProperty("issue", out var i) ? i.GetString() : null,
                     TypeId = ExtractRefId(el, "ticketType"),
-                    PriorityId = ExtractRefId(el, "priority")
+                    PriorityId = ExtractRefId(el, "priority"),
+                    Checklist = ExtractChecklistTitles(el)
                 });
             }
             return list;
@@ -571,6 +630,25 @@ else
         return null;
     }
 
+    // Templates created before the checklist feature have no `checklist`
+    // key — treat missing/non-array as empty.
+    private static List<string> ExtractChecklistTitles(JsonElement parent)
+    {
+        var titles = new List<string>();
+        if (!parent.TryGetProperty("checklist", out var arr) || arr.ValueKind != JsonValueKind.Array)
+            return titles;
+        foreach (var item in arr.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object) continue;
+            if (item.TryGetProperty("title", out var titleEl) && titleEl.ValueKind == JsonValueKind.String)
+            {
+                var title = titleEl.GetString();
+                if (!string.IsNullOrWhiteSpace(title)) titles.Add(title);
+            }
+        }
+        return titles;
+    }
+
     internal sealed class TemplateItem
     {
         public string Name { get; set; } = string.Empty;
@@ -578,5 +656,6 @@ else
         public string? Issue { get; set; }
         public string? TypeId { get; set; }
         public string? PriorityId { get; set; }
+        public List<string> Checklist { get; set; } = new();
     }
 }
