@@ -11,6 +11,8 @@
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.LocalizationService L
 @inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
+@inject IJSRuntime JsRuntime
+@using Microsoft.JSInterop
 @implements IDisposable
 
 <PageTitle>@L.T("tickets.create_title") - THW Ticket App</PageTitle>
@@ -131,39 +133,45 @@ else
            multiple files; each is size-checked client-side against the
            same 25 MB ceiling the server enforces. *@
         <MudText Typo="Typo.body2" Class="mb-2">@L.T("tickets.attachments_label")</MudText>
-        <div class="d-flex gap-2 align-center flex-wrap mb-4">
-            <InputFile id="new-ticket-attachments" OnChange="OnFilesPicked" hidden multiple
-                       accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.txt,.zip,.mp3,.wav" />
-            <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.AttachFile" for="new-ticket-attachments"
-                       Disabled="_isLoading">
-                @L.T("tickets.attachments_pick")
-            </MudButton>
-            @if (_pendingAttachments.Count > 0)
-            {
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    @string.Format(L.T("tickets.attachments_selected"), _pendingAttachments.Count)
-                </MudText>
-            }
-        </div>
-        @if (_pendingAttachments.Count > 0)
-        {
-            <div class="d-flex flex-column gap-1 mb-4">
-                @foreach (var (file, idx) in _pendingAttachments.Select((f, i) => (f, i)))
+        @* Same drag&drop hookup as TicketDetail: dropzone-interop.js forwards
+           dropped files into the hidden InputFile, so OnFilesPicked handles
+           click-pick and drop identically. *@
+        <div id="new-ticket-dropzone" class="pwa-dropzone pa-2 mb-4">
+            <div class="d-flex gap-2 align-center flex-wrap">
+                <InputFile id="new-ticket-attachments" OnChange="OnFilesPicked" hidden multiple
+                           accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.txt,.zip,.mp3,.wav" />
+                <MudButton HtmlTag="label" Variant="Variant.Outlined" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.AttachFile" for="new-ticket-attachments"
+                           Disabled="_isLoading">
+                    @L.T("tickets.attachments_pick")
+                </MudButton>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("attachments.drop_hint")</MudText>
+                @if (_pendingAttachments.Count > 0)
                 {
-                    var capturedIdx = idx;
-                    <div class="d-flex align-center gap-2">
-                        <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" />
-                        <MudText Typo="Typo.body2" Style="flex:1; overflow:hidden; text-overflow:ellipsis;">
-                            @file.Name <span style="color:var(--mud-palette-text-secondary);">(@FormatBytes(file.Size))</span>
-                        </MudText>
-                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
-                                       OnClick="@(() => RemovePendingAttachment(capturedIdx))"
-                                       aria-label="@L.T("tickets.attachments_remove")" />
-                    </div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @string.Format(L.T("tickets.attachments_selected"), _pendingAttachments.Count)
+                    </MudText>
                 }
             </div>
-        }
+            @if (_pendingAttachments.Count > 0)
+            {
+                <div class="d-flex flex-column gap-1 mt-2">
+                    @foreach (var (file, idx) in _pendingAttachments.Select((f, i) => (f, i)))
+                    {
+                        var capturedIdx = idx;
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" />
+                            <MudText Typo="Typo.body2" Style="flex:1; overflow:hidden; text-overflow:ellipsis;">
+                                @file.Name <span style="color:var(--mud-palette-text-secondary);">(@FormatBytes(file.Size))</span>
+                            </MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                           OnClick="@(() => RemovePendingAttachment(capturedIdx))"
+                                           aria-label="@L.T("tickets.attachments_remove")" />
+                        </div>
+                    }
+                </div>
+            }
+        </div>
 
         <div class="d-flex gap-3 mt-4">
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
@@ -217,10 +225,28 @@ else
     private const long MaxAttachmentBytes = 25L * 1024 * 1024;
     private readonly List<IBrowserFile> _pendingAttachments = new();
 
+    private IJSObjectReference? _dropzoneModule;
+    private bool _dropzoneRegistered;
+
     protected override async Task OnInitializedAsync()
     {
         await TryRestoreDraftAsync();
         await LoadDataAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The dropzone div only exists once the skeleton phase is over, so
+        // keep trying on each render until register() reports it bound.
+        if (_dropzoneRegistered) return;
+        try
+        {
+            _dropzoneModule ??= await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./js/dropzone-interop.js");
+            _dropzoneRegistered = await _dropzoneModule.InvokeAsync<bool>("register",
+                "new-ticket-dropzone", "new-ticket-attachments");
+        }
+        catch { /* drag-drop is optional — button still works */ }
     }
 
     private async Task TryRestoreDraftAsync()
@@ -286,6 +312,13 @@ else
     public void Dispose()
     {
         _saveDebounce?.Dispose();
+        // Fire-and-forget — same pattern as Tickets.razor's pull-to-refresh
+        // module: detach the global drop listeners, then drop the module ref.
+        if (_dropzoneModule != null)
+        {
+            try { _ = _dropzoneModule.InvokeVoidAsync("unregister", "new-ticket-dropzone"); } catch { }
+            _ = _dropzoneModule.DisposeAsync();
+        }
     }
 
     private sealed class DraftDto

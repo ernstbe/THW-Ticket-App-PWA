@@ -18,9 +18,12 @@ function findFileInput(zoneEl, inputId) {
            zoneEl.querySelector(`input[type="file"]`);
 }
 
+// Returns true when the zone element existed and listeners were bound —
+// callers that render the zone only after async data arrives (skeleton
+// phase) retry on later renders until this reports success.
 export function register(zoneId, inputId) {
     const zone = document.getElementById(zoneId);
-    if (!zone) return;
+    if (!zone) return false;
 
     // Defensive: don't double-bind if Blazor re-renders the page.
     if (handlers.has(zoneId)) unregister(zoneId);
@@ -51,6 +54,7 @@ export function register(zoneId, inputId) {
     zone.addEventListener('dragleave', onLeave);
     zone.addEventListener('drop', onDrop);
     handlers.set(zoneId, { onOver, onLeave, onDrop, zone });
+    return true;
 }
 
 export function unregister(zoneId) {
