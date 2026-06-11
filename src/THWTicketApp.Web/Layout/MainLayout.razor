@@ -13,6 +13,7 @@
 @inject THWTicketApp.Web.Services.IdleLockService IdleLock
 @inject THWTicketApp.Web.Services.CommandPaletteService Palette
 @inject THWTicketApp.Web.Services.OnboardingService Onboarding
+@inject THWTicketApp.Web.Services.WhatsNewService WhatsNew
 @inject THWTicketApp.Web.Services.NavigationHistoryService NavHistory
 @inject IJSRuntime JsRuntime
 @implements IDisposable
@@ -162,6 +163,7 @@
 
 @* Welcome tour shown once per device on first login. *@
 <OnboardingTour />
+<WhatsNewDialog />
 
 @* Floating "+" Quick-Create button. Hidden on the AddTicket page itself
    to avoid covering the form submit button. Bug-report FAB stacks
@@ -416,6 +418,10 @@
                 {
                     await Task.Delay(500);
                     await Onboarding.ShowIfFirstRunAsync();
+                    // After the onboarding decision: announce new features
+                    // once per device. No-ops on fresh installs and when
+                    // the tour is on screen (seeds silently instead).
+                    await WhatsNew.ShowIfUpdatedAsync();
                 }
                 catch (Exception ex)
                 {

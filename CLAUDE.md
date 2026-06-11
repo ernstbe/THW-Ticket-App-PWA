@@ -77,6 +77,7 @@ Each module is loaded on demand via `import('./js/<module>.js')` from a paired C
 ## Conventions
 
 - Conventional Commits (`feat(...)`, `fix(...)`, `ui(...)`, `chore(...)`); the recent log shows scopes like `auth`, `api`, `kanban`, `settings`, `login`. Match the existing style when committing.
+- When shipping user-facing features or notable fixes, append a `WhatsNewEntry` (German text, next Id) to `WhatsNewService.Entries` — that's what feeds the in-app "Was ist neu?" dialog shown once per device after the deploy. Deploys without a new entry stay silent.
 - Default branch is `master`; PRs merge into it. CI (`.github/workflows/build.yml`) runs build, test, `dotnet format --verify-no-changes`, and a vulnerable-package scan on push/PR to master.
 - C# files use `Nullable` and `ImplicitUsings` enabled — don't disable per-file.
 - Service registration: most services are `Scoped` (Blazor WASM has a single scope per user, so this is effectively singleton); `AppSettings` is the only `Singleton`. Follow this pattern when adding services and remember to register both the concrete type and any interface (see `IndexedDbService` / `IIndexedDbService`).

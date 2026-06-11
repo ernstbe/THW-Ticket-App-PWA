@@ -1,0 +1,63 @@
+@using MudBlazor
+@using THWTicketApp.Web.Services
+@inject WhatsNewService WhatsNew
+@inject LocalizationService L
+@implements IDisposable
+
+@* Rendered once in MainLayout; visibility is driven entirely by
+   WhatsNewService so the Settings "Was ist neu?" button can open it
+   from anywhere. Closing in any way (button, backdrop, Escape) marks
+   the current entries as seen. *@
+<MudDialog Visible="WhatsNew.IsVisible" VisibleChanged="OnVisibleChangedAsync" Options="_options">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Campaign" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@L.T("whatsnew.title")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @foreach (var entry in WhatsNew.VisibleEntries)
+        {
+            <div class="mb-4">
+                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">@entry.Title</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">@entry.Date</MudText>
+                @foreach (var item in entry.Items)
+                {
+                    <div class="d-flex gap-2 mb-2" style="align-items:flex-start;">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
+                                 Size="Size.Small" Style="margin-top:2px; flex-shrink:0;" />
+                        <MudText Typo="Typo.body2">@item</MudText>
+                    </div>
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="DismissAsync">
+            @L.T("whatsnew.dismiss")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private readonly DialogOptions _options = new()
+    {
+        MaxWidth = MaxWidth.Small,
+        FullWidth = true,
+        CloseOnEscapeKey = true
+    };
+
+    protected override void OnInitialized() => WhatsNew.StateChanged += OnStateChanged;
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task OnVisibleChangedAsync(bool visible)
+    {
+        if (!visible && WhatsNew.IsVisible)
+            await WhatsNew.DismissAsync();
+    }
+
+    private Task DismissAsync() => WhatsNew.DismissAsync();
+
+    public void Dispose() => WhatsNew.StateChanged -= OnStateChanged;
+}
