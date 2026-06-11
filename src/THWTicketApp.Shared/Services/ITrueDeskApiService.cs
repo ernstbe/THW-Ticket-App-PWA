@@ -31,12 +31,15 @@ public interface ITrueDeskApiService
     Task<(int StatusCode, string Body)> GetTicketRawAsync(string ticketUid);
     Task<string> AddTicketAsync(string title, string description, string? assigneeId);
     /// <summary>
-    /// Creates a ticket and returns its id on success, or null on failure.
-    /// Used by AddTicket to chain follow-up calls (e.g. attachment uploads
-    /// from the same form submission). Offline queue replay treats any
-    /// non-null result as success.
+    /// Creates a ticket and returns its id + uid on success, or null on
+    /// failure. Used by AddTicket to chain follow-up calls (attachment
+    /// uploads via _id, checklist items via uid) from the same form
+    /// submission. Offline queue replay treats any non-null result as
+    /// success. On parse trouble the create still counts as success and
+    /// returns an empty Id / zero Uid — callers needing either value must
+    /// check explicitly.
     /// </summary>
-    Task<string?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null);
+    Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null);
     Task<bool> EditTicketAsync(Ticket ticket);
     Task<bool> DeleteTicketAsync(string ticketId);
     Task<bool> UpdateTicketStatusAsync(string ticketId, string statusId);

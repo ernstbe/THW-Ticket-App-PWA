@@ -431,7 +431,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<string?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null)
+    public async Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null)
     {
         if (string.IsNullOrWhiteSpace(subject))
             return null;
@@ -460,22 +460,29 @@ public class TrueDeskApiService : ITrueDeskApiService
             LastError = $"{(int)response.StatusCode}: {responseBody}";
             return null;
         }
-        // Both v1 (`{ success, ticket: { _id, ... } }`) and v2 wrap the
-        // created ticket under `ticket`. Surface the id so callers can chain
-        // follow-ups (attachments, navigate-to-detail). On parse trouble we
-        // still treat the create as a success and return an empty id —
-        // callers that need the id check for null explicitly.
+        // Both v1 (`{ success, ticket: { _id, uid, ... } }`) and v2 wrap the
+        // created ticket under `ticket`. Surface id + uid so callers can chain
+        // follow-ups (attachments via _id, checklist items via uid). On parse
+        // trouble we still treat the create as a success and return empty
+        // id / zero uid — callers that need them check explicitly.
         try
         {
             using var doc = JsonDocument.Parse(responseBody);
-            if (doc.RootElement.TryGetProperty("ticket", out var ticket) &&
-                ticket.TryGetProperty("_id", out var idEl))
+            if (doc.RootElement.TryGetProperty("ticket", out var ticket))
             {
-                return idEl.GetString() ?? string.Empty;
+                var id = ticket.TryGetProperty("_id", out var idEl)
+                    ? idEl.GetString() ?? string.Empty
+                    : string.Empty;
+                var uid = ticket.TryGetProperty("uid", out var uidEl) &&
+                          uidEl.ValueKind == JsonValueKind.Number &&
+                          uidEl.TryGetInt32(out var parsedUid)
+                    ? parsedUid
+                    : 0;
+                return new TicketCreateResult(id, uid);
             }
         }
-        catch { /* malformed body — fall through to empty id */ }
-        return string.Empty;
+        catch { /* malformed body — fall through to empty result */ }
+        return new TicketCreateResult(string.Empty, 0);
     }
 
     public async Task<bool> EditTicketAsync(Ticket ticket)

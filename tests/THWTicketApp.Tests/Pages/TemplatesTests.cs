@@ -87,6 +87,43 @@ public class TemplatesTests
         Assert.Null(result[0].Issue);
     }
 
+    [Fact]
+    public void ParseTemplates_checklist_extractsTitlesInOrder()
+    {
+        const string json = """
+        {
+            "ticketTemplates": [{
+                "_id":"1","name":"T","subject":"S",
+                "checklist":[
+                    {"_id":"c1","title":"Fahrzeug prüfen"},
+                    {"_id":"c2","title":"Material zählen"}
+                ]
+            }]
+        }
+        """;
+        var result = Templates.ParseTemplates(json);
+        Assert.Equal(new[] { "Fahrzeug prüfen", "Material zählen" }, result[0].Checklist);
+    }
+
+    [Fact]
+    public void ParseTemplates_missingChecklist_returnsEmptyList()
+    {
+        // Templates created before the checklist feature have no key at all.
+        const string json = """{"ticketTemplates":[{"_id":"1","name":"T","subject":"S"}]}""";
+        var result = Templates.ParseTemplates(json);
+        Assert.Empty(result[0].Checklist);
+    }
+
+    [Fact]
+    public void ParseTemplates_checklistWithBlankTitles_skipsThem()
+    {
+        const string json = """
+        {"ticketTemplates":[{"_id":"1","name":"T","subject":"S","checklist":[{"title":""},{"title":"OK"},{"_id":"x"}]}]}
+        """;
+        var result = Templates.ParseTemplates(json);
+        Assert.Equal(new[] { "OK" }, result[0].Checklist);
+    }
+
     // -----------------------------------------------------------------
     // ValidateForm
     // -----------------------------------------------------------------
@@ -156,5 +193,27 @@ public class TemplatesTests
         var payload = Templates.BuildPayload("N", "S", null, "", "  ");
         Assert.False(payload.ContainsKey("ticketType"));
         Assert.False(payload.ContainsKey("priority"));
+    }
+
+    [Fact]
+    public void BuildPayload_checklist_wrapsTitlesAsObjects()
+    {
+        var payload = Templates.BuildPayload("N", "S", null,
+            checklist: new List<string> { "Eins", "Zwei" });
+
+        var items = Assert.IsType<List<Dictionary<string, object?>>>(payload["checklist"]);
+        Assert.Equal(2, items.Count);
+        Assert.Equal("Eins", items[0]["title"]);
+        Assert.Equal("Zwei", items[1]["title"]);
+    }
+
+    [Fact]
+    public void BuildPayload_noChecklist_sendsEmptyArray()
+    {
+        // The key must always be present: PUT replaces the whole array,
+        // so omitting it would make "delete all items" not stick.
+        var payload = Templates.BuildPayload("N", "S", null);
+        var items = Assert.IsType<List<Dictionary<string, object?>>>(payload["checklist"]);
+        Assert.Empty(items);
     }
 }

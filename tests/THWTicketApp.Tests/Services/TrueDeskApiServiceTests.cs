@@ -146,6 +146,43 @@ public class TrueDeskApiServiceTests
     }
 
     [Fact]
+    public async Task CreateTicketTemplateAsync_serializesChecklistTitleObjects()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await _sut.CreateTicketTemplateAsync(new()
+        {
+            ["name"] = "Mit Checkliste",
+            ["subject"] = "S",
+            ["checklist"] = new List<Dictionary<string, object?>>
+            {
+                new() { ["title"] = "Fahrzeug prüfen" },
+                new() { ["title"] = "Material zählen" }
+            }
+        });
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v2/ticket-templates", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"checklist\":[{\"title\":\"Fahrzeug pr", LastBody);
+        Assert.Contains("Material z", LastBody);
+    }
+
+    [Fact]
+    public async Task UpdateTicketTemplateAsync_putsChecklistReplacementArray()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await _sut.UpdateTicketTemplateAsync("tpl1", new()
+        {
+            ["name"] = "N",
+            ["subject"] = "S",
+            // Empty array must go out as-is: the server replaces the whole
+            // checklist on update, so this is how "delete all items" works.
+            ["checklist"] = new List<Dictionary<string, object?>>()
+        });
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v2/ticket-templates/tpl1", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"checklist\":[]", LastBody);
+    }
+
+    [Fact]
     public async Task DeleteTicketTemplateAsync_callsV2Delete()
     {
         _handler.SetDefault(HttpStatusCode.OK);
@@ -527,6 +564,57 @@ public class TrueDeskApiServiceTests
 
         Assert.Equal(HttpMethod.Get, LastRequest.Method);
         Assert.Equal("/api/v2/tickets/stats/assignee/usr1", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    // -----------------------------------------------------------------
+    // CreateTicketAsync result (id + uid)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateTicketAsync_parsesIdAndUidFromResponse()
+    {
+        _handler.SetDefault(HttpStatusCode.OK,
+            "{\"success\":true,\"ticket\":{\"_id\":\"abc123\",\"uid\":1234}}");
+
+        var result = await _sut.CreateTicketAsync("Subject", "Issue", null, null, null, null);
+
+        Assert.NotNull(result);
+        Assert.Equal("abc123", result!.Id);
+        Assert.Equal(1234, result.Uid);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v1/tickets/create", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task CreateTicketAsync_returnsNullOnServerError()
+    {
+        _handler.SetDefault(HttpStatusCode.BadRequest, "{\"success\":false}");
+        var result = await _sut.CreateTicketAsync("Subject", "Issue", null, null, null, null);
+        Assert.Null(result);
+        Assert.NotNull(_sut.LastError);
+    }
+
+    [Fact]
+    public async Task CreateTicketAsync_malformedBody_returnsEmptyIdAndZeroUid()
+    {
+        // Create succeeded but the body is not parseable — still a success,
+        // callers just can't chain follow-ups (attachments/checklist).
+        _handler.SetDefault(HttpStatusCode.OK, "not json");
+        var result = await _sut.CreateTicketAsync("Subject", "Issue", null, null, null, null);
+        Assert.NotNull(result);
+        Assert.Equal(string.Empty, result!.Id);
+        Assert.Equal(0, result.Uid);
+    }
+
+    [Fact]
+    public async Task CreateTicketAsync_missingUid_returnsZeroUid()
+    {
+        // Older trudesk without checklist support echoes only _id.
+        _handler.SetDefault(HttpStatusCode.OK, "{\"ticket\":{\"_id\":\"abc123\"}}");
+        var result = await _sut.CreateTicketAsync("Subject", "Issue", null, null, null, null);
+        Assert.NotNull(result);
+        Assert.Equal("abc123", result!.Id);
+        Assert.Equal(0, result.Uid);
     }
 
     // -----------------------------------------------------------------

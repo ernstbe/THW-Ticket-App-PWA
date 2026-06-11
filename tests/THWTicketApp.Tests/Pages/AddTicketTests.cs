@@ -103,6 +103,24 @@ public class AddTicketTests
     }
 
     [Fact]
+    public void ParseTemplates_checklist_extractsTitlesInOrder()
+    {
+        var json = """
+        {"ticketTemplates":[{"name":"T","subject":"S","checklist":[{"_id":"c1","title":"Erst"},{"_id":"c2","title":"Dann"}]}]}
+        """;
+        var result = AddTicket.ParseTemplates(json);
+        Assert.Equal(new[] { "Erst", "Dann" }, result[0].Checklist);
+    }
+
+    [Fact]
+    public void ParseTemplates_missingChecklist_returnsEmptyList()
+    {
+        var json = """{"ticketTemplates":[{"name":"T","subject":"S"}]}""";
+        var result = AddTicket.ParseTemplates(json);
+        Assert.Empty(result[0].Checklist);
+    }
+
+    [Fact]
     public void ParseTemplates_multipleTemplates_parsesAll()
     {
         var json = """{"ticketTemplates":[{"name":"A","subject":"S1"},{"name":"B","subject":"S2","issue":"I2"}]}""";

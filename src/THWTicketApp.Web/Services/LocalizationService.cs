@@ -272,6 +272,9 @@ public class LocalizationService
         ["templates.name_required"] = "Name ist erforderlich.",
         ["templates.subject_required"] = "Betreff ist erforderlich.",
         ["templates.delete_confirm"] = "Vorlage wirklich löschen?",
+        ["templates.checklist"] = "Checkliste",
+        ["templates.checklist_add"] = "Punkt hinzufügen",
+        ["templates.checklist_hint"] = "Wird beim Anwenden der Vorlage als Ticket-Checkliste übernommen",
 
         // Calendar
         ["nav.calendar"] = "Kalender",
@@ -560,6 +563,9 @@ public class LocalizationService
         ["tickets.attachments_too_large"] = "{0} ist zu groß (max. 25 MB).",
         ["tickets.attachments_uploading"] = "Lade Anhänge hoch…",
         ["tickets.attachments_partial"] = "Ticket erstellt, aber {0} von {1} Anhängen konnten nicht hochgeladen werden.",
+        ["tickets.template_checklist_info"] = "{0} Checklisten-Punkte werden übernommen",
+        ["tickets.template_checklist_partial"] = "{0} von {1} Checklisten-Punkten konnten nicht angelegt werden",
+        ["tickets.template_checklist_offline"] = "Offline — die Checkliste der Vorlage konnte nicht übernommen werden. Bitte später im Ticket ergänzen.",
 
         // Dashboard
         ["dashboard.total"] = "Gesamt",
@@ -1009,6 +1015,9 @@ public class LocalizationService
         ["templates.name_required"] = "Name is required.",
         ["templates.subject_required"] = "Subject is required.",
         ["templates.delete_confirm"] = "Really delete template?",
+        ["templates.checklist"] = "Checklist",
+        ["templates.checklist_add"] = "Add item",
+        ["templates.checklist_hint"] = "Copied onto the ticket when the template is applied",
 
         // Calendar
         ["nav.calendar"] = "Calendar",
@@ -1297,6 +1306,9 @@ public class LocalizationService
         ["tickets.attachments_too_large"] = "{0} is too large (max. 25 MB).",
         ["tickets.attachments_uploading"] = "Uploading attachments…",
         ["tickets.attachments_partial"] = "Ticket created, but {0} of {1} attachments failed to upload.",
+        ["tickets.template_checklist_info"] = "{0} checklist items will be applied",
+        ["tickets.template_checklist_partial"] = "{0} of {1} checklist items could not be created",
+        ["tickets.template_checklist_offline"] = "Offline — the template's checklist could not be applied. Please add the items on the ticket later.",
 
         // Dashboard
         ["dashboard.total"] = "Total",
