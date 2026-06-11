@@ -15,6 +15,7 @@
 @inject IIndexedDbService IndexedDb
 @inject IdleLockService IdleLock
 @inject OnboardingService Onboarding
+@inject WhatsNewService WhatsNew
 @inject ISyncService SyncService
 @inject WebPushService WebPush
 @implements IAsyncDisposable
@@ -437,6 +438,10 @@
     <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => Onboarding.ShowNow())"
                StartIcon="@Icons.Material.Filled.HelpOutline">
         @L.T("settings.show_onboarding")
+    </MudButton>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => WhatsNew.ShowAll())"
+               StartIcon="@Icons.Material.Filled.Campaign">
+        @L.T("settings.show_whatsnew")
     </MudButton>
 </div>
 
