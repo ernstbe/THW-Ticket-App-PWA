@@ -349,6 +349,35 @@ public class TrueDeskApiServiceTests
     }
 
     // -----------------------------------------------------------------
+    // EditTicketAsync dueDate handling
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task EditTicketAsync_sendsDueDateWhenSet()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var due = new DateTime(2030, 1, 15, 0, 0, 0, DateTimeKind.Utc);
+        var ok = await _sut.EditTicketAsync(new Shared.Models.Ticket { Id = "t1", Subject = "S", DueDate = due });
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v1/tickets/t1", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"dueDate\":\"2030-01-15T00:00:00.0000000Z\"", LastBody);
+    }
+
+    [Fact]
+    public async Task EditTicketAsync_sendsNullDueDateWhenCleared()
+    {
+        // A missing key means "leave unchanged" on the server, so clearing
+        // a due date must serialize as an explicit null.
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.EditTicketAsync(new Shared.Models.Ticket { Id = "t1", Subject = "S" });
+
+        Assert.True(ok);
+        Assert.Contains("\"dueDate\":null", LastBody);
+    }
+
+    // -----------------------------------------------------------------
     // Overdue (v2)
     // -----------------------------------------------------------------
 

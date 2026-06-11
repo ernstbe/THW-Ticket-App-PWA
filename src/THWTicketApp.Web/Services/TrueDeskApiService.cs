@@ -490,7 +490,10 @@ public class TrueDeskApiService : ITrueDeskApiService
         if (ticket.Status?.Id != null) ticketData["status"] = ticket.Status.Id;
         if (ticket.Type?.Id != null) ticketData["type"] = ticket.Type.Id;
         if (ticket.Group?.Id != null) ticketData["group"] = ticket.Group.Id;
-        if (ticket.DueDate != DateTime.MinValue) ticketData["dueDate"] = ticket.DueDate.ToString("O");
+        // Always send dueDate: MinValue means "no due date" and must go out
+        // as an explicit null, otherwise clearing the date never reaches the
+        // server (trudesk treats a missing key as "leave unchanged").
+        ticketData["dueDate"] = ticket.DueDate == DateTime.MinValue ? null : ticket.DueDate.ToString("O");
 
         // v2 expects { ticket: {...} } wrapper, v1 expects flat object
         object payload = IsV2 ? new { ticket = ticketData } : ticketData;
