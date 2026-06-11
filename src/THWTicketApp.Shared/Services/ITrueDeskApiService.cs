@@ -46,6 +46,12 @@ public interface ITrueDeskApiService
 
     Task<bool> AssignTicketAsync(string ticketId, string userId);
     Task<bool> ClearTicketAssigneeAsync(string ticketId);
+    /// <summary>
+    /// Replaces the whole additionalAssignees array of a ticket. An empty
+    /// list clears it. The server de-duplicates and drops the primary
+    /// assignee id, so callers don't need to pre-filter.
+    /// </summary>
+    Task<bool> SetAdditionalAssigneesAsync(string ticketId, IEnumerable<string> userIds);
 
     Task<bool> AddCommentAsync(string ticketUid, string ownerId, string newComment);
     Task<bool> AddNoteAsync(string ticketUid, string ownerId, string note);

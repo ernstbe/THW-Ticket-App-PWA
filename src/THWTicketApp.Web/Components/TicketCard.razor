@@ -32,6 +32,24 @@
                             <MudText Typo="Typo.caption">@Ticket.Assignee.Fullname</MudText>
                         </div>
                     }
+                    @if (Ticket.AdditionalAssignees.Count > 0)
+                    {
+                        @* Compact overlapping avatar stack for the additional
+                           assignees — max 3, the rest collapses into "+n". *@
+                        <div class="d-flex align-center"
+                             title="@string.Join(", ", Ticket.AdditionalAssignees.Select(a => a.Fullname))">
+                            @{ var stackIndex = 0; }
+                            @foreach (var extra in Ticket.AdditionalAssignees.Take(3))
+                            {
+                                <UserAvatar Name="@extra.Fullname" Size="Size.Small"
+                                            Style="@($"width:18px;height:18px;font-size:9px;{(stackIndex++ > 0 ? "margin-left:-6px;" : "")}")" />
+                            }
+                            @if (Ticket.AdditionalAssignees.Count > 3)
+                            {
+                                <MudText Typo="Typo.caption" Class="ml-1">+@(Ticket.AdditionalAssignees.Count - 3)</MudText>
+                            }
+                        </div>
+                    }
                     @if (Ticket.Group != null)
                     {
                         <MudText Typo="Typo.caption">

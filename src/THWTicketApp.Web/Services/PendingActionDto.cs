@@ -19,6 +19,9 @@ internal sealed class PendingActionDto
     public string? PriorityId { get; set; }
     public string? GroupId { get; set; }
     public string? TargetUserId { get; set; }
+    // Full replacement set for SetAdditionalAssignees — JSON-serialized into
+    // IndexedDB alongside the rest of the DTO.
+    public List<string>? TargetUserIds { get; set; }
     public string? StatusId { get; set; }
     public string? TagId { get; set; }
     public string? DueDate { get; set; }
