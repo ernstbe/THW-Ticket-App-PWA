@@ -49,6 +49,13 @@ public class Ticket
     public DateTime DueDate { get; set; }
     public DateTime? ClosedDate { get; set; }
     public Assignee? Assignee { get; set; }
+    /// <summary>
+    /// "Weitere Zuständige" besides the primary <see cref="Assignee"/>.
+    /// Populated user objects, same shape as the assignee field.
+    /// Missing/empty on tickets created before the feature existed.
+    /// </summary>
+    [JsonPropertyName("additionalAssignees")]
+    public List<Assignee> AdditionalAssignees { get; set; } = new();
     public DateTime Updated { get; set; }
 
     /// <summary>

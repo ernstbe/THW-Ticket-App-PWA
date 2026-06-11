@@ -527,7 +527,8 @@ else
             _ => source
         };
         if (_showOnlyMyTickets && !string.IsNullOrEmpty(ApiService.CurrentUserId))
-            source = source.Where(t => t.Assignee?.Id == ApiService.CurrentUserId);
+            source = source.Where(t => t.Assignee?.Id == ApiService.CurrentUserId
+                || t.AdditionalAssignees.Any(a => a.Id == ApiService.CurrentUserId));
 
         // Advanced filters
         if (!string.IsNullOrEmpty(_filterPriority))

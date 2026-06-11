@@ -114,6 +114,16 @@ public class SyncService : ISyncService
             TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
         });
 
+    public Task EnqueueSetAdditionalAssigneesAsync(string ticketId, int ticketUid, IEnumerable<string> userIds, DateTime? ticketUpdatedAt = null) =>
+        EnqueueAsync(new PendingActionDto
+        {
+            ActionType = "SetAdditionalAssignees",
+            TicketId = ticketId,
+            TicketUid = ticketUid,
+            TargetUserIds = userIds.ToList(),
+            TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
+        });
+
     public Task EnqueueStatusAsync(string ticketId, int ticketUid, string statusId, DateTime? ticketUpdatedAt = null) =>
         EnqueueAsync(new PendingActionDto
         {
@@ -315,6 +325,7 @@ public class SyncService : ISyncService
         "AddNote" => await _apiService.AddNoteAsync(action.TicketUid.ToString(), action.OwnerId!, action.Content!),
         "AssignTicket" => await _apiService.AssignTicketAsync(action.TicketId!, action.TargetUserId!),
         "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!),
+        "SetAdditionalAssignees" => await _apiService.SetAdditionalAssigneesAsync(action.TicketId!, action.TargetUserIds ?? []),
         "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.StatusId!),
         "CreateTicket" => await _apiService.CreateTicketAsync(
             action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId) != null,

@@ -448,6 +448,10 @@ else
                 PrioritySortOrder = t.Priority?.OverdueIn ?? 0,
                 AssigneeId = t.Assignee?.Id,
                 AssigneeName = t.Assignee?.Fullname,
+                AdditionalAssigneeIds = t.AdditionalAssignees
+                    .Select(a => a.Id)
+                    .Where(id => !string.IsNullOrEmpty(id))
+                    .ToHashSet(),
                 TypeId = t.Type?.Id,
                 TypeName = t.Type?.TranslatedName ?? t.Type?.Name,
                 GroupId = t.Group?.Id,
@@ -519,7 +523,8 @@ else
 
     private bool MatchesFilter(KanbanTicketItem item)
     {
-        if (_onlyMine && item.AssigneeId != ApiService.CurrentUserId) return false;
+        if (_onlyMine && item.AssigneeId != ApiService.CurrentUserId
+            && !(ApiService.CurrentUserId is { } me && item.AdditionalAssigneeIds.Contains(me))) return false;
         if (!string.IsNullOrEmpty(_priorityFilter) && item.PriorityName != _priorityFilter) return false;
         if (!string.IsNullOrEmpty(_typeFilter) && item.TypeId != _typeFilter) return false;
         if (!string.IsNullOrEmpty(_groupFilter) && item.GroupId != _groupFilter) return false;
@@ -716,6 +721,7 @@ else
         public int PrioritySortOrder { get; set; }
         public string? AssigneeId { get; set; }
         public string? AssigneeName { get; set; }
+        public HashSet<string> AdditionalAssigneeIds { get; set; } = [];
         public string? TypeId { get; set; }
         public string? TypeName { get; set; }
         public string? GroupId { get; set; }

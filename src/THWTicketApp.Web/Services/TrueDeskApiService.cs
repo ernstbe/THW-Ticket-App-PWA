@@ -541,6 +541,20 @@ public class TrueDeskApiService : ITrueDeskApiService
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<bool> SetAdditionalAssigneesAsync(string ticketId, IEnumerable<string> userIds)
+    {
+        if (string.IsNullOrWhiteSpace(ticketId)) return false;
+        // PUT /tickets/:id/additional-assignees only exists in v1
+        // (trudesk-thw feat/additional-assignees). Replaces the whole array;
+        // empty array clears. The server de-duplicates and drops the primary
+        // assignee id.
+        var payload = new { additionalAssignees = userIds.ToArray() };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync(
+            $"{V1BaseUrl}/tickets/{ticketId}/additional-assignees", content));
+        return response.IsSuccessStatusCode;
+    }
+
     public async Task<bool> AddCommentAsync(string ticketUid, string ownerId, string newComment)
     {
         if (string.IsNullOrWhiteSpace(ticketUid) || string.IsNullOrWhiteSpace(newComment))

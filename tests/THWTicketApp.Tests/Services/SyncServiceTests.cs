@@ -63,6 +63,31 @@ public class SyncServiceTests
     }
 
     [Fact]
+    public async Task EnqueueSetAdditionalAssigneesAsync_producesDtoWithUserIdList()
+    {
+        var dto = await CaptureEnqueuedAsync(() =>
+            _sut.EnqueueSetAdditionalAssigneesAsync("t1", 1001, ["u1", "u2"], new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        Assert.Equal("SetAdditionalAssignees", dto.ActionType);
+        Assert.Equal("t1", dto.TicketId);
+        Assert.Equal(1001, dto.TicketUid);
+        Assert.Equal(new List<string> { "u1", "u2" }, dto.TargetUserIds);
+        Assert.NotNull(dto.TicketUpdatedAt);
+        Assert.NotNull(dto.CreatedAt);
+    }
+
+    [Fact]
+    public async Task EnqueueSetAdditionalAssigneesAsync_emptyListSurvivesRoundTrip()
+    {
+        var dto = await CaptureEnqueuedAsync(() =>
+            _sut.EnqueueSetAdditionalAssigneesAsync("t1", 1001, []));
+
+        Assert.Equal("SetAdditionalAssignees", dto.ActionType);
+        Assert.NotNull(dto.TargetUserIds);
+        Assert.Empty(dto.TargetUserIds!);
+    }
+
+    [Fact]
     public async Task EnqueueUpdateTicketFieldsAsync_producesDtoWithAllProvidedFields()
     {
         var due = new DateTime(2026, 5, 1, 12, 0, 0, DateTimeKind.Utc);
@@ -216,6 +241,27 @@ public class SyncServiceTests
         await _api.Received(1).UploadAttachmentAsync("t1", Arg.Any<Stream>(), "a.bin");
         Assert.NotNull(capturedBytes);
         Assert.Equal(payload, capturedBytes);
+    }
+
+    [Fact]
+    public async Task Sync_dispatchesSetAdditionalAssigneesToApi()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 4,
+            ActionType = "SetAdditionalAssignees",
+            TicketId = "t1",
+            TicketUid = 1001,
+            TargetUserIds = ["u1", "u2"]
+        });
+        _api.SetAdditionalAssigneesAsync("t1", Arg.Any<IEnumerable<string>>()).Returns(true);
+
+        var result = await _sut.SyncPendingActionsAsync();
+
+        Assert.True(result);
+        await _api.Received(1).SetAdditionalAssigneesAsync("t1",
+            Arg.Is<IEnumerable<string>>(ids => ids.SequenceEqual(new[] { "u1", "u2" })));
+        await _db.Received(1).RemovePendingActionAsync(4);
     }
 
     // ---------------------------------------------------------------------

@@ -148,6 +148,27 @@ else
         </MudChip>
     </div>
 
+    @* ─── Weitere Zuständige — additional assignees besides the primary ─ *@
+    <div class="d-flex align-center gap-2 mb-4 pwa-no-print flex-wrap">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.additional_assignees"):</MudText>
+        @foreach (var assignee in _ticket.AdditionalAssignees)
+        {
+            var local = assignee;
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                     Icon="@Icons.Material.Filled.Person"
+                     OnClose="@(() => RemoveAdditionalAssigneeAsync(local))">
+                @local.Fullname
+            </MudChip>
+        }
+        <ChipWithMenu T="User"
+                      EmptyLabel="@L.T("detail.additional_assignees_add")"
+                      Icon="@Icons.Material.Filled.PersonAdd"
+                      Items="@AvailableAdditionalAssignees()"
+                      ItemTitle="@(u => u.Fullname ?? "")"
+                      OnSelected="AddAdditionalAssigneeAsync"
+                      EmptyMenuLabel="@L.T("detail.no_assignees_available")" />
+    </div>
+
     @if (_isLoading)
     {
         <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-2" />
@@ -162,6 +183,10 @@ else
             <tr><th>Priorität</th><td>@(_ticket.Priority?.TranslatedName ?? "-")</td></tr>
             <tr><th>Ersteller</th><td>@(_ticket.Owner?.Fullname ?? "-")</td></tr>
             <tr><th>Zuständig</th><td>@(_ticket.Assignee?.Fullname ?? "Nicht zugewiesen")</td></tr>
+            @if (_ticket.AdditionalAssignees.Count > 0)
+            {
+                <tr><th>Weitere Zuständige</th><td>@string.Join(", ", _ticket.AdditionalAssignees.Select(a => a.Fullname))</td></tr>
+            }
             <tr><th>Gruppe</th><td>@(_ticket.Group?.Name ?? "-")</td></tr>
             <tr><th>Typ</th><td>@(_ticket.Type?.TranslatedName ?? "-")</td></tr>
             <tr><th>Erstellt</th><td>@_ticket.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</td></tr>
@@ -1143,6 +1168,71 @@ else
         catch (HttpRequestException)
         {
             await SyncService.EnqueueAssignAsync(ticketId, ticketUid, userId, updatedAt);
+            Snackbar.Add(L.T("offline.queued"), Severity.Info);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+    }
+
+    // ─── Weitere Zuständige (additional assignees) ──────────────────────
+
+    /// <summary>
+    /// Candidates for the add-menu: every assignable user except the
+    /// primary assignee and the ones already on the ticket.
+    /// </summary>
+    private IEnumerable<User> AvailableAdditionalAssignees()
+    {
+        if (_ticket == null) return [];
+        var taken = new HashSet<string>(_ticket.AdditionalAssignees.Select(a => a.Id));
+        if (!string.IsNullOrEmpty(_ticket.Assignee?.Id))
+            taken.Add(_ticket.Assignee.Id);
+        return _users.Where(u => !string.IsNullOrEmpty(u.Id) && !taken.Contains(u.Id));
+    }
+
+    private Task AddAdditionalAssigneeAsync(User u)
+    {
+        if (_ticket == null || string.IsNullOrEmpty(u.Id)) return Task.CompletedTask;
+        var ids = _ticket.AdditionalAssignees.Select(a => a.Id).ToList();
+        if (ids.Contains(u.Id)) return Task.CompletedTask;
+        ids.Add(u.Id);
+        return SaveAdditionalAssigneesAsync(ids, L.T("detail.assign_updated"));
+    }
+
+    private Task RemoveAdditionalAssigneeAsync(Assignee a)
+    {
+        if (_ticket == null) return Task.CompletedTask;
+        var ids = _ticket.AdditionalAssignees.Select(x => x.Id).Where(id => id != a.Id).ToList();
+        return SaveAdditionalAssigneesAsync(ids, L.T("detail.assign_removed"));
+    }
+
+    /// <summary>
+    /// Replaces the whole additionalAssignees array (the endpoint has
+    /// replace semantics — empty list clears). Offline-first like
+    /// QuickAssignAsync: enqueue + snackbar when offline or unreachable.
+    /// </summary>
+    private async Task SaveAdditionalAssigneesAsync(List<string> userIds, string successMessage)
+    {
+        if (_ticket == null) return;
+        var ticketId = _ticket.Id;
+        var ticketUid = _ticket.Uid;
+        var updatedAt = _ticket.Updated;
+        try
+        {
+            if (!AppState.IsOnline)
+            {
+                await SyncService.EnqueueSetAdditionalAssigneesAsync(ticketId, ticketUid, userIds, updatedAt);
+                Snackbar.Add(L.T("offline.queued"), Severity.Info);
+                return;
+            }
+            if (await ApiService.SetAdditionalAssigneesAsync(ticketId, userIds))
+            {
+                Snackbar.Add(successMessage, Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.assign_failed"), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            await SyncService.EnqueueSetAdditionalAssigneesAsync(ticketId, ticketUid, userIds, updatedAt);
             Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }

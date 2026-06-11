@@ -353,9 +353,11 @@ else
             t.Status?.IsResolved == true ||
             t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved");
         var username = ApiService.CurrentUsername;
+        var userId = ApiService.CurrentUserId;
         if (!string.IsNullOrEmpty(username))
             _myTickets = _allTickets.Count(t =>
-                t.Assignee?.Username?.Equals(username, StringComparison.OrdinalIgnoreCase) == true);
+                t.Assignee?.Username?.Equals(username, StringComparison.OrdinalIgnoreCase) == true
+                || (!string.IsNullOrEmpty(userId) && t.AdditionalAssignees.Any(a => a.Id == userId)));
         _overdueTickets = _allTickets.Count(t =>
             t.DueDate != DateTime.MinValue && t.DueDate < DateTime.Now && t.Status?.IsResolved != true);
 
