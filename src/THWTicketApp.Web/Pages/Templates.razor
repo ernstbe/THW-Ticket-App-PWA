@@ -5,6 +5,7 @@
 @using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
+@inject ILookupService Lookup
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject THWTicketApp.Web.Services.LocalizationService L
@@ -97,7 +98,7 @@ else
                    Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Class="mb-2">
             @foreach (var p in _priorities)
             {
-                <MudSelectItem T="string" Value="@p.Id">@p.Name</MudSelectItem>
+                <MudSelectItem T="string" Value="@p.Id">@p.TranslatedName</MudSelectItem>
             }
         </MudSelect>
         <MudTextField @bind-Value="_formIssue" Label="@L.T("templates.issue")"
@@ -139,17 +140,9 @@ else
     {
         try
         {
-            var typesJson = await ApiService.GetTicketTypesAsync();
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var types = JsonSerializer.Deserialize<TicketType[]>(typesJson, options);
-            if (types != null)
-            {
-                _types = types.ToList();
-                _priorities = types.SelectMany(t => t.Priorities)
-                    .DistinctBy(p => p.Id).ToList();
-                foreach (var p in _priorities)
-                    p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
-            }
+            var (types, priorities) = await Lookup.GetTypesAndPrioritiesAsync();
+            _types = types.ToList();
+            _priorities = priorities.ToList();
         }
         catch
         {
@@ -287,8 +280,10 @@ else
     {
         foreach (var t in templates)
         {
+            // Generic Translator — same table the dialog dropdown uses via
+            // TranslatedName, so table chips and dropdown stay in sync.
             if (!string.IsNullOrEmpty(t.PriorityName))
-                t.PriorityName = TrudeskTranslationHelper.TranslatePriority(t.PriorityName);
+                t.PriorityName = Translator.Translate(t.PriorityName);
         }
     }
 

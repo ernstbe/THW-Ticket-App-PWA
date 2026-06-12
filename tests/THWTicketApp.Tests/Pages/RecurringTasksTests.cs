@@ -240,10 +240,21 @@ public class RecurringTasksComponentTests : BunitContext, IAsyncLifetime
 {
     private readonly ITrueDeskApiService _api;
 
+    // t1 configures p1+p2; t2 configures only p3 — used by the
+    // type/priority coupling tests below.
+    private const string TypesJson = """
+    [
+        { "_id": "t1", "name": "Task",
+          "priorities": [ { "_id": "p1", "name": "Normal" }, { "_id": "p2", "name": "High" } ] },
+        { "_id": "t2", "name": "Issue",
+          "priorities": [ { "_id": "p3", "name": "Critical" } ] }
+    ]
+    """;
+
     public RecurringTasksComponentTests()
     {
         _api = Substitute.For<ITrueDeskApiService>();
-        _api.GetTicketTypesAsync().Returns("[]");
+        _api.GetTicketTypesAsync().Returns(TypesJson);
         _api.GetTicketTemplatesAsync().Returns("""{"ticketTemplates":[]}""");
         _api.GetGroupsAsync().Returns("""{"success":true,"groups":[{"_id":"g1","name":"OV"}]}""");
         _api.GetRecurringTasksAsync().Returns("""{"recurringTasks":[]}""");
@@ -254,6 +265,7 @@ public class RecurringTasksComponentTests : BunitContext, IAsyncLifetime
 
         Services.AddMudServices();
         Services.AddSingleton(_api);
+        Services.AddSingleton<ILookupService>(new LookupService(_api));
         Services.AddSingleton(new LocalizationService(localStorage));
         Services.AddAuthorizationCore();
         Services.AddSingleton<AuthenticationStateProvider>(new AlwaysAuthenticatedProvider());
@@ -295,6 +307,50 @@ public class RecurringTasksComponentTests : BunitContext, IAsyncLifetime
 
         Assert.Equal(new[] { "Original-Punkt" }, cut.Instance.FormChecklistForTests);
         Assert.Equal("Original-Betreff", cut.Instance.FormTicketSubjectForTests);
+    }
+
+    [Fact]
+    public async Task TypeChange_restrictsPriorities_andClearsInvalidSelection()
+    {
+        var cut = Render<RecurringTasks>();
+        var task = new RecurringTask
+        {
+            Id = "r1",
+            Name = "Wartung",
+            TicketType = new PopulatedRef("t1", null),
+            TicketPriority = new PopulatedRef("p2", null)
+        };
+
+        await cut.InvokeAsync(() => cut.Instance.ShowEditDialog(task));
+        Assert.Equal(new[] { "p1", "p2" }, cut.Instance.AvailablePrioritiesForTests.Select(p => p.Id));
+        Assert.Equal("p2", cut.Instance.FormPriorityIdForTests);
+
+        // t2 doesn't know p2 → the dropdown narrows and the selection clears.
+        await cut.InvokeAsync(() => cut.Instance.OnTypeChangedForTests("t2"));
+
+        Assert.Equal(new[] { "p3" }, cut.Instance.AvailablePrioritiesForTests.Select(p => p.Id));
+        Assert.Null(cut.Instance.FormPriorityIdForTests);
+    }
+
+    [Fact]
+    public async Task TemplatePriority_outsideSelectedTypesSet_isNotApplied()
+    {
+        var cut = Render<RecurringTasks>();
+        await cut.InvokeAsync(() => cut.Instance.ShowEditDialog(new RecurringTask { Id = "r1", Name = "W" }));
+
+        // Template pins type t1 but a priority only t2 configures — the
+        // priority must be validated against t1's set, not the union.
+        var template = new TicketTemplate
+        {
+            Name = "Vorlage",
+            Subject = "S",
+            TypeId = "t1",
+            PriorityId = "p3"
+        };
+        await cut.InvokeAsync(() => cut.Instance.OnTemplateSelected(template));
+
+        Assert.Equal("t1", cut.Instance.FormTypeIdForTests);
+        Assert.Null(cut.Instance.FormPriorityIdForTests);
     }
 
     private sealed class AlwaysAuthenticatedProvider : AuthenticationStateProvider
