@@ -568,8 +568,6 @@ public class LocalizationService
         ["tickets.attachments_uploading"] = "Lade Anhänge hoch…",
         ["tickets.attachments_partial"] = "Ticket erstellt, aber {0} von {1} Anhängen konnten nicht hochgeladen werden.",
         ["tickets.template_checklist_info"] = "{0} Checklisten-Punkte werden übernommen",
-        ["tickets.template_checklist_partial"] = "{0} von {1} Checklisten-Punkten konnten nicht angelegt werden",
-        ["tickets.template_checklist_offline"] = "Offline — die Checkliste der Vorlage konnte nicht übernommen werden. Bitte später im Ticket ergänzen.",
 
         // Dashboard
         ["dashboard.total"] = "Gesamt",
@@ -1315,8 +1313,6 @@ public class LocalizationService
         ["tickets.attachments_uploading"] = "Uploading attachments…",
         ["tickets.attachments_partial"] = "Ticket created, but {0} of {1} attachments failed to upload.",
         ["tickets.template_checklist_info"] = "{0} checklist items will be applied",
-        ["tickets.template_checklist_partial"] = "{0} of {1} checklist items could not be created",
-        ["tickets.template_checklist_offline"] = "Offline — the template's checklist could not be applied. Please add the items on the ticket later.",
 
         // Dashboard
         ["dashboard.total"] = "Total",

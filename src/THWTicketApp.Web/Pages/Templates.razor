@@ -107,31 +107,7 @@ else
         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
             @L.T("templates.checklist_hint")
         </MudText>
-        @if (_formChecklist.Count > 0)
-        {
-            <div class="d-flex flex-column gap-1 mb-2">
-                @foreach (var (item, idx) in _formChecklist.Select((c, i) => (c, i)))
-                {
-                    var capturedIdx = idx;
-                    <div class="d-flex align-center gap-2">
-                        <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Size="Size.Small" />
-                        <MudText Typo="Typo.body2" Style="flex:1; overflow:hidden; text-overflow:ellipsis;">@item</MudText>
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                       OnClick="@(() => RemoveChecklistItem(capturedIdx))"
-                                       aria-label="@L.T("common.delete")" />
-                    </div>
-                }
-            </div>
-        }
-        <div class="d-flex gap-1">
-            <MudTextField @bind-Value="_newChecklistTitle" Placeholder="@L.T("templates.checklist_add")"
-                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" Immediate="true"
-                          OnKeyDown="@((e) => { if (e.Key == "Enter") AddChecklistItem(); })" />
-            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
-                           OnClick="AddChecklistItem"
-                           Disabled="@(string.IsNullOrWhiteSpace(_newChecklistTitle))"
-                           aria-label="@L.T("templates.checklist_add")" />
-        </div>
+        <ChecklistEditor Items="_formChecklist" AllowAdd="true" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="() => _dialogVisible = false">@L.T("common.cancel")</MudButton>
@@ -141,18 +117,17 @@ else
 
 @code {
     private bool _isLoading;
-    private List<TicketTemplateVm> _templates = new();
+    private List<TicketTemplate> _templates = new();
     private List<TicketType> _types = new();
     private List<Priority> _priorities = new();
     private bool _dialogVisible;
-    private TicketTemplateVm? _editing;
+    private TicketTemplate? _editing;
     private string _formName = string.Empty;
     private string _formSubject = string.Empty;
     private string _formIssue = string.Empty;
     private string? _formTypeId;
     private string? _formPriorityId;
     private List<string> _formChecklist = new();
-    private string _newChecklistTitle = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -191,7 +166,9 @@ else
         try
         {
             var json = await ApiService.GetTicketTemplatesAsync();
-            _templates = ParseTemplates(json);
+            var templates = TicketTemplateParser.ParseTemplates(json);
+            TranslatePriorityNames(templates);
+            _templates = templates;
         }
         catch (Exception ex)
         {
@@ -212,11 +189,10 @@ else
         _formTypeId = null;
         _formPriorityId = null;
         _formChecklist = new();
-        _newChecklistTitle = string.Empty;
         _dialogVisible = true;
     }
 
-    private void ShowEditDialog(TicketTemplateVm template)
+    private void ShowEditDialog(TicketTemplate template)
     {
         _editing = template;
         _formName = template.Name;
@@ -225,22 +201,7 @@ else
         _formTypeId = template.TypeId;
         _formPriorityId = template.PriorityId;
         _formChecklist = new List<string>(template.Checklist);
-        _newChecklistTitle = string.Empty;
         _dialogVisible = true;
-    }
-
-    private void AddChecklistItem()
-    {
-        var title = _newChecklistTitle.Trim();
-        if (title.Length == 0) return;
-        _formChecklist.Add(title);
-        _newChecklistTitle = string.Empty;
-    }
-
-    private void RemoveChecklistItem(int index)
-    {
-        if (index < 0 || index >= _formChecklist.Count) return;
-        _formChecklist.RemoveAt(index);
     }
 
     private async Task SaveAsync()
@@ -279,7 +240,7 @@ else
         }
     }
 
-    private async Task DeleteTemplateAsync(TicketTemplateVm template)
+    private async Task DeleteTemplateAsync(TicketTemplate template)
     {
         var parameters = new DialogParameters<ConfirmDialog>
         {
@@ -319,86 +280,16 @@ else
 
     // Exposed for unit tests ---------------------------------------------
 
-    internal sealed class TicketTemplateVm
+    // Presentation step on top of the shared parser: the table shows the
+    // German priority label, but the parser deliberately returns raw
+    // server values (translation is page concern, see TicketTemplateParser).
+    internal static void TranslatePriorityNames(List<TicketTemplate> templates)
     {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string Subject { get; set; } = string.Empty;
-        public string? Issue { get; set; }
-        public string? TypeId { get; set; }
-        public string? TypeName { get; set; }
-        public string? PriorityId { get; set; }
-        public string? PriorityName { get; set; }
-        public List<string> Checklist { get; set; } = new();
-    }
-
-    internal static List<TicketTemplateVm> ParseTemplates(string json)
-    {
-        try
+        foreach (var t in templates)
         {
-            using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("ticketTemplates", out var arr) || arr.ValueKind != JsonValueKind.Array)
-                return new();
-            var list = new List<TicketTemplateVm>();
-            foreach (var el in arr.EnumerateArray())
-            {
-                var (typeId, typeName) = ExtractRef(el, "ticketType");
-                var (priorityId, priorityName) = ExtractRef(el, "priority");
-                list.Add(new TicketTemplateVm
-                {
-                    Id = el.TryGetProperty("_id", out var idEl) ? idEl.GetString() ?? "" : "",
-                    Name = el.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "",
-                    Subject = el.TryGetProperty("subject", out var subjEl) ? subjEl.GetString() ?? "" : "",
-                    Issue = el.TryGetProperty("issue", out var issueEl) ? issueEl.GetString() : null,
-                    TypeId = typeId,
-                    TypeName = typeName,
-                    PriorityId = priorityId,
-                    PriorityName = string.IsNullOrEmpty(priorityName)
-                        ? priorityName
-                        : TrudeskTranslationHelper.TranslatePriority(priorityName),
-                    Checklist = ExtractChecklistTitles(el)
-                });
-            }
-            return list;
+            if (!string.IsNullOrEmpty(t.PriorityName))
+                t.PriorityName = TrudeskTranslationHelper.TranslatePriority(t.PriorityName);
         }
-        catch
-        {
-            return new();
-        }
-    }
-
-    // trudesk populiert Refs als Objekt mit _id + name, kann aber auch
-    // ein einfacher ObjectId-String oder null sein. Beide Formen toleriert.
-    private static (string? id, string? name) ExtractRef(JsonElement parent, string property)
-    {
-        if (!parent.TryGetProperty(property, out var el)) return (null, null);
-        if (el.ValueKind == JsonValueKind.String) return (el.GetString(), null);
-        if (el.ValueKind == JsonValueKind.Object)
-        {
-            var id = el.TryGetProperty("_id", out var idEl) ? idEl.GetString() : null;
-            var name = el.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
-            return (id, name);
-        }
-        return (null, null);
-    }
-
-    // Templates created before the checklist feature have no `checklist`
-    // key — treat missing/non-array as empty.
-    private static List<string> ExtractChecklistTitles(JsonElement parent)
-    {
-        var titles = new List<string>();
-        if (!parent.TryGetProperty("checklist", out var arr) || arr.ValueKind != JsonValueKind.Array)
-            return titles;
-        foreach (var item in arr.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object) continue;
-            if (item.TryGetProperty("title", out var titleEl) && titleEl.ValueKind == JsonValueKind.String)
-            {
-                var title = titleEl.GetString();
-                if (!string.IsNullOrWhiteSpace(title)) titles.Add(title);
-            }
-        }
-        return titles;
     }
 
     internal static string? ValidateForm(string? name, string? subject)

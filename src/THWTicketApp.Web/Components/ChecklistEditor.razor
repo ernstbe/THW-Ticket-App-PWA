@@ -1,0 +1,65 @@
+@*
+    Editable list of checklist titles, shared by the Templates dialog and
+    the RecurringTasks dialog (the markup used to be duplicated 1:1).
+
+    The component mutates the `Items` list the parent handed in and raises
+    `ItemsChanged` afterwards so the parent can re-render anything derived
+    from the list (count captions, surrounding @if blocks).
+
+    `AllowAdd` (default false) shows the add-row with Enter handling —
+    headings/hints around the editor stay in the pages.
+*@
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+@if (Items.Count > 0)
+{
+    <div class="d-flex flex-column gap-1 mb-2">
+        @foreach (var (item, idx) in Items.Select((c, i) => (c, i)))
+        {
+            var capturedIdx = idx;
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Size="Size.Small" />
+                <MudText Typo="Typo.body2" Style="flex:1; overflow:hidden; text-overflow:ellipsis;">@item</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                               OnClick="@(() => RemoveItemAsync(capturedIdx))"
+                               aria-label="@L.T("common.delete")" />
+            </div>
+        }
+    </div>
+}
+@if (AllowAdd)
+{
+    <div class="d-flex gap-1">
+        <MudTextField @bind-Value="_newTitle" Placeholder="@L.T("templates.checklist_add")"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1" Immediate="true"
+                      OnKeyDown="@(async (e) => { if (e.Key == "Enter") await AddItemAsync(); })" />
+        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                       OnClick="AddItemAsync"
+                       Disabled="@(string.IsNullOrWhiteSpace(_newTitle))"
+                       aria-label="@L.T("templates.checklist_add")" />
+    </div>
+}
+
+@code {
+    [Parameter] public List<string> Items { get; set; } = new();
+    [Parameter] public EventCallback ItemsChanged { get; set; }
+    [Parameter] public bool AllowAdd { get; set; }
+
+    private string _newTitle = string.Empty;
+
+    private async Task RemoveItemAsync(int index)
+    {
+        if (index < 0 || index >= Items.Count) return;
+        Items.RemoveAt(index);
+        await ItemsChanged.InvokeAsync();
+    }
+
+    private async Task AddItemAsync()
+    {
+        var title = _newTitle.Trim();
+        if (title.Length == 0) return;
+        Items.Add(title);
+        _newTitle = string.Empty;
+        await ItemsChanged.InvokeAsync();
+    }
+}

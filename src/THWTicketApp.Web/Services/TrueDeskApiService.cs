@@ -431,7 +431,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null)
+    public async Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null, IReadOnlyList<string>? checklist = null)
     {
         if (string.IsNullOrWhiteSpace(subject))
             return null;
@@ -448,6 +448,13 @@ public class TrueDeskApiService : ITrueDeskApiService
         if (!string.IsNullOrEmpty(groupId)) payload["group"] = groupId;
         if (!string.IsNullOrEmpty(assigneeId)) payload["assignee"] = assigneeId;
         if (dueDate.HasValue) payload["dueDate"] = dueDate.Value.ToString("O");
+        // Template checklist rides along in the create payload — the server
+        // (trudesk PR #106) validates `checklist` on the ticketsV2 create
+        // and stores the items with completed:false.
+        if (checklist is { Count: > 0 })
+            payload["checklist"] = checklist
+                .Select(t => new Dictionary<string, object?> { ["title"] = t })
+                .ToList();
 
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");

@@ -125,7 +125,7 @@ else if (_isLoading)
     <DialogContent>
         @if (_templates.Count > 0)
         {
-            <MudSelect T="AddTicket.TemplateItem" Value="_selectedTemplate" ValueChanged="OnTemplateSelected"
+            <MudSelect T="TicketTemplate" Value="_selectedTemplate" ValueChanged="OnTemplateSelected"
                        Label="@L.T("tickets.use_template")" Clearable="true" Class="mb-2"
                        ToStringFunc="@(t => t?.Name ?? "")">
                 @foreach (var tpl in _templates)
@@ -170,19 +170,7 @@ else if (_isLoading)
             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-1">
                 @string.Format(L.T("tickets.template_checklist_info"), _formChecklist.Count)
             </MudText>
-            <div class="d-flex flex-column gap-1 mb-2">
-                @foreach (var (item, idx) in _formChecklist.Select((c, i) => (c, i)))
-                {
-                    var capturedIdx = idx;
-                    <div class="d-flex align-center gap-2">
-                        <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Size="Size.Small" />
-                        <MudText Typo="Typo.body2" Style="flex:1; overflow:hidden; text-overflow:ellipsis;">@item</MudText>
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                       OnClick="@(() => RemoveChecklistItem(capturedIdx))"
-                                       aria-label="@L.T("common.delete")" />
-                    </div>
-                }
-            </div>
+            <ChecklistEditor Items="_formChecklist" ItemsChanged="StateHasChanged" />
         }
         <MudDivider Class="my-3" />
         <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("recurring.schedule")</MudText>
@@ -218,8 +206,8 @@ else if (_isLoading)
     private string? _formPriorityId;
     private string? _formGroupId;
     private List<string> _formChecklist = [];
-    private List<AddTicket.TemplateItem> _templates = [];
-    private AddTicket.TemplateItem? _selectedTemplate;
+    private List<TicketTemplate> _templates = [];
+    private TicketTemplate? _selectedTemplate;
     private List<TicketType> _types = [];
     private List<Priority> _priorities = [];
     private List<Group> _groups = [];
@@ -289,7 +277,7 @@ else if (_isLoading)
         try
         {
             var templatesJson = await ApiService.GetTicketTemplatesAsync();
-            _templates = AddTicket.ParseTemplates(templatesJson);
+            _templates = TicketTemplateParser.ParseTemplates(templatesJson);
         }
         catch
         {
@@ -368,7 +356,7 @@ else if (_isLoading)
         _stashChecklist = new List<string>(_formChecklist);
     }
 
-    internal void OnTemplateSelected(AddTicket.TemplateItem? template)
+    internal void OnTemplateSelected(TicketTemplate? template)
     {
         _selectedTemplate = template;
         if (template == null)
@@ -393,12 +381,6 @@ else if (_isLoading)
         if (!string.IsNullOrEmpty(template.PriorityId) && _priorities.Any(p => p.Id == template.PriorityId))
             _formPriorityId = template.PriorityId;
         _formChecklist = new List<string>(template.Checklist);
-    }
-
-    private void RemoveChecklistItem(int index)
-    {
-        if (index < 0 || index >= _formChecklist.Count) return;
-        _formChecklist.RemoveAt(index);
     }
 
     private async Task SaveTaskAsync()

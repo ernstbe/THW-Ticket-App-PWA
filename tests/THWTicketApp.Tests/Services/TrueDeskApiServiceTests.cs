@@ -617,6 +617,32 @@ public class TrueDeskApiServiceTests
         Assert.Equal(0, result.Uid);
     }
 
+    [Fact]
+    public async Task CreateTicketAsync_checklist_ridesAlongInPayload()
+    {
+        // Template checklists go out with the create itself (trudesk
+        // validates `checklist` on the ticketsV2 create) — no follow-up
+        // per-item POSTs.
+        _handler.SetDefault(HttpStatusCode.OK, "{\"ticket\":{\"_id\":\"abc123\",\"uid\":1}}");
+
+        await _sut.CreateTicketAsync("Subject", "Issue", null, null, null, null,
+            checklist: new List<string> { "Fahrzeug prüfen", "Material zählen" });
+
+        Assert.Contains("\"checklist\":[{\"title\":\"Fahrzeug pr", LastBody);
+        Assert.Contains("Material z", LastBody);
+    }
+
+    [Fact]
+    public async Task CreateTicketAsync_emptyChecklist_omitsKey()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"ticket\":{\"_id\":\"abc123\",\"uid\":1}}");
+
+        await _sut.CreateTicketAsync("Subject", "Issue", null, null, null, null,
+            checklist: new List<string>());
+
+        Assert.DoesNotContain("checklist", LastBody);
+    }
+
     // -----------------------------------------------------------------
     // Checklist (v2)
     // -----------------------------------------------------------------
