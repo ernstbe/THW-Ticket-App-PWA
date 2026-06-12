@@ -34,6 +34,10 @@ public sealed class WhatsNewService
             "Checklisten in Ticket-Vorlagen: Vorlagen können jetzt eine Checkliste enthalten — beim Anwenden landen die Punkte automatisch auf dem neuen Ticket.",
             "Anhänge per Drag & Drop: Dateien können beim Erstellen eines Tickets direkt ins Formular gezogen werden.",
             "Fälligkeitsdatum repariert: Nachträgliches Setzen, Ändern und Löschen funktioniert jetzt zuverlässig — die „Überfällig“-Kachel im Dashboard zeigt damit echte Werte."
+        ]),
+        new WhatsNewEntry(2, "12.06.2026", "Wiederkehrende Aufgaben",
+        [
+            "Vorlagen-Auswahl für wiederkehrende Aufgaben: Beim Anlegen oder Bearbeiten kann jetzt eine Ticket-Vorlage gewählt werden — Betreff, Beschreibung, Typ, Priorität und Checkliste werden automatisch übernommen und bleiben einzeln anpassbar."
         ])
     ];
 

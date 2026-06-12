@@ -77,6 +77,28 @@ else if (_isLoading)
                     }
                     <MudText Typo="Typo.body2"><strong>@L.T("recurring.schedule"):</strong> @FormatSchedule(task)</MudText>
                     <MudText Typo="Typo.body2"><strong>@L.T("recurring.ticket_subject"):</strong> @task.TicketSubject</MudText>
+                    @{
+                        var typeName = ResolveTypeName(task);
+                        var priorityName = ResolvePriorityName(task);
+                    }
+                    @if (typeName != null || priorityName != null || task.Checklist.Count > 0)
+                    {
+                        <div class="d-flex flex-wrap gap-1 mt-2">
+                            @if (typeName != null)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@typeName</MudChip>
+                            }
+                            @if (priorityName != null)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@priorityName</MudChip>
+                            }
+                            @if (task.Checklist.Count > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                         Icon="@Icons.Material.Filled.Checklist">@task.Checklist.Count</MudChip>
+                            }
+                        </div>
+                    }
                     @if (task.NextRun.HasValue)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
@@ -100,12 +122,54 @@ else if (_isLoading)
         <MudText Typo="Typo.h6">@(_editingTask == null ? L.T("recurring.new") : L.T("common.edit"))</MudText>
     </TitleContent>
     <DialogContent>
+        @if (_templates.Count > 0)
+        {
+            <MudSelect T="AddTicket.TemplateItem" Value="_selectedTemplate" ValueChanged="OnTemplateSelected"
+                       Label="@L.T("tickets.use_template")" Clearable="true" Class="mb-2"
+                       ToStringFunc="@(t => t?.Name ?? "")">
+                @foreach (var tpl in _templates)
+                {
+                    <MudSelectItem Value="tpl">@tpl.Name</MudSelectItem>
+                }
+            </MudSelect>
+        }
         <MudTextField @bind-Value="_formName" Label="@L.T("assets.name")" Class="mb-2" />
         <MudTextField @bind-Value="_formDescription" Label="@L.T("detail.description")" Lines="2" Class="mb-2" />
         <MudDivider Class="my-3" />
         <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("recurring.ticket_template")</MudText>
         <MudTextField @bind-Value="_formTicketSubject" Label="@L.T("detail.subject")" Class="mb-2" />
         <MudTextField @bind-Value="_formTicketIssue" Label="@L.T("detail.description")" Lines="3" Class="mb-2" />
+        <MudSelect T="string" @bind-Value="_formTypeId" Label="@L.T("detail.type")" Clearable="true" Class="mb-2">
+            @foreach (var t in _types)
+            {
+                <MudSelectItem T="string" Value="@t.Id">@t.TranslatedName</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="string" @bind-Value="_formPriorityId" Label="@L.T("detail.priority")" Clearable="true" Class="mb-2">
+            @foreach (var p in _priorities)
+            {
+                <MudSelectItem T="string" Value="@p.Id">@p.TranslatedName</MudSelectItem>
+            }
+        </MudSelect>
+        @if (_formChecklist.Count > 0)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-1">
+                @string.Format(L.T("tickets.template_checklist_info"), _formChecklist.Count)
+            </MudText>
+            <div class="d-flex flex-column gap-1 mb-2">
+                @foreach (var (item, idx) in _formChecklist.Select((c, i) => (c, i)))
+                {
+                    var capturedIdx = idx;
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Style="flex:1; overflow:hidden; text-overflow:ellipsis;">@item</MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       OnClick="@(() => RemoveChecklistItem(capturedIdx))"
+                                       aria-label="@L.T("common.delete")" />
+                    </div>
+                }
+            </div>
+        }
         <MudDivider Class="my-3" />
         <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("recurring.schedule")</MudText>
         <MudSelect @bind-Value="_formScheduleType" Label="@L.T("recurring.schedule_type")" Class="mb-2">
@@ -136,8 +200,49 @@ else if (_isLoading)
     private int _formDayOfMonth = 1;
     private int _formDaysBeforeDeadline = 7;
     private bool _formEnabled = true;
+    private string? _formTypeId;
+    private string? _formPriorityId;
+    private List<string> _formChecklist = [];
+    private List<AddTicket.TemplateItem> _templates = [];
+    private AddTicket.TemplateItem? _selectedTemplate;
+    private List<TicketType> _types = [];
+    private List<Priority> _priorities = [];
 
-    protected override async Task OnInitializedAsync() => await LoadTasksAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLookupsAsync();
+        await LoadTasksAsync();
+    }
+
+    private async Task LoadLookupsAsync()
+    {
+        try
+        {
+            var typesJson = await ApiService.GetTicketTypesAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var types = JsonSerializer.Deserialize<TicketType[]>(typesJson, options);
+            if (types != null)
+            {
+                _types = types.ToList();
+                _priorities = types.SelectMany(t => t.Priorities).DistinctBy(p => p.Id).ToList();
+            }
+        }
+        catch
+        {
+            // Backend unreachable — type/priority selects stay empty, tasks
+            // can still be managed with the free-text fields.
+        }
+
+        try
+        {
+            var templatesJson = await ApiService.GetTicketTemplatesAsync();
+            _templates = AddTicket.ParseTemplates(templatesJson);
+        }
+        catch
+        {
+            // Templates endpoint failed — the picker simply stays hidden.
+        }
+    }
 
     private async Task LoadTasksAsync()
     {
@@ -170,6 +275,10 @@ else if (_isLoading)
         _formDayOfMonth = 1;
         _formDaysBeforeDeadline = 7;
         _formEnabled = true;
+        _formTypeId = null;
+        _formPriorityId = null;
+        _formChecklist = [];
+        _selectedTemplate = null;
         _dialogVisible = true;
     }
 
@@ -184,7 +293,42 @@ else if (_isLoading)
         _formDayOfMonth = task.DayOfMonth;
         _formDaysBeforeDeadline = task.DaysBeforeDeadline;
         _formEnabled = task.Enabled;
+        _formTypeId = task.TicketTypeId;
+        _formPriorityId = task.TicketPriorityId;
+        _formChecklist = task.Checklist
+            .Where(c => !string.IsNullOrWhiteSpace(c.Title))
+            .Select(c => c.Title!)
+            .ToList();
+        _selectedTemplate = null;
         _dialogVisible = true;
+    }
+
+    private void OnTemplateSelected(AddTicket.TemplateItem? template)
+    {
+        _selectedTemplate = template;
+        if (template == null)
+        {
+            // Clearing the picker only drops the stashed checklist — the
+            // user may have edited the autofilled fields already.
+            _formChecklist = [];
+            return;
+        }
+
+        _formTicketSubject = template.Subject;
+        _formTicketIssue = template.Issue ?? string.Empty;
+        // Apply Type + Priority only if they're set AND match a loaded
+        // option (same guard as AddTicket).
+        if (!string.IsNullOrEmpty(template.TypeId) && _types.Any(t => t.Id == template.TypeId))
+            _formTypeId = template.TypeId;
+        if (!string.IsNullOrEmpty(template.PriorityId) && _priorities.Any(p => p.Id == template.PriorityId))
+            _formPriorityId = template.PriorityId;
+        _formChecklist = new List<string>(template.Checklist);
+    }
+
+    private void RemoveChecklistItem(int index)
+    {
+        if (index < 0 || index >= _formChecklist.Count) return;
+        _formChecklist.RemoveAt(index);
     }
 
     private async Task SaveTaskAsync()
@@ -195,17 +339,9 @@ else if (_isLoading)
             return;
         }
 
-        var data = new Dictionary<string, object?>
-        {
-            ["name"] = _formName,
-            ["description"] = _formDescription,
-            ["ticketSubject"] = _formTicketSubject,
-            ["ticketIssue"] = _formTicketIssue,
-            ["scheduleType"] = _formScheduleType,
-            ["dayOfMonth"] = _formDayOfMonth,
-            ["daysBeforeDeadline"] = _formDaysBeforeDeadline,
-            ["enabled"] = _formEnabled
-        };
+        var data = BuildPayload(_formName, _formDescription, _formTicketSubject, _formTicketIssue,
+            _formScheduleType, _formDayOfMonth, _formDaysBeforeDeadline, _formEnabled,
+            _formTypeId, _formPriorityId, _formChecklist);
 
         bool success;
         if (_editingTask != null)
@@ -259,5 +395,52 @@ else if (_isLoading)
             _ => task.ScheduleType ?? "-"
         };
         return $"{type}, {L.T("recurring.day_of_month")} {task.DayOfMonth}";
+    }
+
+    // GET may return refs populated ({_id, name}) or as bare id strings —
+    // prefer the populated name, otherwise look the id up in the loaded lists.
+    private string? ResolveTypeName(RecurringTask task)
+    {
+        if (!string.IsNullOrEmpty(task.TicketTypeName)) return Translator.Translate(task.TicketTypeName);
+        if (string.IsNullOrEmpty(task.TicketTypeId)) return null;
+        return _types.FirstOrDefault(t => t.Id == task.TicketTypeId)?.TranslatedName;
+    }
+
+    private string? ResolvePriorityName(RecurringTask task)
+    {
+        var name = task.TicketPriorityName;
+        if (string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(task.TicketPriorityId))
+            name = _priorities.FirstOrDefault(p => p.Id == task.TicketPriorityId)?.Name;
+        return string.IsNullOrEmpty(name) ? null : TrudeskTranslationHelper.TranslatePriority(name);
+    }
+
+    // Exposed for unit tests ---------------------------------------------
+
+    internal static Dictionary<string, object?> BuildPayload(
+        string name, string description, string ticketSubject, string ticketIssue,
+        string scheduleType, int dayOfMonth, int daysBeforeDeadline, bool enabled,
+        string? typeId = null, string? priorityId = null, List<string>? checklist = null)
+    {
+        return new Dictionary<string, object?>
+        {
+            ["name"] = name,
+            ["description"] = description,
+            ["ticketSubject"] = ticketSubject,
+            ["ticketIssue"] = ticketIssue,
+            ["scheduleType"] = scheduleType,
+            ["dayOfMonth"] = dayOfMonth,
+            ["daysBeforeDeadline"] = daysBeforeDeadline,
+            ["enabled"] = enabled,
+            // Explicit null unsets the ref on the server (PUT only skips
+            // undefined keys); omitting it would make clearing the select
+            // not stick on edit.
+            ["ticketType"] = string.IsNullOrWhiteSpace(typeId) ? null : typeId,
+            ["ticketPriority"] = string.IsNullOrWhiteSpace(priorityId) ? null : priorityId,
+            // Always send the checklist (even empty): the server replaces
+            // the whole array, [] clears, omitted = unchanged.
+            ["checklist"] = (checklist ?? [])
+                .Select(t => new Dictionary<string, object?> { ["title"] = t })
+                .ToList()
+        };
     }
 }
