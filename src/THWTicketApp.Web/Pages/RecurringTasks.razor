@@ -347,9 +347,9 @@ else if (_isLoading)
         _formDayOfMonth = task.DayOfMonth;
         _formDaysBeforeDeadline = task.DaysBeforeDeadline;
         _formEnabled = task.Enabled;
-        _formTypeId = task.TicketTypeId;
-        _formPriorityId = task.TicketPriorityId;
-        _formGroupId = task.TicketGroupId;
+        _formTypeId = task.TicketType?.Id;
+        _formPriorityId = task.TicketPriority?.Id;
+        _formGroupId = task.TicketGroup?.Id;
         _formChecklist = task.Checklist
             .Where(c => !string.IsNullOrWhiteSpace(c.Title))
             .Select(c => c.Title!)
@@ -491,16 +491,19 @@ else if (_isLoading)
     // prefer the populated name, otherwise look the id up in the loaded lists.
     private string? ResolveTypeName(RecurringTask task)
     {
-        if (!string.IsNullOrEmpty(task.TicketTypeName)) return Translator.Translate(task.TicketTypeName);
-        if (string.IsNullOrEmpty(task.TicketTypeId)) return null;
-        return _types.FirstOrDefault(t => t.Id == task.TicketTypeId)?.TranslatedName;
+        var typeName = task.TicketType?.Name;
+        if (!string.IsNullOrEmpty(typeName)) return Translator.Translate(typeName);
+        var typeId = task.TicketType?.Id;
+        if (string.IsNullOrEmpty(typeId)) return null;
+        return _types.FirstOrDefault(t => t.Id == typeId)?.TranslatedName;
     }
 
     private string? ResolvePriorityName(RecurringTask task)
     {
-        var name = task.TicketPriorityName;
-        if (string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(task.TicketPriorityId))
-            name = _priorities.FirstOrDefault(p => p.Id == task.TicketPriorityId)?.Name;
+        var name = task.TicketPriority?.Name;
+        var priorityId = task.TicketPriority?.Id;
+        if (string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(priorityId))
+            name = _priorities.FirstOrDefault(p => p.Id == priorityId)?.Name;
         return string.IsNullOrEmpty(name) ? null : TrudeskTranslationHelper.TranslatePriority(name);
     }
 

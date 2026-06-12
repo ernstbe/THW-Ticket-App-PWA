@@ -114,10 +114,10 @@ public class RecurringTasksTests
         var tasks = Parse(json);
 
         Assert.Single(tasks);
-        Assert.Equal("t1", tasks[0].TicketTypeId);
-        Assert.Equal("Vorfall", tasks[0].TicketTypeName);
-        Assert.Equal("p1", tasks[0].TicketPriorityId);
-        Assert.Equal("High", tasks[0].TicketPriorityName);
+        Assert.Equal("t1", tasks[0].TicketType?.Id);
+        Assert.Equal("Vorfall", tasks[0].TicketType?.Name);
+        Assert.Equal("p1", tasks[0].TicketPriority?.Id);
+        Assert.Equal("High", tasks[0].TicketPriority?.Name);
     }
 
     [Fact]
@@ -129,9 +129,9 @@ public class RecurringTasksTests
 
         var tasks = Parse(json);
 
-        Assert.Equal("t1", tasks[0].TicketTypeId);
-        Assert.Null(tasks[0].TicketTypeName);
-        Assert.Equal("p1", tasks[0].TicketPriorityId);
+        Assert.Equal("t1", tasks[0].TicketType?.Id);
+        Assert.Null(tasks[0].TicketType?.Name);
+        Assert.Equal("p1", tasks[0].TicketPriority?.Id);
     }
 
     [Fact]
@@ -143,8 +143,8 @@ public class RecurringTasksTests
 
         var tasks = Parse(json);
 
-        Assert.Null(tasks[0].TicketTypeId);
-        Assert.Null(tasks[0].TicketPriorityId);
+        Assert.Null(tasks[0].TicketType);
+        Assert.Null(tasks[0].TicketPriority);
     }
 
     [Fact]
@@ -195,10 +195,38 @@ public class RecurringTasksTests
 
         var tasks = Parse(json);
 
-        Assert.Equal("g1", tasks[0].TicketGroupId);
-        Assert.Equal("OV", tasks[0].TicketGroupName);
-        Assert.Equal("u1", tasks[0].TicketAssigneeId);
-        Assert.Equal(new List<string> { "tag1", "tag2" }, tasks[0].TicketTagIds);
+        Assert.Equal("g1", tasks[0].TicketGroup?.Id);
+        Assert.Equal("OV", tasks[0].TicketGroup?.Name);
+        Assert.Equal("u1", tasks[0].TicketAssignee?.Id);
+        Assert.Equal(new[] { "tag1", "tag2" }, tasks[0].TicketTags?.Select(t => t.Id));
+    }
+
+    [Fact]
+    public void SerializeRoundtrip_keepsRefIds()
+    {
+        // A future offline cache will serialize RecurringTask with the
+        // default serializer — the refs must survive the roundtrip.
+        const string json = """
+        {
+            "recurringTasks": [{
+                "_id":"r1","name":"W",
+                "ticketType":{"_id":"t1","name":"Vorfall"},
+                "ticketGroup":"g1",
+                "ticketPriority":null,
+                "ticketTags":[{"_id":"tag1","name":"Wartung"},"tag2"]
+            }]
+        }
+        """;
+
+        var original = Parse(json)[0];
+        var roundtripped = JsonSerializer.Deserialize<RecurringTask>(
+            JsonSerializer.Serialize(original, Options), Options)!;
+
+        Assert.Equal("t1", roundtripped.TicketType?.Id);
+        Assert.Equal("g1", roundtripped.TicketGroup?.Id);
+        Assert.Null(roundtripped.TicketPriority);
+        Assert.Null(roundtripped.TicketAssignee);
+        Assert.Equal(new[] { "tag1", "tag2" }, roundtripped.TicketTags?.Select(t => t.Id));
     }
 }
 
