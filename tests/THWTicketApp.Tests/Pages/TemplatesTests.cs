@@ -1,127 +1,34 @@
+using THWTicketApp.Shared.Models;
 using THWTicketApp.Web.Pages;
 
 namespace THWTicketApp.Tests.Pages;
 
 public class TemplatesTests
 {
+    // Template parsing moved to the shared TicketTemplateParser —
+    // see Helpers/TicketTemplateParserTests. The page only adds the
+    // priority-name translation on top.
+
     // -----------------------------------------------------------------
-    // ParseTemplates
+    // TranslatePriorityNames
     // -----------------------------------------------------------------
 
     [Fact]
-    public void ParseTemplates_emptyObject_returnsEmptyList()
+    public void TranslatePriorityNames_translatesKnownNames_keepsNulls()
     {
-        var result = Templates.ParseTemplates("{}");
-        Assert.Empty(result);
-    }
-
-    [Fact]
-    public void ParseTemplates_malformed_returnsEmptyList()
-    {
-        var result = Templates.ParseTemplates("not json");
-        Assert.Empty(result);
-    }
-
-    [Fact]
-    public void ParseTemplates_validWrappedResponse_returnsEntries()
-    {
-        const string json = """
+        var templates = new List<TicketTemplate>
         {
-            "ticketTemplates": [
-                {"_id":"1","name":"Einsatznachbereitung","subject":"Einsatz vom {date}","issue":"Vollständiger Bericht"},
-                {"_id":"2","name":"Fahrzeugausfall","subject":"Ausfall {vehicle}","issue":null}
-            ]
-        }
-        """;
+            new() { PriorityName = "High" },
+            new() { PriorityName = null },
+            new() { PriorityName = "Sondermeldung" },
+        };
 
-        var result = Templates.ParseTemplates(json);
+        Templates.TranslatePriorityNames(templates);
 
-        Assert.Equal(2, result.Count);
-        Assert.Equal("1", result[0].Id);
-        Assert.Equal("Einsatznachbereitung", result[0].Name);
-        Assert.Equal("Einsatz vom {date}", result[0].Subject);
-        Assert.Equal("Vollständiger Bericht", result[0].Issue);
-        Assert.Null(result[1].Issue);
-    }
-
-    [Fact]
-    public void ParseTemplates_populatedTypeAndPriority_extractsIdAndName()
-    {
-        const string json = """
-        {
-            "ticketTemplates": [{
-                "_id":"1","name":"T","subject":"S",
-                "ticketType":{"_id":"t1","name":"Vorfall"},
-                "priority":{"_id":"p1","name":"High"}
-            }]
-        }
-        """;
-        var result = Templates.ParseTemplates(json);
-        Assert.Equal("t1", result[0].TypeId);
-        Assert.Equal("Vorfall", result[0].TypeName);
-        Assert.Equal("p1", result[0].PriorityId);
-        Assert.Equal("Hoch", result[0].PriorityName);
-    }
-
-    [Fact]
-    public void ParseTemplates_refAsBareString_stillExtractsId()
-    {
-        const string json = """
-        {"ticketTemplates":[{"_id":"1","name":"T","subject":"S","ticketType":"t1","priority":"p1"}]}
-        """;
-        var result = Templates.ParseTemplates(json);
-        Assert.Equal("t1", result[0].TypeId);
-        Assert.Null(result[0].TypeName);
-        Assert.Equal("p1", result[0].PriorityId);
-    }
-
-    [Fact]
-    public void ParseTemplates_missingFields_returnsEmptyStrings()
-    {
-        const string json = "{\"ticketTemplates\":[{\"_id\":\"x\"}]}";
-        var result = Templates.ParseTemplates(json);
-        Assert.Single(result);
-        Assert.Equal("x", result[0].Id);
-        Assert.Equal("", result[0].Name);
-        Assert.Equal("", result[0].Subject);
-        Assert.Null(result[0].Issue);
-    }
-
-    [Fact]
-    public void ParseTemplates_checklist_extractsTitlesInOrder()
-    {
-        const string json = """
-        {
-            "ticketTemplates": [{
-                "_id":"1","name":"T","subject":"S",
-                "checklist":[
-                    {"_id":"c1","title":"Fahrzeug prüfen"},
-                    {"_id":"c2","title":"Material zählen"}
-                ]
-            }]
-        }
-        """;
-        var result = Templates.ParseTemplates(json);
-        Assert.Equal(new[] { "Fahrzeug prüfen", "Material zählen" }, result[0].Checklist);
-    }
-
-    [Fact]
-    public void ParseTemplates_missingChecklist_returnsEmptyList()
-    {
-        // Templates created before the checklist feature have no key at all.
-        const string json = """{"ticketTemplates":[{"_id":"1","name":"T","subject":"S"}]}""";
-        var result = Templates.ParseTemplates(json);
-        Assert.Empty(result[0].Checklist);
-    }
-
-    [Fact]
-    public void ParseTemplates_checklistWithBlankTitles_skipsThem()
-    {
-        const string json = """
-        {"ticketTemplates":[{"_id":"1","name":"T","subject":"S","checklist":[{"title":""},{"title":"OK"},{"_id":"x"}]}]}
-        """;
-        var result = Templates.ParseTemplates(json);
-        Assert.Equal(new[] { "OK" }, result[0].Checklist);
+        Assert.Equal("Hoch", templates[0].PriorityName);
+        Assert.Null(templates[1].PriorityName);
+        // Unknown names pass through untouched.
+        Assert.Equal("Sondermeldung", templates[2].PriorityName);
     }
 
     // -----------------------------------------------------------------
