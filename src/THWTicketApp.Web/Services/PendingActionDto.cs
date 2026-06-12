@@ -25,6 +25,11 @@ internal sealed class PendingActionDto
     public string? StatusId { get; set; }
     public string? TagId { get; set; }
     public string? DueDate { get; set; }
+    // Tri-state due date in UpdateTicketFields actions: DueDate set = change,
+    // DueDateCleared = explicitly remove the date (sync sends explicit null),
+    // neither = leave unchanged. Bool flag keeps old queued actions (without
+    // the property in IndexedDB) on the "unchanged" path after an app update.
+    public bool DueDateCleared { get; set; }
     public string? FileName { get; set; }
     public string? FileContentBase64 { get; set; }
     public string? FileContentType { get; set; }

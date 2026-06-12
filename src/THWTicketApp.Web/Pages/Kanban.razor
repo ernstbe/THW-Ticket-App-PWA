@@ -241,7 +241,7 @@ else
             <MudText Typo="Typo.body2" Style="font-weight: 600;" Class="mb-2">@item.Subject</MudText>
             @if (item.DueDate != DateTime.MinValue)
             {
-                var overdue = item.DueDate < DateTime.Now && !item.StatusIsResolved;
+                var overdue = TicketDueDateHelper.IsOverdue(item.DueDate) && !item.StatusIsResolved;
                 <MudText Typo="Typo.caption" Color="@(overdue ? Color.Error : Color.Secondary)" Class="mb-1 d-flex align-center"
                          Style="@(overdue ? "font-weight:600;" : null)">
                     <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Class="mr-1" />

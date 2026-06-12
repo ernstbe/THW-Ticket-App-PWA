@@ -16,7 +16,12 @@ public interface ISyncService
     Task EnqueueClearAssigneeAsync(string ticketId, int ticketUid, DateTime? ticketUpdatedAt = null);
     Task EnqueueSetAdditionalAssigneesAsync(string ticketId, int ticketUid, IEnumerable<string> userIds, DateTime? ticketUpdatedAt = null);
     Task EnqueueStatusAsync(string ticketId, int ticketUid, string statusId, DateTime? ticketUpdatedAt = null);
-    Task EnqueueUpdateTicketFieldsAsync(string ticketId, int ticketUid, string? subject, string? issue, string? priorityId, string? typeId, string? groupId, DateTime? dueDate, DateTime? ticketUpdatedAt = null);
+    /// <summary>
+    /// Queues a partial ticket update. <paramref name="dueDate"/> null means
+    /// "due date unchanged" — pass <paramref name="dueDateCleared"/>=true to
+    /// queue an explicit removal of the due date instead.
+    /// </summary>
+    Task EnqueueUpdateTicketFieldsAsync(string ticketId, int ticketUid, string? subject, string? issue, string? priorityId, string? typeId, string? groupId, DateTime? dueDate, DateTime? ticketUpdatedAt = null, bool dueDateCleared = false);
     Task EnqueueDeleteTicketAsync(string ticketId, int ticketUid, DateTime? ticketUpdatedAt = null);
     Task EnqueueUploadAttachmentAsync(string ticketId, int ticketUid, string fileName, byte[] fileContent, string contentType, DateTime? ticketUpdatedAt = null);
     Task EnqueueAddTagAsync(string ticketId, int ticketUid, string tagId, DateTime? ticketUpdatedAt = null);

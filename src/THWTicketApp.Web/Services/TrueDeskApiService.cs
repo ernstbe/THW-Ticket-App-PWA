@@ -492,7 +492,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         return new TicketCreateResult(string.Empty, 0);
     }
 
-    public async Task<bool> EditTicketAsync(Ticket ticket)
+    public async Task<bool> EditTicketAsync(Ticket ticket, bool includeDueDate = true)
     {
         if (ticket == null || string.IsNullOrWhiteSpace(ticket.Id))
             return false;
@@ -504,10 +504,14 @@ public class TrueDeskApiService : ITrueDeskApiService
         if (ticket.Status?.Id != null) ticketData["status"] = ticket.Status.Id;
         if (ticket.Type?.Id != null) ticketData["type"] = ticket.Type.Id;
         if (ticket.Group?.Id != null) ticketData["group"] = ticket.Group.Id;
-        // Always send dueDate: MinValue means "no due date" and must go out
-        // as an explicit null, otherwise clearing the date never reaches the
-        // server (trudesk treats a missing key as "leave unchanged").
-        ticketData["dueDate"] = ticket.DueDate == DateTime.MinValue ? null : ticket.DueDate.ToString("O");
+        // By default always send dueDate: MinValue means "no due date" and
+        // must go out as an explicit null, otherwise clearing the date never
+        // reaches the server (trudesk treats a missing key as "leave
+        // unchanged"). Partial updates replayed from the offline sync queue
+        // pass includeDueDate=false so an unrelated edit (e.g. subject-only)
+        // doesn't clobber the server-side due date.
+        if (includeDueDate)
+            ticketData["dueDate"] = ticket.DueDate == DateTime.MinValue ? null : ticket.DueDate.ToString("O");
 
         // v2 expects { ticket: {...} } wrapper, v1 expects flat object
         object payload = IsV2 ? new { ticket = ticketData } : ticketData;
