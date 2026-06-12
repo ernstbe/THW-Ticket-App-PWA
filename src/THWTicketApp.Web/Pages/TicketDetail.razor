@@ -545,7 +545,7 @@ else
                             {
                                 <div>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("detail.due")</MudText>
-                                    <MudText Typo="Typo.body2" Color="@(_ticket.DueDate < DateTime.Now ? Color.Error : Color.Default)">
+                                    <MudText Typo="Typo.body2" Color="@(TicketDueDateHelper.IsOverdue(_ticket.DueDate) ? Color.Error : Color.Default)">
                                         @_ticket.DueDate.ToLocalDisplayString("dd.MM.yyyy HH:mm")
                                     </MudText>
                                 </div>
@@ -1255,7 +1255,10 @@ else
         {
             if (!AppState.IsOnline)
             {
-                await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, null, null, newDate, updatedAt);
+                // newDate == null is an explicit clear here (the no-op guard
+                // above already returned for "unchanged") — flag it so the
+                // sync sends the same explicit null as the online path.
+                await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, null, null, newDate, updatedAt, dueDateCleared: newDate == null);
                 Snackbar.Add(L.T("offline.queued"), Severity.Info);
                 return;
             }
@@ -1268,7 +1271,7 @@ else
         }
         catch (HttpRequestException)
         {
-            await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, null, null, newDate, updatedAt);
+            await SyncService.EnqueueUpdateTicketFieldsAsync(ticketId, ticketUid, null, null, null, null, null, newDate, updatedAt, dueDateCleared: newDate == null);
             Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
@@ -1310,13 +1313,10 @@ else
     // a couple of priority names, so any admin-defined value rendered
     // grey. Reported via in-app bug 2026-05-19.
 
-    // Paint the due-date chip red when the date has already passed,
+    // Paint the due-date chip red when the due day is over (local date),
     // default otherwise (incl. no date set).
     private static Color DueDateChipColor(DateTime? due)
-    {
-        if (due == null) return Color.Default;
-        return due.Value < DateTime.Now ? Color.Error : Color.Default;
-    }
+        => TicketDueDateHelper.IsOverdue(due) ? Color.Error : Color.Default;
 
     private async Task OpenDuePickerAsync()
     {

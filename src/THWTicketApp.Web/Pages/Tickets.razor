@@ -523,7 +523,7 @@ else
             "open" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new"),
             "pending" => source.Where(t => t.Status?.IsInProgress == true),
             "closed" => source.Where(t => t.Status?.IsResolved == true || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved"),
-            "overdue" => source.Where(t => t.DueDate != DateTime.MinValue && t.DueDate < DateTime.Now && t.Status?.IsResolved != true),
+            "overdue" => source.Where(t => TicketDueDateHelper.IsOverdue(t.DueDate) && t.Status?.IsResolved != true),
             _ => source
         };
         if (_showOnlyMyTickets && !string.IsNullOrEmpty(ApiService.CurrentUserId))

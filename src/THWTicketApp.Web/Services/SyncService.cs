@@ -134,7 +134,7 @@ public class SyncService : ISyncService
             TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
         });
 
-    public Task EnqueueUpdateTicketFieldsAsync(string ticketId, int ticketUid, string? subject, string? issue, string? priorityId, string? typeId, string? groupId, DateTime? dueDate, DateTime? ticketUpdatedAt = null) =>
+    public Task EnqueueUpdateTicketFieldsAsync(string ticketId, int ticketUid, string? subject, string? issue, string? priorityId, string? typeId, string? groupId, DateTime? dueDate, DateTime? ticketUpdatedAt = null, bool dueDateCleared = false) =>
         EnqueueAsync(new PendingActionDto
         {
             ActionType = "UpdateTicketFields",
@@ -146,6 +146,7 @@ public class SyncService : ISyncService
             TypeId = typeId,
             GroupId = groupId,
             DueDate = dueDate?.ToString("O"),
+            DueDateCleared = dueDateCleared && dueDate == null,
             TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
         });
 
@@ -352,10 +353,18 @@ public class SyncService : ISyncService
             ticket.Type = new TicketType { Id = action.TypeId };
         if (!string.IsNullOrEmpty(action.GroupId))
             ticket.Group = new Group { Id = action.GroupId };
+        // Tri-state due date: DueDate set = change it, DueDateCleared = send
+        // an explicit null (ticket.DueDate stays MinValue, which
+        // EditTicketAsync serializes as null), neither = omit the key so an
+        // unrelated queued edit doesn't clobber the server-side due date.
+        var hasDueDate = false;
         if (!string.IsNullOrEmpty(action.DueDate) && DateTime.TryParse(action.DueDate, out var dd))
+        {
             ticket.DueDate = dd;
+            hasDueDate = true;
+        }
 
-        return _apiService.EditTicketAsync(ticket);
+        return _apiService.EditTicketAsync(ticket, includeDueDate: hasDueDate || action.DueDateCleared);
     }
 
     private async Task<bool> ApplyUploadAttachmentAsync(PendingActionDto action)

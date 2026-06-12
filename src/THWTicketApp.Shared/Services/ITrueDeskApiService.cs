@@ -42,7 +42,13 @@ public interface ITrueDeskApiService
     /// with completed:false).
     /// </summary>
     Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null, IReadOnlyList<string>? checklist = null);
-    Task<bool> EditTicketAsync(Ticket ticket);
+    /// <summary>
+    /// Updates ticket fields. When <paramref name="includeDueDate"/> is true
+    /// (default), dueDate is always sent — MinValue goes out as an explicit
+    /// null so the server clears the date. Pass false for partial updates
+    /// that must leave the server-side due date untouched.
+    /// </summary>
+    Task<bool> EditTicketAsync(Ticket ticket, bool includeDueDate = true);
     Task<bool> DeleteTicketAsync(string ticketId);
     Task<bool> UpdateTicketStatusAsync(string ticketId, string statusId);
 
