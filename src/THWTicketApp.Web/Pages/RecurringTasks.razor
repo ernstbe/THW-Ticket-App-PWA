@@ -2,6 +2,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using System.Text.Json
 @using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Models.Responses
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
@@ -139,18 +140,31 @@ else if (_isLoading)
         <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("recurring.ticket_template")</MudText>
         <MudTextField @bind-Value="_formTicketSubject" Label="@L.T("detail.subject")" Class="mb-2" />
         <MudTextField @bind-Value="_formTicketIssue" Label="@L.T("detail.description")" Lines="3" Class="mb-2" />
-        <MudSelect T="string" @bind-Value="_formTypeId" Label="@L.T("detail.type")" Clearable="true" Class="mb-2">
+        <MudSelect T="string" @bind-Value="_formTypeId" Label="@L.T("detail.type")" Required="true" Class="mb-2">
             @foreach (var t in _types)
             {
                 <MudSelectItem T="string" Value="@t.Id">@t.TranslatedName</MudSelectItem>
             }
         </MudSelect>
-        <MudSelect T="string" @bind-Value="_formPriorityId" Label="@L.T("detail.priority")" Clearable="true" Class="mb-2">
+        <MudSelect T="string" @bind-Value="_formPriorityId" Label="@L.T("detail.priority")" Required="true" Class="mb-2">
             @foreach (var p in _priorities)
             {
                 <MudSelectItem T="string" Value="@p.Id">@p.TranslatedName</MudSelectItem>
             }
         </MudSelect>
+        <MudSelect T="string" @bind-Value="_formGroupId" Label="@L.T("detail.group")" Required="true"
+                   RequiredError="@L.T("tickets.group_required")" Class="mb-2">
+            @foreach (var g in _groups)
+            {
+                <MudSelectItem T="string" Value="@g.Id">@g.Name</MudSelectItem>
+            }
+        </MudSelect>
+        @if (_noVisibleGroups)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                @L.T("tickets.no_visible_groups")
+            </MudAlert>
+        }
         @if (_formChecklist.Count > 0)
         {
             <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-1">
@@ -202,25 +216,37 @@ else if (_isLoading)
     private bool _formEnabled = true;
     private string? _formTypeId;
     private string? _formPriorityId;
+    private string? _formGroupId;
     private List<string> _formChecklist = [];
     private List<AddTicket.TemplateItem> _templates = [];
     private AddTicket.TemplateItem? _selectedTemplate;
     private List<TicketType> _types = [];
     private List<Priority> _priorities = [];
+    private List<Group> _groups = [];
+    private bool _noVisibleGroups;
+
+    // Snapshot of the ticket-template fields taken when the dialog opens,
+    // so clearing the template picker restores what the user started with
+    // (instead of wiping e.g. the checklist loaded from the edited task).
+    private string _stashTicketSubject = string.Empty;
+    private string _stashTicketIssue = string.Empty;
+    private string? _stashTypeId;
+    private string? _stashPriorityId;
+    private List<string> _stashChecklist = [];
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadLookupsAsync();
-        await LoadTasksAsync();
+        await Task.WhenAll(LoadTypesAsync(), LoadGroupsAsync(), LoadTemplatesAsync(), LoadTasksAsync());
     }
 
-    private async Task LoadLookupsAsync()
+    private async Task LoadTypesAsync()
     {
         try
         {
             var typesJson = await ApiService.GetTicketTypesAsync();
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var types = JsonSerializer.Deserialize<TicketType[]>(typesJson, options);
+            var types = JsonSerializer.Deserialize<TicketType[]>(typesJson, JsonOptions);
             if (types != null)
             {
                 _types = types.ToList();
@@ -229,10 +255,37 @@ else if (_isLoading)
         }
         catch
         {
-            // Backend unreachable — type/priority selects stay empty, tasks
-            // can still be managed with the free-text fields.
+            // Type/priority are required on save — tell the user the
+            // reference data is missing instead of failing silently later.
+            Snackbar.Add(L.T("tickets.form_load_error"), Severity.Error);
         }
+    }
 
+    private async Task LoadGroupsAsync()
+    {
+        try
+        {
+            // Same visibility scoping as AddTicket: restrict the dropdown to
+            // the groups the profile can reach; fall back to the raw list if
+            // the profile lookup failed (the server check is the real gate).
+            var groupsTask = ApiService.GetGroupsAsync();
+            var profileTask = ApiService.GetCurrentUserProfileAsync();
+            await Task.WhenAll(groupsTask, profileTask);
+
+            var groupResponse = JsonSerializer.Deserialize<GetGroupResponse>(groupsTask.Result, JsonOptions);
+            var rawGroups = groupResponse?.Groups ?? new List<Group>();
+            var visibleGroupIds = profileTask.Result?.Groups;
+            _groups = AddTicket.FilterGroupsByVisibility(rawGroups, visibleGroupIds);
+            _noVisibleGroups = visibleGroupIds != null && _groups.Count == 0;
+        }
+        catch
+        {
+            Snackbar.Add(L.T("tickets.form_load_error"), Severity.Error);
+        }
+    }
+
+    private async Task LoadTemplatesAsync()
+    {
         try
         {
             var templatesJson = await ApiService.GetTicketTemplatesAsync();
@@ -252,8 +305,7 @@ else if (_isLoading)
         try
         {
             var json = await ApiService.GetRecurringTasksAsync();
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            _tasks = JsonHelper.DeserializeWrappedArray<RecurringTask>(json, "recurringTasks", options);
+            _tasks = JsonHelper.DeserializeWrappedArray<RecurringTask>(json, "recurringTasks");
         }
         catch (Exception ex)
         {
@@ -277,12 +329,14 @@ else if (_isLoading)
         _formEnabled = true;
         _formTypeId = null;
         _formPriorityId = null;
+        _formGroupId = _groups.Count > 0 ? _groups[0].Id : null;
         _formChecklist = [];
         _selectedTemplate = null;
+        StashFormState();
         _dialogVisible = true;
     }
 
-    private void ShowEditDialog(RecurringTask task)
+    internal void ShowEditDialog(RecurringTask task)
     {
         _editingTask = task;
         _formName = task.Name ?? string.Empty;
@@ -295,22 +349,38 @@ else if (_isLoading)
         _formEnabled = task.Enabled;
         _formTypeId = task.TicketTypeId;
         _formPriorityId = task.TicketPriorityId;
+        _formGroupId = task.TicketGroupId;
         _formChecklist = task.Checklist
             .Where(c => !string.IsNullOrWhiteSpace(c.Title))
             .Select(c => c.Title!)
             .ToList();
         _selectedTemplate = null;
+        StashFormState();
         _dialogVisible = true;
     }
 
-    private void OnTemplateSelected(AddTicket.TemplateItem? template)
+    private void StashFormState()
+    {
+        _stashTicketSubject = _formTicketSubject;
+        _stashTicketIssue = _formTicketIssue;
+        _stashTypeId = _formTypeId;
+        _stashPriorityId = _formPriorityId;
+        _stashChecklist = new List<string>(_formChecklist);
+    }
+
+    internal void OnTemplateSelected(AddTicket.TemplateItem? template)
     {
         _selectedTemplate = template;
         if (template == null)
         {
-            // Clearing the picker only drops the stashed checklist — the
-            // user may have edited the autofilled fields already.
-            _formChecklist = [];
+            // Clearing the picker restores the state captured when the
+            // dialog opened — on edit that's the task's own checklist,
+            // which must not be wiped (BuildPayload always sends it).
+            _formTicketSubject = _stashTicketSubject;
+            _formTicketIssue = _stashTicketIssue;
+            _formTypeId = _stashTypeId;
+            _formPriorityId = _stashPriorityId;
+            _formChecklist = new List<string>(_stashChecklist);
             return;
         }
 
@@ -339,9 +409,29 @@ else if (_isLoading)
             return;
         }
 
-        var data = BuildPayload(_formName, _formDescription, _formTicketSubject, _formTicketIssue,
-            _formScheduleType, _formDayOfMonth, _formDaysBeforeDeadline, _formEnabled,
-            _formTypeId, _formPriorityId, _formChecklist);
+        // ticketType/ticketPriority/ticketGroup are required:true on the
+        // server schema — a missing one would fail the save with a 500.
+        if (string.IsNullOrWhiteSpace(_formTypeId) ||
+            string.IsNullOrWhiteSpace(_formPriorityId) ||
+            string.IsNullOrWhiteSpace(_formGroupId))
+        {
+            Snackbar.Add(L.T("recurring.refs_required"), Severity.Warning);
+            return;
+        }
+
+        var data = BuildPayload(
+            name: _formName,
+            description: _formDescription,
+            ticketSubject: _formTicketSubject,
+            ticketIssue: _formTicketIssue,
+            scheduleType: _formScheduleType,
+            dayOfMonth: _formDayOfMonth,
+            daysBeforeDeadline: _formDaysBeforeDeadline,
+            enabled: _formEnabled,
+            typeId: _formTypeId,
+            priorityId: _formPriorityId,
+            groupId: _formGroupId,
+            checklist: _formChecklist);
 
         bool success;
         if (_editingTask != null)
@@ -416,12 +506,16 @@ else if (_isLoading)
 
     // Exposed for unit tests ---------------------------------------------
 
+    internal IReadOnlyList<string> FormChecklistForTests => _formChecklist;
+    internal string FormTicketSubjectForTests => _formTicketSubject;
+
     internal static Dictionary<string, object?> BuildPayload(
         string name, string description, string ticketSubject, string ticketIssue,
         string scheduleType, int dayOfMonth, int daysBeforeDeadline, bool enabled,
-        string? typeId = null, string? priorityId = null, List<string>? checklist = null)
+        string? typeId = null, string? priorityId = null, string? groupId = null,
+        List<string>? checklist = null)
     {
-        return new Dictionary<string, object?>
+        var payload = new Dictionary<string, object?>
         {
             ["name"] = name,
             ["description"] = description,
@@ -431,16 +525,17 @@ else if (_isLoading)
             ["dayOfMonth"] = dayOfMonth,
             ["daysBeforeDeadline"] = daysBeforeDeadline,
             ["enabled"] = enabled,
-            // Explicit null unsets the ref on the server (PUT only skips
-            // undefined keys); omitting it would make clearing the select
-            // not stick on edit.
-            ["ticketType"] = string.IsNullOrWhiteSpace(typeId) ? null : typeId,
-            ["ticketPriority"] = string.IsNullOrWhiteSpace(priorityId) ? null : priorityId,
             // Always send the checklist (even empty): the server replaces
             // the whole array, [] clears, omitted = unchanged.
             ["checklist"] = (checklist ?? [])
                 .Select(t => new Dictionary<string, object?> { ["title"] = t })
                 .ToList()
         };
+        // ticketType/ticketPriority/ticketGroup are required:true on the
+        // server — never send null (it fails validation); omit instead.
+        if (!string.IsNullOrWhiteSpace(typeId)) payload["ticketType"] = typeId;
+        if (!string.IsNullOrWhiteSpace(priorityId)) payload["ticketPriority"] = priorityId;
+        if (!string.IsNullOrWhiteSpace(groupId)) payload["ticketGroup"] = groupId;
+        return payload;
     }
 }

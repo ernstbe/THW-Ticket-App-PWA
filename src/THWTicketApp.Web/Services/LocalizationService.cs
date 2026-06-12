@@ -311,6 +311,7 @@ public class LocalizationService
         ["recurring.next_run"] = "Nächste Ausführung",
         ["recurring.none"] = "Keine wiederkehrenden Aufgaben.",
         ["recurring.name_required"] = "Name ist erforderlich.",
+        ["recurring.refs_required"] = "Bitte Typ, Priorität und Gruppe wählen.",
         ["recurring.delete_confirm"] = "Aufgabe wirklich löschen?",
 
         // Reports
@@ -1057,6 +1058,7 @@ public class LocalizationService
         ["recurring.next_run"] = "Next Run",
         ["recurring.none"] = "No recurring tasks.",
         ["recurring.name_required"] = "Name is required.",
+        ["recurring.refs_required"] = "Please select a type, priority and group.",
         ["recurring.delete_confirm"] = "Really delete task",
 
         // Reports

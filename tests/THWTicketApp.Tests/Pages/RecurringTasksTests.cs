@@ -1,7 +1,15 @@
 using System.Text.Json;
+using Bunit;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
+using MudBlazor.Services;
+using NSubstitute;
 using THWTicketApp.Shared.Helpers;
 using THWTicketApp.Shared.Models;
+using THWTicketApp.Shared.Services;
 using THWTicketApp.Web.Pages;
+using THWTicketApp.Web.Services;
 
 namespace THWTicketApp.Tests.Pages;
 
@@ -15,7 +23,8 @@ public class RecurringTasksTests
     public void BuildPayload_includesAllBaseFields()
     {
         var payload = RecurringTasks.BuildPayload(
-            "Wartung", "Beschreibung", "Betreff", "Inhalt", "monthly", 15, 7, true);
+            "Wartung", "Beschreibung", "Betreff", "Inhalt", "monthly", 15, 7, true,
+            "type-1", "prio-1", "group-1");
 
         Assert.Equal("Wartung", payload["name"]);
         Assert.Equal("Beschreibung", payload["description"]);
@@ -25,33 +34,35 @@ public class RecurringTasksTests
         Assert.Equal(15, payload["dayOfMonth"]);
         Assert.Equal(7, payload["daysBeforeDeadline"]);
         Assert.Equal(true, payload["enabled"]);
+        Assert.Equal("group-1", payload["ticketGroup"]);
     }
 
     [Fact]
-    public void BuildPayload_typeAndPriority_includedWhenSet()
+    public void BuildPayload_typePriorityAndGroup_includedWhenSet()
     {
         var payload = RecurringTasks.BuildPayload("N", "", "S", "", "monthly", 1, 7, true,
-            "type-1", "prio-1");
+            "type-1", "prio-1", "group-1");
 
         Assert.Equal("type-1", payload["ticketType"]);
         Assert.Equal("prio-1", payload["ticketPriority"]);
+        Assert.Equal("group-1", payload["ticketGroup"]);
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void BuildPayload_blankTypeAndPriority_sentAsExplicitNull(string? blank)
+    public void BuildPayload_blankRefs_keysOmitted(string? blank)
     {
-        // The trudesk update controller only skips undefined keys — an
-        // explicit null is required to unset a previously stored ref.
+        // ticketType/ticketPriority/ticketGroup are required:true on the
+        // server schema — sending an explicit null fails validation with
+        // a 500, so blank selections must omit the key entirely.
         var payload = RecurringTasks.BuildPayload("N", "", "S", "", "monthly", 1, 7, true,
-            blank, blank);
+            blank, blank, blank);
 
-        Assert.True(payload.ContainsKey("ticketType"));
-        Assert.Null(payload["ticketType"]);
-        Assert.True(payload.ContainsKey("ticketPriority"));
-        Assert.Null(payload["ticketPriority"]);
+        Assert.False(payload.ContainsKey("ticketType"));
+        Assert.False(payload.ContainsKey("ticketPriority"));
+        Assert.False(payload.ContainsKey("ticketGroup"));
     }
 
     [Fact]
@@ -188,5 +199,84 @@ public class RecurringTasksTests
         Assert.Equal("OV", tasks[0].TicketGroupName);
         Assert.Equal("u1", tasks[0].TicketAssigneeId);
         Assert.Equal(new List<string> { "tag1", "tag2" }, tasks[0].TicketTagIds);
+    }
+}
+
+/// <summary>
+/// bUnit tests for the dialog's template-stash behavior: clearing the
+/// template picker must restore the state from when the dialog opened,
+/// not wipe it (BuildPayload always sends the checklist — [] clears it
+/// server-side).
+/// </summary>
+public class RecurringTasksComponentTests : BunitContext, IAsyncLifetime
+{
+    private readonly ITrueDeskApiService _api;
+
+    public RecurringTasksComponentTests()
+    {
+        _api = Substitute.For<ITrueDeskApiService>();
+        _api.GetTicketTypesAsync().Returns("[]");
+        _api.GetTicketTemplatesAsync().Returns("""{"ticketTemplates":[]}""");
+        _api.GetGroupsAsync().Returns("""{"success":true,"groups":[{"_id":"g1","name":"OV"}]}""");
+        _api.GetRecurringTasksAsync().Returns("""{"recurringTasks":[]}""");
+        _api.GetCurrentUserProfileAsync().Returns(Task.FromResult<UserProfile?>(null));
+
+        var jsRuntime = Substitute.For<IJSRuntime>();
+        var localStorage = new LocalStorageService(jsRuntime);
+
+        Services.AddMudServices();
+        Services.AddSingleton(_api);
+        Services.AddSingleton(new LocalizationService(localStorage));
+        Services.AddAuthorizationCore();
+        Services.AddSingleton<AuthenticationStateProvider>(new AlwaysAuthenticatedProvider());
+
+        JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    // Route xUnit's cleanup through BunitContext.DisposeAsync (see
+    // SyncConflictsTests for the bunit 2.x rationale).
+    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+    Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
+
+    [Fact]
+    public async Task ClearingTemplate_onEdit_restoresOriginalChecklistAndSubject()
+    {
+        var cut = Render<RecurringTasks>();
+        var task = new RecurringTask
+        {
+            Id = "r1",
+            Name = "Wartung",
+            TicketSubject = "Original-Betreff",
+            Checklist = [new RecurringTaskChecklistItem { Title = "Original-Punkt" }]
+        };
+
+        await cut.InvokeAsync(() => cut.Instance.ShowEditDialog(task));
+
+        var template = new AddTicket.TemplateItem
+        {
+            Name = "Vorlage",
+            Subject = "Vorlagen-Betreff",
+            Checklist = ["Vorlagen-Punkt"]
+        };
+        await cut.InvokeAsync(() => cut.Instance.OnTemplateSelected(template));
+
+        Assert.Equal(new[] { "Vorlagen-Punkt" }, cut.Instance.FormChecklistForTests);
+        Assert.Equal("Vorlagen-Betreff", cut.Instance.FormTicketSubjectForTests);
+
+        await cut.InvokeAsync(() => cut.Instance.OnTemplateSelected(null));
+
+        Assert.Equal(new[] { "Original-Punkt" }, cut.Instance.FormChecklistForTests);
+        Assert.Equal("Original-Betreff", cut.Instance.FormTicketSubjectForTests);
+    }
+
+    private sealed class AlwaysAuthenticatedProvider : AuthenticationStateProvider
+    {
+        public override Task<AuthenticationState> GetAuthenticationStateAsync()
+        {
+            var identity = new System.Security.Claims.ClaimsIdentity(
+                [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "test")],
+                "test");
+            return Task.FromResult(new AuthenticationState(new System.Security.Claims.ClaimsPrincipal(identity)));
+        }
     }
 }
