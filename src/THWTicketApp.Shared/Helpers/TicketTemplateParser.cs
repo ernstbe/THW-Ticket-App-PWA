@@ -21,18 +21,18 @@ public static class TicketTemplateParser
             var list = new List<TicketTemplate>();
             foreach (var el in arr.EnumerateArray())
             {
-                var (typeId, typeName) = ExtractRef(el, "ticketType");
-                var (priorityId, priorityName) = ExtractRef(el, "priority");
+                var typeRef = ExtractRef(el, "ticketType");
+                var priorityRef = ExtractRef(el, "priority");
                 list.Add(new TicketTemplate
                 {
                     Id = el.TryGetProperty("_id", out var idEl) ? idEl.GetString() ?? "" : "",
                     Name = el.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "",
                     Subject = el.TryGetProperty("subject", out var subjEl) ? subjEl.GetString() ?? "" : "",
                     Issue = el.TryGetProperty("issue", out var issueEl) ? issueEl.GetString() : null,
-                    TypeId = typeId,
-                    TypeName = typeName,
-                    PriorityId = priorityId,
-                    PriorityName = priorityName,
+                    TypeId = typeRef?.Id,
+                    TypeName = typeRef?.Name,
+                    PriorityId = priorityRef?.Id,
+                    PriorityName = priorityRef?.Name,
                     Checklist = ExtractChecklistTitles(el)
                 });
             }
@@ -45,18 +45,12 @@ public static class TicketTemplateParser
     }
 
     // trudesk populiert Refs als Objekt mit _id + name, kann aber auch
-    // ein einfacher ObjectId-String oder null sein. Beide Formen toleriert.
-    private static (string? id, string? name) ExtractRef(JsonElement parent, string property)
+    // ein einfacher ObjectId-String oder null sein. PopulatedRefConverter
+    // (am Typ registriert) toleriert beide Formen.
+    private static PopulatedRef? ExtractRef(JsonElement parent, string property)
     {
-        if (!parent.TryGetProperty(property, out var el)) return (null, null);
-        if (el.ValueKind == JsonValueKind.String) return (el.GetString(), null);
-        if (el.ValueKind == JsonValueKind.Object)
-        {
-            var id = el.TryGetProperty("_id", out var idEl) ? idEl.GetString() : null;
-            var name = el.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
-            return (id, name);
-        }
-        return (null, null);
+        if (!parent.TryGetProperty(property, out var el)) return null;
+        return JsonSerializer.Deserialize<PopulatedRef>(el.GetRawText());
     }
 
     // Templates created before the checklist feature have no `checklist`
