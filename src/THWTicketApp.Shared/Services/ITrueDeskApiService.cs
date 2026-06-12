@@ -33,13 +33,15 @@ public interface ITrueDeskApiService
     /// <summary>
     /// Creates a ticket and returns its id + uid on success, or null on
     /// failure. Used by AddTicket to chain follow-up calls (attachment
-    /// uploads via _id, checklist items via uid) from the same form
-    /// submission. Offline queue replay treats any non-null result as
-    /// success. On parse trouble the create still counts as success and
-    /// returns an empty Id / zero Uid — callers needing either value must
-    /// check explicitly.
+    /// uploads via _id) from the same form submission. Offline queue
+    /// replay treats any non-null result as success. On parse trouble the
+    /// create still counts as success and returns an empty Id / zero Uid —
+    /// callers needing either value must check explicitly.
+    /// `checklist` titles ride along in the create payload (trudesk
+    /// validates `checklist` on the ticketsV2 create and stores the items
+    /// with completed:false).
     /// </summary>
-    Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null);
+    Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null, IReadOnlyList<string>? checklist = null);
     Task<bool> EditTicketAsync(Ticket ticket);
     Task<bool> DeleteTicketAsync(string ticketId);
     Task<bool> UpdateTicketStatusAsync(string ticketId, string statusId);

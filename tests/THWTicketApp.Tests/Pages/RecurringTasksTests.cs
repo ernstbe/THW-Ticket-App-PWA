@@ -252,7 +252,7 @@ public class RecurringTasksComponentTests : BunitContext, IAsyncLifetime
 
         await cut.InvokeAsync(() => cut.Instance.ShowEditDialog(task));
 
-        var template = new AddTicket.TemplateItem
+        var template = new TicketTemplate
         {
             Name = "Vorlage",
             Subject = "Vorlagen-Betreff",

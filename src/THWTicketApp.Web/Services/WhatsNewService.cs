@@ -42,6 +42,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(3, "12.06.2026", "Wiederkehrende Aufgaben: Korrekturen",
         [
             "Gruppen-Auswahl für wiederkehrende Aufgaben: Im Dialog kann jetzt die Gruppe des erzeugten Tickets gewählt werden — das Anlegen neuer Aufgaben funktioniert damit zuverlässig."
+        ]),
+        new WhatsNewEntry(4, "12.06.2026", "Checklisten aus Vorlagen",
+        [
+            "Checklisten aus Vorlagen werden jetzt direkt beim Erstellen des Tickets angelegt — auch bei Offline-Ticketerstellung gehen sie nicht mehr verloren."
         ])
     ];
 
