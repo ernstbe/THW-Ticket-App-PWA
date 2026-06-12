@@ -191,7 +191,11 @@ else
                         : (el.TryGetProperty("resourceUid", out var uidStrEl) && uidStrEl.ValueKind == JsonValueKind.String
                             ? uidStrEl.GetString()
                             : null),
-                    IsOverdue = type == "ticket-deadline" && start != DateTime.MinValue && start.ToUniversalTime() < clock
+                    // Day-based overdue semantics (see TicketDueDateHelper):
+                    // a deadline counts as overdue only once its local due
+                    // day is over, not from the stored UTC-midnight instant.
+                    IsOverdue = type == "ticket-deadline" && start != DateTime.MinValue
+                        && TicketDueDateHelper.IsOverdue(start, clock)
                 });
             }
             return list;

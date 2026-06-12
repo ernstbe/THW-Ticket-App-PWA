@@ -359,7 +359,7 @@ else
                 t.Assignee?.Username?.Equals(username, StringComparison.OrdinalIgnoreCase) == true
                 || (!string.IsNullOrEmpty(userId) && t.AdditionalAssignees.Any(a => a.Id == userId)));
         _overdueTickets = _allTickets.Count(t =>
-            t.DueDate != DateTime.MinValue && t.DueDate < DateTime.Now && t.Status?.IsResolved != true);
+            TicketDueDateHelper.IsOverdue(t.DueDate) && t.Status?.IsResolved != true);
 
         _ticketsPerGroup = _allTickets
             .Where(t => t.Group != null && !string.IsNullOrEmpty(t.Group.Name))

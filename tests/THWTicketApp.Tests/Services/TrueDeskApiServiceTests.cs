@@ -457,6 +457,18 @@ public class TrueDeskApiServiceTests
         Assert.Contains("\"dueDate\":null", LastBody);
     }
 
+    [Fact]
+    public async Task EditTicketAsync_omitsDueDateWhenExcluded()
+    {
+        // Partial updates from the offline sync queue must not touch the
+        // server-side due date — the key has to be absent entirely.
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.EditTicketAsync(new Shared.Models.Ticket { Id = "t1", Subject = "S" }, includeDueDate: false);
+
+        Assert.True(ok);
+        Assert.DoesNotContain("dueDate", LastBody);
+    }
+
     // -----------------------------------------------------------------
     // Overdue (v2)
     // -----------------------------------------------------------------

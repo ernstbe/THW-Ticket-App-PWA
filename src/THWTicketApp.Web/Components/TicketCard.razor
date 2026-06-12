@@ -59,7 +59,7 @@
                     }
                     @if (Ticket.DueDate != DateTime.MinValue)
                     {
-                        var overdue = Ticket.DueDate < DateTime.Now && Ticket.Status?.IsResolved != true;
+                        var overdue = TicketDueDateHelper.IsOverdue(Ticket.DueDate) && Ticket.Status?.IsResolved != true;
                         <MudText Typo="Typo.caption" Color="@(overdue ? Color.Error : Color.Default)"
                                  Style="@(overdue ? "font-weight:600;" : null)">
                             <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Class="mr-1" />

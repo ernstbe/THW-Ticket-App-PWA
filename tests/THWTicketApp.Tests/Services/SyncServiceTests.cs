@@ -101,6 +101,40 @@ public class SyncServiceTests
         Assert.Equal("tt1", dto.TypeId);
         Assert.Equal("g1", dto.GroupId);
         Assert.Equal(due, DateTime.Parse(dto.DueDate!).ToUniversalTime());
+        Assert.False(dto.DueDateCleared);
+    }
+
+    [Fact]
+    public async Task EnqueueUpdateTicketFieldsAsync_dueDateClearedSetsFlag()
+    {
+        var dto = await CaptureEnqueuedAsync(() =>
+            _sut.EnqueueUpdateTicketFieldsAsync("t1", 1001, null, null, null, null, null, null, null, dueDateCleared: true));
+
+        Assert.Equal("UpdateTicketFields", dto.ActionType);
+        Assert.Null(dto.DueDate);
+        Assert.True(dto.DueDateCleared);
+    }
+
+    [Fact]
+    public async Task EnqueueUpdateTicketFieldsAsync_nullDueDateWithoutClearFlag_meansUnchanged()
+    {
+        var dto = await CaptureEnqueuedAsync(() =>
+            _sut.EnqueueUpdateTicketFieldsAsync("t1", 1001, "subj", null, null, null, null, null));
+
+        Assert.Null(dto.DueDate);
+        Assert.False(dto.DueDateCleared);
+    }
+
+    [Fact]
+    public void PendingActionDto_withoutDueDateClearedProperty_deserializesAsFalse()
+    {
+        // Backwards compatibility: actions queued in IndexedDB before the
+        // flag existed must keep behaving like "due date unchanged".
+        var dto = DeserializeEnqueued(
+            "{\"id\":1,\"actionType\":\"UpdateTicketFields\",\"ticketId\":\"t1\",\"ticketUid\":1001,\"subject\":\"s\"}");
+
+        Assert.False(dto.DueDateCleared);
+        Assert.Null(dto.DueDate);
     }
 
     [Fact]
@@ -194,10 +228,13 @@ public class SyncServiceTests
             TypeId = "tt1",
             GroupId = "g1"
         });
-        _api.EditTicketAsync(Arg.Any<Ticket>()).Returns(true);
+        _api.EditTicketAsync(Arg.Any<Ticket>(), Arg.Any<bool>()).Returns(true);
 
         await _sut.SyncPendingActionsAsync();
 
+        // No DueDate and no clear flag — the apply must NOT touch the
+        // server-side due date (includeDueDate: false), otherwise an
+        // unrelated queued edit clobbers it to null.
         await _api.Received(1).EditTicketAsync(Arg.Is<Ticket>(t =>
             t.Id == "t1" &&
             t.Uid == 1001 &&
@@ -205,7 +242,50 @@ public class SyncServiceTests
             t.Issue == "body" &&
             t.Priority!.Id == "p1" &&
             t.Type!.Id == "tt1" &&
-            t.Group!.Id == "g1"));
+            t.Group!.Id == "g1"), false);
+    }
+
+    [Fact]
+    public async Task Sync_updateTicketFieldsWithDueDate_sendsDueDate()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 7,
+            ActionType = "UpdateTicketFields",
+            TicketId = "t1",
+            TicketUid = 1001,
+            DueDate = "2030-01-15T00:00:00.0000000Z"
+        });
+        _api.EditTicketAsync(Arg.Any<Ticket>(), Arg.Any<bool>()).Returns(true);
+
+        await _sut.SyncPendingActionsAsync();
+
+        await _api.Received(1).EditTicketAsync(Arg.Is<Ticket>(t =>
+            t.Id == "t1" &&
+            t.DueDate.ToUniversalTime() == new DateTime(2030, 1, 15, 0, 0, 0, DateTimeKind.Utc)), true);
+    }
+
+    [Fact]
+    public async Task Sync_updateTicketFieldsWithDueDateCleared_sendsExplicitClear()
+    {
+        // An offline "remove due date" must arrive at the API exactly like
+        // the online path: EditTicketAsync with DueDate == MinValue and
+        // includeDueDate true, which serializes dueDate as explicit null.
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 8,
+            ActionType = "UpdateTicketFields",
+            TicketId = "t1",
+            TicketUid = 1001,
+            DueDateCleared = true
+        });
+        _api.EditTicketAsync(Arg.Any<Ticket>(), Arg.Any<bool>()).Returns(true);
+
+        await _sut.SyncPendingActionsAsync();
+
+        await _api.Received(1).EditTicketAsync(Arg.Is<Ticket>(t =>
+            t.Id == "t1" && t.DueDate == DateTime.MinValue), true);
+        await _db.Received(1).RemovePendingActionAsync(8);
     }
 
     [Fact]

@@ -364,12 +364,13 @@
         {
             if (t.Status?.IsResolved == true)
             {
-                if (t.ClosedDate.HasValue && t.ClosedDate.Value <= t.DueDate) met++;
+                // Day-based: closing on the due day itself still counts as met.
+                if (t.ClosedDate.HasValue && !TicketDueDateHelper.IsOverdue(t.DueDate, t.ClosedDate.Value)) met++;
                 else breached++;
             }
             else
             {
-                if (t.DueDate < DateTime.Now) breached++;
+                if (TicketDueDateHelper.IsOverdue(t.DueDate)) breached++;
                 else if (t.DueDate < DateTime.Now.AddHours(24)) atRisk++;
                 else met++;
             }
