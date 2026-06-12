@@ -46,6 +46,11 @@ public sealed class WhatsNewService
         new WhatsNewEntry(4, "12.06.2026", "Checklisten aus Vorlagen",
         [
             "Checklisten aus Vorlagen werden jetzt direkt beim Erstellen des Tickets angelegt — auch bei Offline-Ticketerstellung gehen sie nicht mehr verloren."
+        ]),
+        new WhatsNewEntry(5, "12.06.2026", "Prioritäten-Auswahl verbessert",
+        [
+            "Die Prioritäten-Auswahl passt sich dem gewählten Tickettyp an: Beim Erstellen von Tickets und wiederkehrenden Aufgaben stehen nur noch Prioritäten zur Wahl, die der Typ auch vorsieht.",
+            "Prioritäts-Bezeichnungen werden jetzt überall einheitlich übersetzt — auch eigene Prioritäten wie „Very High“ erscheinen nun auf Deutsch."
         ])
     ];
 

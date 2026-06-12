@@ -8,6 +8,7 @@
 @using THWTicketApp.Shared.Models.Responses
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
+@inject ILookupService Lookup
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.LocalizationService L
@@ -82,7 +83,7 @@ else
 
         <MudGrid>
             <MudItem xs="12" sm="6">
-                <MudSelect T="TicketType" @bind-Value="_selectedType" Label="@L.T("detail.type")" Variant="Variant.Outlined"
+                <MudSelect T="TicketType" Value="_selectedType" ValueChanged="OnTypeChanged" Label="@L.T("detail.type")" Variant="Variant.Outlined"
                            ToStringFunc="@(t => t?.TranslatedName ?? "")" Class="mb-4">
                     @foreach (var type in _ticketTypes)
                     {
@@ -216,6 +217,9 @@ else
     private User? _selectedAssignee;
     private DateTime? _dueDate;
     private List<TicketType> _ticketTypes = [];
+    // Union of all priorities across types (fallback when a type defines
+    // none of its own); _priorities is the filtered list the select renders.
+    private List<Priority> _allPriorities = [];
     private List<Priority> _priorities = [];
     private List<Group> _groups = [];
     private List<User> _users = [];
@@ -354,26 +358,21 @@ else
             // filter uses (see PR #144). Server-side enforcement landed in
             // trudesk PR #97; this just stops users from picking a group
             // that would 403 on submit.
-            var typesTask = ApiService.GetTicketTypesAsync();
+            var lookupTask = Lookup.GetTypesAndPrioritiesAsync();
             var groupsTask = ApiService.GetGroupsAsync();
             var profileTask = ApiService.GetCurrentUserProfileAsync();
-            await Task.WhenAll(typesTask, groupsTask, profileTask);
+            await Task.WhenAll(lookupTask, groupsTask, profileTask);
 
-            // Types + Priorities
-            var types = JsonSerializer.Deserialize<TicketType[]>(typesTask.Result, options);
-            if (types != null)
-            {
-                _ticketTypes = types.ToList();
-                _priorities = types.SelectMany(t => t.Priorities)
-                    .DistinctBy(p => p.Id).ToList();
-                // Match against the original (English) name before the loop below
-                // mutates Name to its German translation.
-                _selectedPriority = _priorities.FirstOrDefault(p =>
-                    string.Equals(p.Name, "Normal", StringComparison.OrdinalIgnoreCase));
-                foreach (var p in _priorities)
-                    p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
-                if (_ticketTypes.Count > 0) _selectedType = _ticketTypes[0];
-            }
+            // Types + Priorities — cached lookup, raw server names; the
+            // select renders TranslatedName, so no Name mutation here.
+            var (types, allPriorities) = lookupTask.Result;
+            _ticketTypes = types.ToList();
+            _allPriorities = allPriorities.ToList();
+            if (_ticketTypes.Count > 0) _selectedType = _ticketTypes[0];
+            _priorities = TypePriorityCoupling.PrioritiesForType(_selectedType, _allPriorities);
+            // Match by the raw (English) server name — Name stays untranslated.
+            _selectedPriority = _priorities.FirstOrDefault(p =>
+                string.Equals(p.Name, "Normal", StringComparison.OrdinalIgnoreCase));
 
             // Groups — filter to the visible set when we have a profile;
             // fall back to the raw list if the profile lookup failed so the
@@ -513,6 +512,16 @@ else
         return $"{bytes / (1024.0 * 1024):0.#} MB";
     }
 
+    // Couple the priority dropdown to the selected type: only offer the
+    // priorities the type actually configures (union as fallback) and drop
+    // a selection the new type doesn't know.
+    private void OnTypeChanged(TicketType? type)
+    {
+        _selectedType = type;
+        _priorities = TypePriorityCoupling.PrioritiesForType(type, _allPriorities);
+        _selectedPriority = TypePriorityCoupling.EnsureSelected(_priorities, _selectedPriority);
+    }
+
     private void OnTemplateSelected(TicketTemplate? template)
     {
         if (template == null)
@@ -531,10 +540,12 @@ else
         if (!string.IsNullOrEmpty(template.TypeId))
         {
             var match = _ticketTypes.FirstOrDefault(t => t.Id == template.TypeId);
-            if (match != null) _selectedType = match;
+            if (match != null) OnTypeChanged(match); // re-filters priorities too
         }
         if (!string.IsNullOrEmpty(template.PriorityId))
         {
+            // Validate against the priorities of the type just applied,
+            // not the cross-type union.
             var match = _priorities.FirstOrDefault(p => p.Id == template.PriorityId);
             if (match != null) _selectedPriority = match;
         }

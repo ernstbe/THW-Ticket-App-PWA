@@ -6,6 +6,7 @@
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
 @inject ITrueDeskApiService ApiService
+@inject ILookupService Lookup
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject THWTicketApp.Web.Services.LocalizationService L
@@ -140,14 +141,14 @@ else if (_isLoading)
         <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("recurring.ticket_template")</MudText>
         <MudTextField @bind-Value="_formTicketSubject" Label="@L.T("detail.subject")" Class="mb-2" />
         <MudTextField @bind-Value="_formTicketIssue" Label="@L.T("detail.description")" Lines="3" Class="mb-2" />
-        <MudSelect T="string" @bind-Value="_formTypeId" Label="@L.T("detail.type")" Required="true" Class="mb-2">
+        <MudSelect T="string" Value="_formTypeId" ValueChanged="OnTypeChanged" Label="@L.T("detail.type")" Required="true" Class="mb-2">
             @foreach (var t in _types)
             {
                 <MudSelectItem T="string" Value="@t.Id">@t.TranslatedName</MudSelectItem>
             }
         </MudSelect>
         <MudSelect T="string" @bind-Value="_formPriorityId" Label="@L.T("detail.priority")" Required="true" Class="mb-2">
-            @foreach (var p in _priorities)
+            @foreach (var p in _availablePriorities)
             {
                 <MudSelectItem T="string" Value="@p.Id">@p.TranslatedName</MudSelectItem>
             }
@@ -209,7 +210,10 @@ else if (_isLoading)
     private List<TicketTemplate> _templates = [];
     private TicketTemplate? _selectedTemplate;
     private List<TicketType> _types = [];
+    // Union of all priorities across types; the dialog renders the
+    // type-filtered _availablePriorities (union as fallback).
     private List<Priority> _priorities = [];
+    private List<Priority> _availablePriorities = [];
     private List<Group> _groups = [];
     private bool _noVisibleGroups;
 
@@ -233,13 +237,9 @@ else if (_isLoading)
     {
         try
         {
-            var typesJson = await ApiService.GetTicketTypesAsync();
-            var types = JsonSerializer.Deserialize<TicketType[]>(typesJson, JsonOptions);
-            if (types != null)
-            {
-                _types = types.ToList();
-                _priorities = types.SelectMany(t => t.Priorities).DistinctBy(p => p.Id).ToList();
-            }
+            var (types, priorities) = await Lookup.GetTypesAndPrioritiesAsync();
+            _types = types.ToList();
+            _priorities = priorities.ToList();
         }
         catch
         {
@@ -320,6 +320,7 @@ else if (_isLoading)
         _formGroupId = _groups.Count > 0 ? _groups[0].Id : null;
         _formChecklist = [];
         _selectedTemplate = null;
+        RefreshAvailablePriorities();
         StashFormState();
         _dialogVisible = true;
     }
@@ -343,8 +344,25 @@ else if (_isLoading)
             .Select(c => c.Title!)
             .ToList();
         _selectedTemplate = null;
+        RefreshAvailablePriorities();
         StashFormState();
         _dialogVisible = true;
+    }
+
+    // Couple the priority dropdown to the selected type (same rule as
+    // AddTicket): only the type's own priorities are offered — union as
+    // fallback — and a selection the type doesn't know is cleared.
+    private void OnTypeChanged(string? typeId)
+    {
+        _formTypeId = typeId;
+        RefreshAvailablePriorities();
+    }
+
+    private void RefreshAvailablePriorities()
+    {
+        var type = _types.FirstOrDefault(t => t.Id == _formTypeId);
+        _availablePriorities = TypePriorityCoupling.PrioritiesForType(type, _priorities);
+        _formPriorityId = TypePriorityCoupling.EnsureSelectedId(_availablePriorities, _formPriorityId);
     }
 
     private void StashFormState()
@@ -369,16 +387,19 @@ else if (_isLoading)
             _formTypeId = _stashTypeId;
             _formPriorityId = _stashPriorityId;
             _formChecklist = new List<string>(_stashChecklist);
+            RefreshAvailablePriorities();
             return;
         }
 
         _formTicketSubject = template.Subject;
         _formTicketIssue = template.Issue ?? string.Empty;
         // Apply Type + Priority only if they're set AND match a loaded
-        // option (same guard as AddTicket).
+        // option (same guard as AddTicket). The priority is validated
+        // against the priorities of the type just applied, not the union.
         if (!string.IsNullOrEmpty(template.TypeId) && _types.Any(t => t.Id == template.TypeId))
             _formTypeId = template.TypeId;
-        if (!string.IsNullOrEmpty(template.PriorityId) && _priorities.Any(p => p.Id == template.PriorityId))
+        RefreshAvailablePriorities();
+        if (!string.IsNullOrEmpty(template.PriorityId) && _availablePriorities.Any(p => p.Id == template.PriorityId))
             _formPriorityId = template.PriorityId;
         _formChecklist = new List<string>(template.Checklist);
     }
@@ -486,13 +507,19 @@ else if (_isLoading)
         var priorityId = task.TicketPriority?.Id;
         if (string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(priorityId))
             name = _priorities.FirstOrDefault(p => p.Id == priorityId)?.Name;
-        return string.IsNullOrEmpty(name) ? null : TrudeskTranslationHelper.TranslatePriority(name);
+        // Generic Translator — same table the dialog dropdown renders via
+        // TranslatedName, so chips and dropdown can't drift apart.
+        return string.IsNullOrEmpty(name) ? null : Translator.Translate(name);
     }
 
     // Exposed for unit tests ---------------------------------------------
 
     internal IReadOnlyList<string> FormChecklistForTests => _formChecklist;
     internal string FormTicketSubjectForTests => _formTicketSubject;
+    internal string? FormTypeIdForTests => _formTypeId;
+    internal string? FormPriorityIdForTests => _formPriorityId;
+    internal IReadOnlyList<Priority> AvailablePrioritiesForTests => _availablePriorities;
+    internal void OnTypeChangedForTests(string? typeId) => OnTypeChanged(typeId);
 
     internal static Dictionary<string, object?> BuildPayload(
         string name, string description, string ticketSubject, string ticketIssue,

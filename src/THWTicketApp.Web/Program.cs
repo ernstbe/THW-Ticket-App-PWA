@@ -24,6 +24,8 @@ builder.Services.AddScoped(sp => new HttpClient
 // Services
 builder.Services.AddScoped<LocalStorageService>();
 builder.Services.AddScoped<ITrueDeskApiService, TrueDeskApiService>();
+builder.Services.AddScoped<LookupService>();
+builder.Services.AddScoped<ILookupService>(sp => sp.GetRequiredService<LookupService>());
 builder.Services.AddScoped<AppStateService>();
 builder.Services.AddScoped<RealtimeService>();
 builder.Services.AddScoped<IndexedDbService>();

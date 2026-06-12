@@ -11,6 +11,7 @@
 @using QRCoder
 @using System.Net.Http
 @inject ITrueDeskApiService ApiService
+@inject ILookupService Lookup
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject LocalStorageService LocalStorage
@@ -868,30 +869,20 @@ else
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var statusTask = ApiService.GetStatusesAsync();
-            var prioTask = ApiService.GetPrioritiesAsync();
             var tagsTask = ApiService.GetTagsAsync();
             var groupsTask = ApiService.GetGroupsAsync();
-            var typesTask = ApiService.GetTicketTypesAsync();
-            await Task.WhenAll(statusTask, prioTask, tagsTask, groupsTask, typesTask);
+            // Types + priority union from the shared cached lookup; both
+            // render via TranslatedName (generic Translator), so no
+            // per-name post-processing is needed here.
+            var lookupTask = Lookup.GetTypesAndPrioritiesAsync();
+            await Task.WhenAll(statusTask, tagsTask, groupsTask, lookupTask);
 
-            // Ticket types come back as a bare JSON array, no wrapper.
-            // TicketType.TranslatedName already runs the generic Translator,
-            // so no per-name post-processing is needed here.
-            try
-            {
-                var types = JsonSerializer.Deserialize<TicketType[]>(typesTask.Result, options);
-                _ticketTypes = types?.ToList() ?? [];
-            }
-            catch { _ticketTypes = []; }
+            var (types, priorities) = lookupTask.Result;
+            _ticketTypes = types.ToList();
+            _priorities = priorities.ToList();
 
             _statuses = JsonHelper.DeserializeWrappedArray<Status>(statusTask.Result, "status", options).ToList();
             foreach (var s in _statuses) s.Name = TrudeskTranslationHelper.TranslateStatus(s.Name);
-
-            using var prioDoc = JsonDocument.Parse(prioTask.Result);
-            _priorities = prioDoc.RootElement.TryGetProperty("priorities", out var prioEl)
-                ? JsonSerializer.Deserialize<List<Priority>>(prioEl.GetRawText(), options) ?? []
-                : JsonSerializer.Deserialize<List<Priority>>(prioTask.Result, options) ?? [];
-            foreach (var p in _priorities) p.Name = TrudeskTranslationHelper.TranslatePriority(p.Name);
 
             _availableTags = JsonHelper.DeserializeWrappedArray<Tag>(tagsTask.Result, "tags", options).ToList();
 
