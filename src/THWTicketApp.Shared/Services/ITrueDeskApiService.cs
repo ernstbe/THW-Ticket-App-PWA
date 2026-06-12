@@ -73,7 +73,6 @@ public interface ITrueDeskApiService
     Task<string> GetUsersAsync();
     Task<string> GetAssigneesAsync();
     Task<string> GetTicketTypesAsync();
-    Task<string> GetPrioritiesAsync();
     Task<string> GetTagsAsync();
     Task<string> GetGroupsAsync();
 
