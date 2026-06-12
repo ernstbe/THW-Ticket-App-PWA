@@ -38,8 +38,8 @@ else
         <HeaderContent>
             <MudTh>@L.T("templates.name")</MudTh>
             <MudTh>@L.T("templates.subject")</MudTh>
-            <MudTh>@L.T("tickets.type")</MudTh>
-            <MudTh>@L.T("tickets.priority")</MudTh>
+            <MudTh>@L.T("detail.type")</MudTh>
+            <MudTh>@L.T("detail.priority")</MudTh>
             <MudTh>@L.T("templates.issue_preview")</MudTh>
             <MudTh>@L.T("common.edit")</MudTh>
         </HeaderContent>
@@ -53,13 +53,13 @@ else
                 }
             </MudTd>
             <MudTd DataLabel="@L.T("templates.subject")">@context.Subject</MudTd>
-            <MudTd DataLabel="@L.T("tickets.type")">
+            <MudTd DataLabel="@L.T("detail.type")">
                 @if (!string.IsNullOrEmpty(context.TypeName))
                 {
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.TypeName</MudChip>
                 }
             </MudTd>
-            <MudTd DataLabel="@L.T("tickets.priority")">
+            <MudTd DataLabel="@L.T("detail.priority")">
                 @if (!string.IsNullOrEmpty(context.PriorityName))
                 {
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.PriorityName</MudChip>
@@ -86,14 +86,14 @@ else
                       Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
         <MudTextField @bind-Value="_formSubject" Label="@L.T("templates.subject")"
                       Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-        <MudSelect T="string" @bind-Value="_formTypeId" Label="@L.T("tickets.type")"
+        <MudSelect T="string" @bind-Value="_formTypeId" Label="@L.T("detail.type")"
                    Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Class="mb-2">
             @foreach (var t in _types)
             {
                 <MudSelectItem T="string" Value="@t.Id">@t.TranslatedName</MudSelectItem>
             }
         </MudSelect>
-        <MudSelect T="string" @bind-Value="_formPriorityId" Label="@L.T("tickets.priority")"
+        <MudSelect T="string" @bind-Value="_formPriorityId" Label="@L.T("detail.priority")"
                    Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Class="mb-2">
             @foreach (var p in _priorities)
             {
