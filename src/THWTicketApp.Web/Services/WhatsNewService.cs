@@ -51,6 +51,10 @@ public sealed class WhatsNewService
         [
             "Die Prioritäten-Auswahl passt sich dem gewählten Tickettyp an: Beim Erstellen von Tickets und wiederkehrenden Aufgaben stehen nur noch Prioritäten zur Wahl, die der Typ auch vorsieht.",
             "Prioritäts-Bezeichnungen werden jetzt überall einheitlich übersetzt — auch eigene Prioritäten wie „Very High“ erscheinen nun auf Deutsch."
+        ]),
+        new WhatsNewEntry(6, "12.06.2026", "Tickets offline erstellen",
+        [
+            "Neue Tickets können jetzt auch ohne Internetverbindung angelegt werden — inklusive Fälligkeitsdatum und Vorlagen-Checkliste. Sie werden automatisch übertragen, sobald die Verbindung wieder steht."
         ])
     ];
 

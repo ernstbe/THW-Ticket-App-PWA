@@ -30,6 +30,10 @@ internal sealed class PendingActionDto
     // neither = leave unchanged. Bool flag keeps old queued actions (without
     // the property in IndexedDB) on the "unchanged" path after an app update.
     public bool DueDateCleared { get; set; }
+    // Checklist titles for CreateTicket — rides in the create payload
+    // (trudesk PR #106), so an offline-created ticket keeps its template
+    // checklist.
+    public List<string>? ChecklistTitles { get; set; }
     public string? FileName { get; set; }
     public string? FileContentBase64 { get; set; }
     public string? FileContentType { get; set; }

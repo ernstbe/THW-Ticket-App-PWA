@@ -184,6 +184,46 @@ public class SyncServiceTests
         Assert.Equal("UploadAttachment", dto.ActionType);
     }
 
+    [Fact]
+    public async Task EnqueueCreateTicketAsync_producesDtoWithDueDateAndChecklist()
+    {
+        var dueDate = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        var dto = await CaptureEnqueuedAsync(() =>
+            _sut.EnqueueCreateTicketAsync("Pumpe defekt", "Macht Geräusche", "type1", "prio1", "g1", "u1",
+                dueDate, ["Schritt 1", "Schritt 2"]));
+
+        Assert.Equal("CreateTicket", dto.ActionType);
+        Assert.Equal("Pumpe defekt", dto.Subject);
+        Assert.Equal("Macht Geräusche", dto.Issue);
+        Assert.Equal("type1", dto.TypeId);
+        Assert.Equal("prio1", dto.PriorityId);
+        Assert.Equal("g1", dto.GroupId);
+        Assert.Equal("u1", dto.TargetUserId);
+        Assert.Equal(dueDate.ToString("O"), dto.DueDate);
+        Assert.Equal(new List<string> { "Schritt 1", "Schritt 2" }, dto.ChecklistTitles);
+        Assert.NotNull(dto.CreatedAt);
+    }
+
+    [Fact]
+    public async Task EnqueueCreateTicketAsync_withoutOptionals_leavesDueDateAndChecklistNull()
+    {
+        var dto = await CaptureEnqueuedAsync(() =>
+            _sut.EnqueueCreateTicketAsync("Subject", "Issue", null, null, "g1", null));
+
+        Assert.Equal("CreateTicket", dto.ActionType);
+        Assert.Null(dto.DueDate);
+        Assert.Null(dto.ChecklistTitles);
+    }
+
+    [Fact]
+    public async Task EnqueueCreateTicketAsync_emptyChecklist_storedAsNull()
+    {
+        var dto = await CaptureEnqueuedAsync(() =>
+            _sut.EnqueueCreateTicketAsync("Subject", "Issue", null, null, "g1", null, null, []));
+
+        Assert.Null(dto.ChecklistTitles);
+    }
+
     // ---------------------------------------------------------------------
     // Sync apply — switch mapping for new action types
     // ---------------------------------------------------------------------
@@ -342,6 +382,86 @@ public class SyncServiceTests
         await _api.Received(1).SetAdditionalAssigneesAsync("t1",
             Arg.Is<IEnumerable<string>>(ids => ids.SequenceEqual(new[] { "u1", "u2" })));
         await _db.Received(1).RemovePendingActionAsync(4);
+    }
+
+    [Fact]
+    public async Task Sync_dispatchesCreateTicketWithDueDateAndChecklist()
+    {
+        var dueDate = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 5,
+            ActionType = "CreateTicket",
+            Subject = "Pumpe defekt",
+            Issue = "Macht Geräusche",
+            TypeId = "type1",
+            PriorityId = "prio1",
+            GroupId = "g1",
+            TargetUserId = "u1",
+            DueDate = dueDate.ToString("O"),
+            ChecklistTitles = ["Schritt 1", "Schritt 2"]
+        });
+        _api.CreateTicketAsync(
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<DateTime?>(), Arg.Any<IReadOnlyList<string>?>())
+            .Returns(new TicketCreateResult("new-id", 4711));
+
+        var result = await _sut.SyncPendingActionsAsync();
+
+        Assert.True(result);
+        await _api.Received(1).CreateTicketAsync(
+            "Pumpe defekt", "Macht Geräusche", "type1", "prio1", "g1", "u1",
+            Arg.Is<DateTime?>(d => d.HasValue),
+            Arg.Is<IReadOnlyList<string>?>(c => c != null && c.SequenceEqual(new[] { "Schritt 1", "Schritt 2" })));
+        await _db.Received(1).RemovePendingActionAsync(5);
+    }
+
+    [Fact]
+    public async Task Sync_createTicketWithoutOptionals_passesNulls()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 6,
+            ActionType = "CreateTicket",
+            Subject = "Subject",
+            Issue = "Issue",
+            GroupId = "g1"
+        });
+        _api.CreateTicketAsync(
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<DateTime?>(), Arg.Any<IReadOnlyList<string>?>())
+            .Returns(new TicketCreateResult("new-id", 4712));
+
+        var result = await _sut.SyncPendingActionsAsync();
+
+        Assert.True(result);
+        await _api.Received(1).CreateTicketAsync(
+            "Subject", "Issue", null, null, "g1", null, null, null);
+        await _db.Received(1).RemovePendingActionAsync(6);
+    }
+
+    [Fact]
+    public async Task Sync_createTicketNullResult_isFailureAndSchedulesRetry()
+    {
+        // CreateTicketAsync returns null when the server rejects the create —
+        // the action must stay queued with retry state, not be removed.
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 7,
+            ActionType = "CreateTicket",
+            Subject = "Subject",
+            GroupId = "g1"
+        });
+        _api.CreateTicketAsync(
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<DateTime?>(), Arg.Any<IReadOnlyList<string>?>())
+            .Returns((TicketCreateResult?)null);
+
+        var result = await _sut.SyncPendingActionsAsync();
+
+        Assert.False(result);
+        await _db.DidNotReceive().RemovePendingActionAsync(7);
+        await _db.Received(1).UpdateRetryStateAsync(7, Arg.Any<string>(), 1, Arg.Any<string>());
     }
 
     // ---------------------------------------------------------------------
