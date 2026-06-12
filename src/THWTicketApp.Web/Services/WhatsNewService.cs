@@ -38,6 +38,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(2, "12.06.2026", "Wiederkehrende Aufgaben",
         [
             "Vorlagen-Auswahl für wiederkehrende Aufgaben: Beim Anlegen oder Bearbeiten kann jetzt eine Ticket-Vorlage gewählt werden — Betreff, Beschreibung, Typ, Priorität und Checkliste werden automatisch übernommen und bleiben einzeln anpassbar."
+        ]),
+        new WhatsNewEntry(3, "12.06.2026", "Wiederkehrende Aufgaben: Korrekturen",
+        [
+            "Gruppen-Auswahl für wiederkehrende Aufgaben: Im Dialog kann jetzt die Gruppe des erzeugten Tickets gewählt werden — das Anlegen neuer Aufgaben funktioniert damit zuverlässig."
         ])
     ];
 
