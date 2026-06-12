@@ -567,6 +567,7 @@ public class LocalizationService
         ["tickets.attachments_too_large"] = "{0} ist zu groß (max. 25 MB).",
         ["tickets.attachments_uploading"] = "Lade Anhänge hoch…",
         ["tickets.attachments_partial"] = "Ticket erstellt, aber {0} von {1} Anhängen konnten nicht hochgeladen werden.",
+        ["tickets.attachments_offline"] = "Offline — {0} Anhang/Anhänge konnten nicht übernommen werden. Bitte später im Ticket hinzufügen.",
         ["tickets.template_checklist_info"] = "{0} Checklisten-Punkte werden übernommen",
 
         // Dashboard
@@ -1312,6 +1313,7 @@ public class LocalizationService
         ["tickets.attachments_too_large"] = "{0} is too large (max. 25 MB).",
         ["tickets.attachments_uploading"] = "Uploading attachments…",
         ["tickets.attachments_partial"] = "Ticket created, but {0} of {1} attachments failed to upload.",
+        ["tickets.attachments_offline"] = "Offline — {0} attachment(s) could not be included. Please add them to the ticket later.",
         ["tickets.template_checklist_info"] = "{0} checklist items will be applied",
 
         // Dashboard

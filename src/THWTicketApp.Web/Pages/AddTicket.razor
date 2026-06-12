@@ -13,6 +13,8 @@
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.LocalizationService L
 @inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
+@inject THWTicketApp.Web.Services.AppStateService AppState
+@inject ISyncService SyncService
 @inject IJSRuntime JsRuntime
 @using Microsoft.JSInterop
 @implements IDisposable
@@ -421,6 +423,12 @@ else
 
         try
         {
+            if (!AppState.IsOnline)
+            {
+                await QueueOfflineCreateAsync();
+                return;
+            }
+
             var created = await ApiService.CreateTicketAsync(
                 _subject, _issue,
                 _selectedType?.Id, _selectedPriority?.Id,
@@ -470,6 +478,12 @@ else
             }
             Navigation.NavigateTo("tickets");
         }
+        catch (HttpRequestException)
+        {
+            // Network died between the IsOnline check and the POST — same
+            // recovery as the offline branch (pattern from TicketDetail).
+            await QueueOfflineCreateAsync();
+        }
         catch
         {
             Snackbar.Add(L.T("common.network_error"), Severity.Error);
@@ -479,6 +493,32 @@ else
             _isLoading = false;
             StateHasChanged();
         }
+    }
+
+    // Offline path: park the ticket (incl. due date + template checklist —
+    // both ride in the create payload since trudesk PR #106) in the
+    // IndexedDB sync queue and leave the page as if the create succeeded.
+    // Pre-picked attachments can't be queued: uploading needs the server-
+    // assigned ticket id, which doesn't exist yet — tell the user instead
+    // of dropping them silently.
+    private async Task QueueOfflineCreateAsync()
+    {
+        await SyncService.EnqueueCreateTicketAsync(
+            _subject, _issue,
+            _selectedType?.Id, _selectedPriority?.Id,
+            _selectedGroup?.Id, _selectedAssignee?.Id,
+            _dueDate, _templateChecklist);
+
+        _saveDebounce?.Dispose();
+        await LocalStorage.RemoveItemAsync(DraftKey);
+
+        if (_pendingAttachments.Count > 0)
+        {
+            Snackbar.Add(string.Format(L.T("tickets.attachments_offline"),
+                _pendingAttachments.Count), Severity.Warning);
+        }
+        Snackbar.Add(L.T("offline.queued"), Severity.Info);
+        Navigation.NavigateTo("tickets");
     }
 
     private void OnFilesPicked(InputFileChangeEventArgs e)

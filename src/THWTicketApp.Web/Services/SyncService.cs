@@ -82,7 +82,7 @@ public class SyncService : ISyncService
             TicketUpdatedAt = ticketUpdatedAt?.ToString("O")
         });
 
-    public Task EnqueueCreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId) =>
+    public Task EnqueueCreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null, IReadOnlyList<string>? checklist = null) =>
         EnqueueAsync(new PendingActionDto
         {
             ActionType = "CreateTicket",
@@ -92,7 +92,9 @@ public class SyncService : ISyncService
             TypeId = typeId,
             PriorityId = priorityId,
             GroupId = groupId,
-            TargetUserId = assigneeId
+            TargetUserId = assigneeId,
+            DueDate = dueDate?.ToString("O"),
+            ChecklistTitles = checklist is { Count: > 0 } ? checklist.ToList() : null
         });
 
     public Task EnqueueAssignAsync(string ticketId, int ticketUid, string userId, DateTime? ticketUpdatedAt = null) =>
@@ -329,7 +331,8 @@ public class SyncService : ISyncService
         "SetAdditionalAssignees" => await _apiService.SetAdditionalAssigneesAsync(action.TicketId!, action.TargetUserIds ?? []),
         "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.StatusId!),
         "CreateTicket" => await _apiService.CreateTicketAsync(
-            action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId) != null,
+            action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId,
+            ParseOptionalDate(action.DueDate), action.ChecklistTitles) != null,
         "UpdateTicketFields" => await ApplyUpdateTicketFieldsAsync(action),
         "DeleteTicket" => await _apiService.DeleteTicketAsync(action.TicketId!),
         "UploadAttachment" => await ApplyUploadAttachmentAsync(action),
@@ -366,6 +369,11 @@ public class SyncService : ISyncService
 
         return _apiService.EditTicketAsync(ticket, includeDueDate: hasDueDate || action.DueDateCleared);
     }
+
+    // DTO dates are stored as round-trip ("O") strings; same lenient parse
+    // as ApplyUpdateTicketFieldsAsync uses for its DueDate.
+    private static DateTime? ParseOptionalDate(string? value) =>
+        !string.IsNullOrEmpty(value) && DateTime.TryParse(value, out var dt) ? dt : null;
 
     private async Task<bool> ApplyUploadAttachmentAsync(PendingActionDto action)
     {
