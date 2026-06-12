@@ -7,6 +7,7 @@
 @using THWTicketApp.Shared.Services
 @using System.Net.Http
 @inject ITrueDeskApiService ApiService
+@inject ILookupService Lookup
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
@@ -323,7 +324,7 @@ else
     private string? _typeFilter;
     private string? _groupFilter;
     private List<string> _allPriorities = [];
-    private List<TicketType> _ticketTypes = [];
+    private IReadOnlyList<TicketType> _ticketTypes = [];
     private List<Group> _allGroups = [];
     // Count of groups the current user can act on, resolved server-side
     // by trudesk's `accountsApi.sessionUser` (Team→Department chain for
@@ -394,12 +395,12 @@ else
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var statusJson = await ApiService.GetStatusesAsync();
             var ticketJson = await ApiService.GetTicketsAsync();
-            var typesJson = await ApiService.GetTicketTypesAsync();
+            var (types, _) = await Lookup.GetTypesAndPrioritiesAsync();
             var groupsJson = await ApiService.GetGroupsAsync();
 
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
             var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(ticketJson, "tickets", options);
-            _ticketTypes = JsonSerializer.Deserialize<List<TicketType>>(typesJson, options) ?? [];
+            _ticketTypes = types;
             var groupResp = JsonSerializer.Deserialize<GetGroupResponse>(groupsJson, options);
             _allGroups = (groupResp?.Groups ?? [])
                 .Where(g => !string.IsNullOrEmpty(g.Id))

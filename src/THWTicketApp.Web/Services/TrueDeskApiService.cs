@@ -664,13 +664,6 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<string> GetPrioritiesAsync()
-    {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{BaseUrl}/tickets/priorities"));
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync();
-    }
-
     public async Task<string> GetTagsAsync()
     {
         // Tags only exist in v1 — there is no v2 /tags endpoint
