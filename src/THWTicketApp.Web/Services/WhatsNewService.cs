@@ -55,6 +55,11 @@ public sealed class WhatsNewService
         new WhatsNewEntry(6, "12.06.2026", "Tickets offline erstellen",
         [
             "Neue Tickets können jetzt auch ohne Internetverbindung angelegt werden — inklusive Fälligkeitsdatum und Vorlagen-Checkliste. Sie werden automatisch übertragen, sobald die Verbindung wieder steht."
+        ]),
+        // Id 7 ist für den parallelen DSGVO-PR reserviert.
+        new WhatsNewEntry(8, "12.06.2026", "Neue Statistik-Seite",
+        [
+            "Neue Statistik-Seite: Ticketaufkommen, Status-Verteilung und Auslastung auf einen Blick — erreichbar über den Menüpunkt „Statistik“."
         ])
     ];
 
