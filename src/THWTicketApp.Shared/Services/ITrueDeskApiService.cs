@@ -166,6 +166,14 @@ public interface ITrueDeskApiService
     Task<UserProfile?> GetCurrentUserProfileAsync();
     Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber);
 
+    /// <summary>
+    /// Downloads the authenticated user's DSGVO data export (Art. 15) from
+    /// the v2-only endpoint GET /accounts/me/export. Returns the raw JSON
+    /// document as a string (the body IS the file the user saves), or null
+    /// when the request fails.
+    /// </summary>
+    Task<string?> ExportMyDataAsync();
+
     Task<List<SessionInfo>> GetSessionsAsync();
     Task<bool> RevokeSessionAsync(string deviceId);
     Task<bool> RevokeAllOtherSessionsAsync();
