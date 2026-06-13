@@ -1384,6 +1384,7 @@ public class TrueDeskApiService : ITrueDeskApiService
                 Title = userEl.TryGetProperty("title", out var tEl) ? tEl.GetString() : null,
                 WorkNumber = userEl.TryGetProperty("workNumber", out var wnEl) ? wnEl.GetString() : null,
                 MobileNumber = userEl.TryGetProperty("mobileNumber", out var mnEl) ? mnEl.GetString() : null,
+                Image = userEl.TryGetProperty("image", out var imgEl) ? imgEl.GetString() : null,
                 Groups = groupIds,
             };
         }
@@ -1420,6 +1421,34 @@ public class TrueDeskApiService : ITrueDeskApiService
         var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{V2BaseUrl}/accounts/profile", content));
         return response.IsSuccessStatusCode;
     }
+
+    public async Task<string?> UploadProfileImageAsync(Stream fileStream, string fileName)
+    {
+        using var content = new MultipartFormDataContent();
+        var streamContent = new StreamContent(fileStream);
+        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(GetMimeType(fileName));
+        content.Add(streamContent, "file", fileName);
+
+        // v2-only (trudesk feat/account-profile-image). The server targets
+        // req.user._id, so we pass no user id. Returns the new image filename.
+        var response = await SendWithAutoRefreshAsync(() =>
+            _httpClient.PostAsync($"{V2BaseUrl}/accounts/profile/picture", content));
+        if (!response.IsSuccessStatusCode) return null;
+        try
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("image", out var img) ? img.GetString() : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Absolute URL of a user avatar served by trudesk under
+    /// <c>/uploads/users/</c>, or null when the filename is empty.
+    /// </summary>
+    public string? BuildUserImageUrl(string? image)
+        => string.IsNullOrWhiteSpace(image) ? null : $"{ServerUrl}/uploads/users/{image}";
 
     // ── Active sessions (multi-device tokens — trudesk PR #52) ───────────
 

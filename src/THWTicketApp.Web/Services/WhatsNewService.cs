@@ -71,6 +71,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(10, "13.06.2026", "Verknüpfte Tickets",
         [
             "Tickets können jetzt miteinander verknüpft werden (verwandt, blockiert, Duplikat) — in der Ticket-Ansicht unter „Verknüpfte Tickets“. Die Verknüpfung erscheint automatisch auch beim verknüpften Ticket."
+        ]),
+        new WhatsNewEntry(11, "13.06.2026", "Profilbild",
+        [
+            "Du kannst jetzt ein eigenes Profilbild hochladen — im Profil unter „Profilbild ändern“."
         ])
     ];
 

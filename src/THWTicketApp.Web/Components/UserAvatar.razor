@@ -10,7 +10,13 @@
     on both light and dark themes — only the hue varies.
 *@
 
-@if (string.IsNullOrWhiteSpace(Name))
+@if (!string.IsNullOrWhiteSpace(ImageUrl))
+{
+    <MudAvatar Size="@Size" Class="@Class" Style="@Style">
+        <img src="@ImageUrl" alt="@Name" style="width:100%;height:100%;object-fit:cover;" />
+    </MudAvatar>
+}
+else if (string.IsNullOrWhiteSpace(Name))
 {
     <MudAvatar Size="@Size" Class="@Class" Style="@Style">
         <MudIcon Icon="@Icons.Material.Filled.Person" />
@@ -26,6 +32,8 @@ else
 
 @code {
     [Parameter, EditorRequired] public string? Name { get; set; }
+    /// <summary>Optional avatar image URL. When set, shown instead of initials.</summary>
+    [Parameter] public string? ImageUrl { get; set; }
     [Parameter] public Size Size { get; set; } = Size.Medium;
     [Parameter] public string Class { get; set; } = string.Empty;
     [Parameter] public string Style { get; set; } = string.Empty;

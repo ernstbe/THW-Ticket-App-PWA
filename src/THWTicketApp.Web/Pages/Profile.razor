@@ -30,6 +30,17 @@
                 }
                 else
                 {
+                    <div class="d-flex flex-column align-center mb-4">
+                        <UserAvatar Name="@_fullname" ImageUrl="@ApiService.BuildUserImageUrl(_avatarImage)"
+                                    Size="Size.Large" Style="width:96px;height:96px;font-size:2rem;" Class="mb-2" />
+                        <InputFile id="avatar-upload" OnChange="OnAvatarPicked" hidden
+                                   accept=".png,.jpg,.jpeg,.gif,.webp" />
+                        <MudButton HtmlTag="label" for="avatar-upload" Variant="Variant.Outlined" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.PhotoCamera" Disabled="_isUploadingAvatar">
+                            @(_isUploadingAvatar ? L.T("profile.avatar_uploading") : L.T("profile.avatar_pick"))
+                        </MudButton>
+                    </div>
+
                     <MudTextField @bind-Value="_fullname" Label="@L.T("profile.fullname")"
                                   Variant="Variant.Outlined" Class="mb-3" />
                     <MudTextField @bind-Value="_jobTitle" Label="@L.T("profile.job_title")"
@@ -197,6 +208,8 @@
     private string _mobileNumber = string.Empty;
     private string? _username;
     private string? _email;
+    private string? _avatarImage;
+    private bool _isUploadingAvatar;
     private string _currentPassword = string.Empty;
     private string _newPassword = string.Empty;
     private string _confirmPassword = string.Empty;
@@ -363,6 +376,7 @@
                 _mobileNumber = profile.MobileNumber ?? string.Empty;
                 _username = profile.Username;
                 _email = profile.Email;
+                _avatarImage = profile.Image;
             }
             else
             {
@@ -404,6 +418,40 @@
         }
         catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
         finally { _isSaving = false; }
+    }
+
+    // 5 MB pre-resize ceiling — matches the server cap; the server downscales
+    // to a 512px JPEG, so the stored avatar lands far below this.
+    private const long MaxAvatarBytes = 5 * 1024 * 1024;
+
+    private async Task OnAvatarPicked(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+        if (!AppState.IsOnline)
+        {
+            Snackbar.Add(L.T("profile.avatar_offline"), Severity.Info);
+            return;
+        }
+        if (file.Size > MaxAvatarBytes)
+        {
+            Snackbar.Add(L.T("profile.avatar_too_large"), Severity.Warning);
+            return;
+        }
+        _isUploadingAvatar = true;
+        try
+        {
+            using var stream = file.OpenReadStream(MaxAvatarBytes);
+            var newImage = await ApiService.UploadProfileImageAsync(stream, file.Name);
+            if (!string.IsNullOrEmpty(newImage))
+            {
+                _avatarImage = newImage;
+                Snackbar.Add(L.T("profile.avatar_saved"), Severity.Success);
+            }
+            else Snackbar.Add(L.T("profile.avatar_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
+        finally { _isUploadingAvatar = false; }
     }
 
     private async Task ExportMyDataAsync()
