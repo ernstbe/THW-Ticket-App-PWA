@@ -16,6 +16,7 @@
 @inject IJSRuntime JsRuntime
 @inject ISyncService SyncService
 @inject THWTicketApp.Web.Services.AppStateService AppState
+@inject IDialogService DialogService
 @implements IDisposable
 
 <PageTitle>@L.T("tickets.title") - THW Ticket App</PageTitle>
@@ -206,6 +207,21 @@
                        OnClick="BatchAssignToMeAsync" Disabled="_isLoading">
                 @L.T("tickets.assign_me")
             </MudButton>
+            @if (_assignableUsers.Count > 0)
+            {
+                <MudMenu Label="@L.T("batch.assign_to")"
+                         StartIcon="@Icons.Material.Filled.PersonAddAlt"
+                         Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                         Disabled="_isLoading" Dense="true" MaxHeight="400">
+                    @foreach (var u in _assignableUsers)
+                    {
+                        var user = u;
+                        <MudMenuItem OnClick="@(() => BatchAssignToUserAsync(user))">
+                            @(string.IsNullOrWhiteSpace(user.Fullname) ? user.Username : user.Fullname)
+                        </MudMenuItem>
+                    }
+                </MudMenu>
+            }
             @if (_allStatuses.Count > 0)
             {
                 <MudMenu Label="@L.T("batch.change_status")"
@@ -315,6 +331,7 @@ else
     private bool _batchMode;
     private HashSet<string> _selectedTicketIds = new();
     private List<Status> _allStatuses = [];
+    private List<User> _assignableUsers = [];
 
     // Advanced filter
     private bool _showAdvancedFilter;
@@ -338,6 +355,7 @@ else
             _activeFilter = InitialFilter;
         await LoadSavedFiltersAsync();
         await LoadStatusesAsync();
+        await LoadAssignableUsersAsync();
         await LoadTicketsAsync();
         Realtime.AnyTicketChanged += OnRealtimeChange;
     }
@@ -353,6 +371,21 @@ else
                 s.Name = TrudeskTranslationHelper.TranslateStatus(s.Name ?? string.Empty);
         }
         catch { /* status dropdowns just stay empty — bulk close fallback still works */ }
+    }
+
+    private async Task LoadAssignableUsersAsync()
+    {
+        try
+        {
+            var json = await ApiService.GetAssigneesAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = JsonSerializer.Deserialize<GetUserResponse>(json, options);
+            _assignableUsers = (response?.Users ?? [])
+                .Where(u => !u.Deleted)
+                .OrderBy(u => u.Fullname ?? u.Username, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch { /* bulk "assign to…" menu just stays hidden */ }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -667,6 +700,21 @@ else
     private async Task BatchDeleteAsync()
     {
         if (_selectedTicketIds.Count == 0) return;
+        if (!EnsureOnline()) return;
+
+        // Bulk delete is irreversible and can hit many tickets at once — make
+        // the user confirm with the exact count first.
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, L.T("batch.delete_confirm_title") },
+            { x => x.Message, string.Format(L.T("batch.delete_confirm"), _selectedTicketIds.Count) },
+            { x => x.ConfirmText, L.T("common.delete") },
+            { x => x.CancelText, L.T("common.cancel") }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(null, parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
         _isLoading = true;
         try
         {
@@ -688,9 +736,19 @@ else
         StateHasChanged();
     }
 
+    // Batch endpoints are v2-only with no offline queue, so gate the bulk
+    // actions on connectivity with a clear message instead of a raw failure.
+    private bool EnsureOnline()
+    {
+        if (AppState.IsOnline) return true;
+        Snackbar.Add(L.T("offline.action_unavailable"), Severity.Warning);
+        return false;
+    }
+
     private async Task BatchChangeStatusAsync(Status target)
     {
         if (_selectedTicketIds.Count == 0 || string.IsNullOrEmpty(target.Id)) return;
+        if (!EnsureOnline()) return;
         _isLoading = true;
         try
         {
@@ -707,16 +765,27 @@ else
         finally { _isLoading = false; }
     }
 
-    private async Task BatchAssignToMeAsync()
+    private Task BatchAssignToMeAsync()
     {
         var userId = ApiService.CurrentUserId;
+        if (string.IsNullOrEmpty(userId)) return Task.CompletedTask;
+        return BatchAssignAsync(userId, L.T("tickets.assign_me"));
+    }
+
+    private Task BatchAssignToUserAsync(User user)
+        => BatchAssignAsync(user.Id, string.IsNullOrWhiteSpace(user.Fullname) ? user.Username ?? string.Empty : user.Fullname);
+
+    private async Task BatchAssignAsync(string userId, string displayName)
+    {
         if (string.IsNullOrEmpty(userId) || _selectedTicketIds.Count == 0) return;
+        if (!EnsureOnline()) return;
         _isLoading = true;
         try
         {
             var batch = _selectedTicketIds.Select(id => new Dictionary<string, object?> { ["id"] = id, ["assignee"] = userId }).ToList();
             var (updated, failed) = await ApiService.BatchUpdateTicketsAsync(batch);
-            Snackbar.Add(string.Format(L.T("batch.updated"), updated, failed), updated > 0 ? Severity.Success : Severity.Error);
+            Snackbar.Add(string.Format(L.T("batch.assigned_to"), updated, displayName, failed),
+                updated > 0 ? Severity.Success : Severity.Error);
             _selectedTicketIds.Clear();
             await LoadTicketsAsync();
         }
