@@ -1,0 +1,375 @@
+@page "/statistics"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using System.Text.Json
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Models.Responses
+@using THWTicketApp.Shared.Helpers
+@using THWTicketApp.Shared.Services
+@inject ITrueDeskApiService ApiService
+@inject ISnackbar Snackbar
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+<PageTitle>@L.T("nav.statistics") - THW Ticket App</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
+    <MudText Typo="Typo.h4">@L.T("nav.statistics")</MudText>
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LoadAllAsync"
+                   Disabled="_isLoading" aria-label="@L.T("common.refresh")" />
+</div>
+
+@* KPI cards *@
+<MudGrid Class="mb-4">
+    <MudItem xs="6" sm="3">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            @if (_isLoadingTickets)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Text" Height="40px" />
+            }
+            else
+            {
+                <MudText Typo="Typo.h4" Color="Color.Primary">@_openTotal</MudText>
+            }
+            <MudText Typo="Typo.caption">@L.T("stats.kpi_open")</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" sm="3">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            @if (_isLoadingStats)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Text" Height="40px" />
+            }
+            else
+            {
+                <MudText Typo="Typo.h4" Color="Color.Primary">@(_overview?.TicketCount?.ToString() ?? "-")</MudText>
+            }
+            <MudText Typo="Typo.caption">@string.Format(L.T("stats.kpi_created"), _timespan)</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" sm="3">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            @if (_isLoadingStats)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Text" Height="40px" />
+            }
+            else
+            {
+                <MudText Typo="Typo.h4" Style="color: #4CAF50;">@(_overview?.ClosedCount?.ToString() ?? "-")</MudText>
+            }
+            <MudText Typo="Typo.caption">@string.Format(L.T("stats.kpi_closed"), _timespan)</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="6" sm="3">
+        <MudPaper Class="pa-4 text-center" Elevation="1">
+            @if (_isLoadingStats)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Text" Height="40px" />
+            }
+            else
+            {
+                <MudText Typo="Typo.h4" Style="color: #FF9800;">@_avgResponseDisplay</MudText>
+            }
+            <MudText Typo="Typo.caption">@L.T("stats.kpi_avg_response")</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid>
+    @* Ticket volume over time *@
+    <MudItem xs="12">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">@L.T("stats.volume_title")</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary">
+                        @foreach (var span in Timespans)
+                        {
+                            <MudButton Variant="@(_timespan == span ? Variant.Filled : Variant.Outlined)"
+                                       OnClick="() => ChangeTimespanAsync(span)" Disabled="_isLoadingStats">
+                                @string.Format(L.T("stats.timespan_days"), span)
+                            </MudButton>
+                        }
+                    </MudButtonGroup>
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_isLoadingStats)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="280px" />
+                }
+                else if (_volumeValues.Length > 0)
+                {
+                    <div style="overflow-x: auto;">
+                        <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_volumeSeries" ChartLabels="@_volumeLabels"
+                                  ChartOptions="@_barOptions" Width="100%" Height="280px" />
+                    </div>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">@L.T("stats.no_data")</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* Status distribution donut *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">@L.T("stats.status_title")</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_isLoadingTickets)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Circle" Width="200px" Height="200px" Class="mx-auto" />
+                }
+                else if (_statusSlices.Count > 0)
+                {
+                    <div class="d-flex flex-column align-center">
+                        <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="@_statusSeries" ChartLabels="@_statusLabels"
+                                  ChartOptions="@_donutOptions" Width="220px" Height="220px" />
+                        <div class="d-flex flex-wrap justify-center gap-3 mt-3">
+                            @foreach (var slice in _statusSlices)
+                            {
+                                <div class="d-flex align-center gap-1">
+                                    <div style="width: 12px; height: 12px; border-radius: 2px; background: @slice.Color;"></div>
+                                    <MudText Typo="Typo.caption">@slice.Name (@slice.Count)</MudText>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">@L.T("stats.no_data")</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    @* Workload per assignee *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">@L.T("stats.workload_title")</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_isLoadingWorkload)
+                {
+                    @for (var i = 0; i < 4; i++)
+                    {
+                        <MudSkeleton SkeletonType="SkeletonType.Text" Height="32px" Class="mb-2" />
+                    }
+                }
+                else if (_workloads.Count > 0)
+                {
+                    @foreach (var w in _workloads)
+                    {
+                        <div class="mb-3">
+                            <div class="d-flex justify-space-between mb-1">
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@w.Name</MudText>
+                                <MudText Typo="Typo.body2">@w.Stats.TicketCount @L.T("nav.tickets")</MudText>
+                            </div>
+                            <div class="d-flex" style="height: 14px; border-radius: 4px; overflow: hidden; background: var(--mud-palette-surface);">
+                                @if (w.Stats.TicketCount > 0)
+                                {
+                                    <div style="width: @ClosedPercent(w)%; background: #4CAF50;"></div>
+                                    <div style="width: @OpenPercent(w)%; background: var(--mud-palette-primary);"></div>
+                                }
+                            </div>
+                            <div class="d-flex gap-3 mt-1 flex-wrap">
+                                <MudText Typo="Typo.caption" Style="color: #4CAF50;">@L.T("stats.closed"): @w.Stats.ClosedCount</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Primary">@L.T("stats.open"): @w.Stats.OpenCount</MudText>
+                                @if (w.Stats.AvgResponseHours > 0)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("stats.kpi_avg_response"): @($"{w.Stats.AvgResponseHours:F0}h")</MudText>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">@L.T("stats.no_data")</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private static readonly int[] Timespans = [30, 90, 365];
+
+    private bool _isLoadingStats;
+    private bool _isLoadingTickets;
+    private bool _isLoadingWorkload;
+    private bool _isLoading => _isLoadingStats || _isLoadingTickets || _isLoadingWorkload;
+
+    private int _timespan = 30;
+    private OverviewStats? _overview;
+    private string _avgResponseDisplay = "-";
+    private int _openTotal;
+
+    private List<ChartSeries<double>> _volumeSeries = [];
+    private string[] _volumeLabels = [];
+    private double[] _volumeValues = [];
+    private readonly ChartOptions _barOptions = new();
+
+    private List<StatusSlice> _statusSlices = [];
+    private List<ChartSeries<double>> _statusSeries = [];
+    private string[] _statusLabels = [];
+    private ChartOptions _donutOptions = new();
+
+    private List<AssigneeWorkloadRow> _workloads = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+    }
+
+    private async Task LoadAllAsync()
+    {
+        if (_isLoading) return;
+        // Stats + tickets first (fast), per-assignee workload afterwards
+        // (one request per agent — the slowest part by far).
+        await LoadOverviewStatsAsync();
+        await LoadStatusDistributionAsync();
+        await LoadWorkloadAsync();
+    }
+
+    private async Task ChangeTimespanAsync(int span)
+    {
+        if (_timespan == span) return;
+        _timespan = span;
+        await LoadOverviewStatsAsync();
+    }
+
+    private async Task LoadOverviewStatsAsync()
+    {
+        _isLoadingStats = true;
+        StateHasChanged();
+        try
+        {
+            var json = await ApiService.GetTicketStatsAsync(_timespan);
+            _overview = StatsParser.ParseOverview(json);
+
+            var (labels, values) = StatsParser.BuildVolumeSeries(_overview.GraphData, _timespan);
+            _volumeLabels = labels;
+            _volumeValues = values;
+            _volumeSeries = values.Length > 0
+                ? [new ChartSeries<double> { Name = L.T("nav.tickets"), Data = values }]
+                : [];
+
+            _avgResponseDisplay = _overview.AvgResponseHours is > 0 ? $"{_overview.AvgResponseHours:F1}h" : "-";
+        }
+        catch (Exception ex)
+        {
+            _overview = null;
+            _volumeSeries = [];
+            _volumeLabels = [];
+            _volumeValues = [];
+            _avgResponseDisplay = "-";
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoadingStats = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadStatusDistributionAsync()
+    {
+        _isLoadingTickets = true;
+        StateHasChanged();
+        try
+        {
+            var json = await ApiService.GetTicketsAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(json, "tickets", options);
+
+            foreach (var t in tickets)
+                TrudeskTranslationHelper.TranslateTicket(t);
+
+            _statusSlices = StatsParser.ComputeStatusDistribution(tickets, L.T("common.unknown"));
+            _statusSeries = _statusSlices.Count > 0
+                ? [new ChartSeries<double> { Name = L.T("stats.status_title"), Data = _statusSlices.Select(s => (double)s.Count).ToArray() }]
+                : [];
+            _statusLabels = _statusSlices.Select(s => $"{s.Name} ({s.Count})").ToArray();
+            _donutOptions = new ChartOptions { ChartPalette = _statusSlices.Select(s => s.Color).ToArray() };
+            _openTotal = StatsParser.CountOpen(tickets);
+        }
+        catch (Exception ex)
+        {
+            _statusSlices = [];
+            _statusSeries = [];
+            _statusLabels = [];
+            _openTotal = 0;
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoadingTickets = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadWorkloadAsync()
+    {
+        _isLoadingWorkload = true;
+        StateHasChanged();
+        try
+        {
+            var json = await ApiService.GetAssigneesAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            // v1 returns { users: [...] }, v2 returns { accounts: [...] }.
+            var agents = JsonHelper.DeserializeWrappedArray<User>(json, "users", options);
+            if (agents.Length == 0)
+                agents = JsonHelper.DeserializeWrappedArray<User>(json, "accounts", options);
+
+            var rows = new List<AssigneeWorkloadRow>();
+            foreach (var agent in agents.Where(a => !a.Deleted))
+            {
+                var userId = agent.Id; // falls back to _id internally
+                if (string.IsNullOrEmpty(userId)) continue;
+
+                try
+                {
+                    // Workload = tickets where the user is the ASSIGNEE.
+                    // (The /stats/user endpoint counts requesters instead.)
+                    var statsJson = await ApiService.GetTicketStatsForAssigneeAsync(userId);
+                    var stats = StatsParser.ParseAssigneeStats(statsJson);
+                    rows.Add(new AssigneeWorkloadRow(agent.Fullname ?? agent.Username ?? L.T("common.unknown"), stats));
+                }
+                catch
+                {
+                    // One failing agent must not take down the whole list.
+                }
+            }
+
+            _workloads = rows.OrderByDescending(r => r.Stats.TicketCount).ToList();
+        }
+        catch (Exception ex)
+        {
+            _workloads = [];
+            var (message, _) = ErrorHelper.Categorize(ex);
+            Snackbar.Add(message, Severity.Error);
+        }
+        finally
+        {
+            _isLoadingWorkload = false;
+            StateHasChanged();
+        }
+    }
+
+    private static int ClosedPercent(AssigneeWorkloadRow w) =>
+        w.Stats.TicketCount > 0 ? (int)(w.Stats.ClosedCount * 100.0 / w.Stats.TicketCount) : 0;
+
+    private static int OpenPercent(AssigneeWorkloadRow w) =>
+        w.Stats.TicketCount > 0 ? (int)(w.Stats.OpenCount * 100.0 / w.Stats.TicketCount) : 0;
+
+    private sealed record AssigneeWorkloadRow(string Name, AssigneeWorkload Stats);
+}

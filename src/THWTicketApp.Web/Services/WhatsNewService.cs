@@ -56,6 +56,14 @@ public sealed class WhatsNewService
         [
             "Neue Tickets können jetzt auch ohne Internetverbindung angelegt werden — inklusive Fälligkeitsdatum und Vorlagen-Checkliste. Sie werden automatisch übertragen, sobald die Verbindung wieder steht."
         ]),
+        new WhatsNewEntry(7, "12.06.2026", "Datenexport (DSGVO)",
+        [
+            "Datenexport: Du kannst deine gespeicherten Daten jetzt als Datei herunterladen (DSGVO-Auskunft) — im Profil unter „Meine Daten“."
+        ]),
+        new WhatsNewEntry(8, "12.06.2026", "Neue Statistik-Seite",
+        [
+            "Neue Statistik-Seite: Ticketaufkommen, Status-Verteilung und Auslastung auf einen Blick — erreichbar über den Menüpunkt „Statistik“."
+        ]),
         new WhatsNewEntry(9, "13.06.2026", "Leerzeilen in Beschreibungen",
         [
             "Leerzeilen in der Ticket-Beschreibung bleiben jetzt erhalten — beim Speichern und beim erneuten Bearbeiten wird der Text so dargestellt, wie du ihn eingegeben hast."
