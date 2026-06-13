@@ -34,6 +34,14 @@ public class Ticket
     /// </summary>
     [JsonPropertyName("additionalAssignees")]
     public List<Assignee> AdditionalAssignees { get; set; } = new();
+
+    /// <summary>
+    /// Bidirectional links to other tickets (trudesk v2 feature). The server
+    /// populates each entry's <see cref="LinkedTicket.Ticket"/> with uid,
+    /// subject and status. Empty on tickets without links.
+    /// </summary>
+    [JsonPropertyName("linkedTickets")]
+    public List<TicketLink> LinkedTickets { get; set; } = new();
     public DateTime Updated { get; set; }
 
     /// <summary>

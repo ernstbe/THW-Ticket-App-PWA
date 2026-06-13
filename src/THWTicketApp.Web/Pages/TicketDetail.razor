@@ -645,49 +645,50 @@ else
                 </MudText>
             </MudPaper>
 
-            @* Linked tickets — ausgeblendet auf Nutzerwunsch (war localStorage-only,
-               nicht serverseitig persistiert). Code bleibt für eine spätere
-               serverseitige Reimplementierung erhalten. *@
-            @if (_showDisabledTicketSections)
-            {
-                <MudPaper Elevation="1" Class="pa-4 mb-3">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.linked")</MudText>
-                    @if (_linkedTickets.Count > 0)
-                    {
-                        <div class="d-flex flex-column gap-1 mb-2">
-                            @foreach (var link in _linkedTickets)
-                            {
-                                var l = link;
-                                <div class="d-flex align-center gap-2">
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@l.LinkType</MudChip>
-                                    <MudLink Href="@($"/tickets/{l.Uid}")" Typo="Typo.body2" Style="flex:1; min-width:0;">
-                                        #@l.Uid – @l.Subject
-                                    </MudLink>
-                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
-                                                   OnClick="@(() => RemoveLinkedTicketAsync(l))" />
-                                </div>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">@L.T("detail.no_links")</MudText>
-                    }
-                    <div class="d-flex gap-1 align-center">
-                        <MudNumericField @bind-Value="_linkTicketUid" Placeholder="#" Variant="Variant.Outlined"
-                                         Margin="Margin.Dense" Style="max-width: 80px;" T="int" />
-                        <MudSelect @bind-Value="_linkType" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                   Dense="true" T="string" Style="flex:1;">
-                            <MudSelectItem Value="@(L.T("detail.link_related"))">@L.T("detail.link_related")</MudSelectItem>
-                            <MudSelectItem Value="@(L.T("detail.link_blocks"))">@L.T("detail.link_blocks")</MudSelectItem>
-                            <MudSelectItem Value="@(L.T("detail.link_blocked_by"))">@L.T("detail.link_blocked_by")</MudSelectItem>
-                            <MudSelectItem Value="@(L.T("detail.link_duplicate"))">@L.T("detail.link_duplicate")</MudSelectItem>
-                        </MudSelect>
-                        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
-                                       OnClick="AddLinkedTicketAsync" />
+            @* Linked tickets — server-backed via trudesk v2 bidirectional links.
+               "blockedBy" is server-generated (the inverse of "blocks") and only
+               shown on received links, so it isn't offered in the add dropdown. *@
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">@L.T("detail.linked")</MudText>
+                @if (_ticket.LinkedTickets.Count > 0)
+                {
+                    <div class="d-flex flex-column gap-1 mb-2">
+                        @foreach (var link in _ticket.LinkedTickets)
+                        {
+                            var l = link;
+                            <div class="d-flex align-center gap-2">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@LinkTypeLabel(l.LinkType)</MudChip>
+                                <MudLink Href="@($"/tickets/{l.Ticket?.Uid}")" Typo="Typo.body2" Style="flex:1; min-width:0;">
+                                    #@l.Ticket?.Uid – @l.Ticket?.Subject
+                                </MudLink>
+                                @if (l.Ticket?.Status?.Name is { Length: > 0 } statusName)
+                                {
+                                    <MudChip T="string" Size="Size.Small"
+                                             Style="@($"background:{l.Ticket.Status.HtmlColor};color:#fff;")">@statusName</MudChip>
+                                }
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
+                                               OnClick="@(() => RemoveLinkedTicketAsync(l))" Disabled="_isLoading" />
+                            </div>
+                        }
                     </div>
-                </MudPaper>
-            }
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">@L.T("detail.no_links")</MudText>
+                }
+                <div class="d-flex gap-1 align-center">
+                    <MudNumericField @bind-Value="_linkTicketUid" Placeholder="#" Variant="Variant.Outlined"
+                                     Margin="Margin.Dense" Style="max-width: 80px;" T="int" />
+                    <MudSelect @bind-Value="_linkType" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Dense="true" T="string" Style="flex:1;">
+                        <MudSelectItem Value="@("related")">@L.T("detail.link_related")</MudSelectItem>
+                        <MudSelectItem Value="@("blocks")">@L.T("detail.link_blocks")</MudSelectItem>
+                        <MudSelectItem Value="@("duplicate")">@L.T("detail.link_duplicate")</MudSelectItem>
+                    </MudSelect>
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                                   OnClick="AddLinkedTicketAsync" Disabled="_isLoading" />
+                </div>
+            </MudPaper>
 
             @* Time tracking entfernt auf Nutzerwunsch (2026-05-19) — die
                Funktion wurde nirgendwo verwendet und hat die Sidebar
@@ -771,23 +772,14 @@ else
     // Attachments
     private bool _isUploading;
     private IJSObjectReference? _dropzoneModule;
-    // Re-enable switch for the linked-tickets panel that was disabled on
-    // user request but kept in markup. Held as a non-const field so the
-    // Razor source generator doesn't fold the `@if` away and trip CS0162
-    // in the generated `.g.cs`. Never assigned anywhere — flip the literal
-    // to `true` when re-enabling.
-#pragma warning disable CS0649
-    private readonly bool _showDisabledTicketSections;
-#pragma warning restore CS0649
 
     // Quick replies
     private List<string> _quickReplyTemplates = new();
     private bool _showQuickReplyEditor;
 
-    // Linked tickets (local)
-    private List<LinkedTicketItem> _linkedTickets = [];
+    // Linked tickets (server-backed; the list lives on _ticket.LinkedTickets)
     private int _linkTicketUid;
-    private string _linkType = "";
+    private string _linkType = "related";
 
     private CancellationTokenSource? _refreshDebounceCts;
 
@@ -795,11 +787,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        _linkType = L.T("detail.link_related");
         await LoadTicketAsync();
         _ = LoadReferenceDataAsync();
         await LoadFavoriteStateAsync();
-        await LoadLinkedTicketsAsync();
         await LoadQuickRepliesAsync();
         await LoadSubscriptionStateAsync();
         Realtime.AnyTicketChanged += OnRealtimeChange;
@@ -1682,50 +1672,67 @@ else
         catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
     }
 
-    // ─── Linked tickets (local-only) ────────────────────────────────────
+    // ─── Linked tickets (server-backed, trudesk v2 bidirectional) ───────
 
-    private async Task LoadLinkedTicketsAsync()
+    // Maps the API link type (incl. server-only "blockedBy") to a localized
+    // label for display.
+    private string LinkTypeLabel(string? linkType) => linkType switch
     {
-        try
-        {
-            var json = await LocalStorage.GetItemAsync($"linked_tickets_{TicketUid}");
-            if (!string.IsNullOrEmpty(json))
-                _linkedTickets = JsonSerializer.Deserialize<List<LinkedTicketItem>>(json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
-        }
-        catch { }
-    }
+        "blocks" => L.T("detail.link_blocks"),
+        "blockedBy" => L.T("detail.link_blocked_by"),
+        "duplicate" => L.T("detail.link_duplicate"),
+        _ => L.T("detail.link_related")
+    };
 
     private async Task AddLinkedTicketAsync()
     {
-        if (_linkTicketUid <= 0 || _linkTicketUid == TicketUid) return;
-        if (_linkedTickets.Any(l => l.Uid == _linkTicketUid)) return;
-        string subject = $"Ticket #{_linkTicketUid}";
+        if (_ticket == null || _linkTicketUid <= 0) return;
+        if (_linkTicketUid == _ticket.Uid)
+        {
+            Snackbar.Add(L.T("detail.link_self"), Severity.Warning);
+            return;
+        }
+        if (!AppState.IsOnline)
+        {
+            Snackbar.Add(L.T("detail.link_offline"), Severity.Info);
+            return;
+        }
+        _isLoading = true;
         try
         {
-            var json = await ApiService.GetTicketAsync(_linkTicketUid.ToString());
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("ticket", out var tEl))
+            if (await ApiService.LinkTicketAsync(_ticket.Uid.ToString(), _linkTicketUid, _linkType))
             {
-                var t = JsonSerializer.Deserialize<Ticket>(tEl.GetRawText(),
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (t?.Subject != null) subject = t.Subject;
+                Snackbar.Add(L.T("detail.link_added"), Severity.Success);
+                _linkTicketUid = 0;
+                await LoadTicketAsync();
             }
+            else Snackbar.Add(L.T("detail.link_failed"), Severity.Error);
         }
-        catch { }
-        _linkedTickets.Add(new LinkedTicketItem { Uid = _linkTicketUid, Subject = subject, LinkType = _linkType });
-        await SaveLinkedTicketsAsync();
-        _linkTicketUid = 0;
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
     }
 
-    private async Task RemoveLinkedTicketAsync(LinkedTicketItem link)
+    private async Task RemoveLinkedTicketAsync(TicketLink link)
     {
-        _linkedTickets.Remove(link);
-        await SaveLinkedTicketsAsync();
+        if (_ticket == null || link.Ticket == null) return;
+        if (!AppState.IsOnline)
+        {
+            Snackbar.Add(L.T("detail.link_offline"), Severity.Info);
+            return;
+        }
+        _isLoading = true;
+        try
+        {
+            if (await ApiService.UnlinkTicketAsync(_ticket.Uid.ToString(), link.Ticket.Uid))
+            {
+                Snackbar.Add(L.T("detail.link_removed"), Severity.Success);
+                await LoadTicketAsync();
+            }
+            else Snackbar.Add(L.T("detail.link_failed"), Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add(ErrorHelper.Categorize(ex).Message, Severity.Error); }
+        finally { _isLoading = false; }
     }
-
-    private async Task SaveLinkedTicketsAsync()
-        => await LocalStorage.SetItemAsync($"linked_tickets_{TicketUid}", JsonSerializer.Serialize(_linkedTickets));
 
     // ─── Quick replies ──────────────────────────────────────────────────
 
@@ -1783,12 +1790,4 @@ else
         }
     }
 
-    // ─── Local DTOs ─────────────────────────────────────────────────────
-
-    private class LinkedTicketItem
-    {
-        public int Uid { get; set; }
-        public string Subject { get; set; } = string.Empty;
-        public string LinkType { get; set; } = string.Empty;
-    }
 }

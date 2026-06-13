@@ -67,6 +67,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(9, "13.06.2026", "Leerzeilen in Beschreibungen",
         [
             "Leerzeilen in der Ticket-Beschreibung bleiben jetzt erhalten — beim Speichern und beim erneuten Bearbeiten wird der Text so dargestellt, wie du ihn eingegeben hast."
+        ]),
+        new WhatsNewEntry(10, "13.06.2026", "Verknüpfte Tickets",
+        [
+            "Tickets können jetzt miteinander verknüpft werden (verwandt, blockiert, Duplikat) — in der Ticket-Ansicht unter „Verknüpfte Tickets“. Die Verknüpfung erscheint automatisch auch beim verknüpften Ticket."
         ])
     ];
 
