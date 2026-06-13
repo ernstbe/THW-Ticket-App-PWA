@@ -10,7 +10,6 @@
 @using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Services
 @using Markdig
-@inject LocalizationService L
 
 @if (Items.Count == 0)
 {
@@ -67,6 +66,10 @@ else
 }
 
 @code {
+    // Injected explicitly (rather than via @inject) so unit tests can supply
+    // a LocalizationService instance when exercising FormatRelative directly.
+    [Inject] internal LocalizationService L { get; set; } = default!;
+
     [Parameter, EditorRequired] public Ticket? Ticket { get; set; }
 
     // Limit the feed to a subset of activity kinds. The detail page renders
@@ -123,7 +126,10 @@ else
         return list.OrderByDescending(e => e.Date).ToList();
     }
 
-    internal static string FormatRelative(DateTime when)
+    // Instance (not static) so it can use the injected LocalizationService —
+    // a static method can't reach L, which is why this used to be hardcoded
+    // German and ignored the language switch (same fix as Dashboard/Profile).
+    internal string FormatRelative(DateTime when)
     {
         var local = when.Kind switch
         {
@@ -132,10 +138,10 @@ else
             _ => DateTime.SpecifyKind(when, DateTimeKind.Utc).ToLocalTime()
         };
         var diff = DateTime.Now - local;
-        if (diff.TotalSeconds < 60) return "gerade eben";
-        if (diff.TotalMinutes < 60) return $"vor {(int)diff.TotalMinutes} Min.";
-        if (diff.TotalHours < 24) return $"vor {(int)diff.TotalHours} Std.";
-        if (diff.TotalDays < 7) return $"vor {(int)diff.TotalDays} Tagen";
+        if (diff.TotalSeconds < 60) return L.T("time.just_now");
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} {L.T("time.minutes_ago")}";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} {L.T("time.hours_ago")}";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays} {L.T("time.days_ago")}";
         return local.ToString("dd.MM.yyyy HH:mm");
     }
 

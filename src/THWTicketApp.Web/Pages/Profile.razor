@@ -347,13 +347,16 @@
         return parts.Count == 0 ? string.Empty : string.Join(" · ", parts);
     }
 
-    private static string FormatRelative(DateTime dt)
+    // Instance (not static) so it can use the injected LocalizationService —
+    // a static method can't reach L, which is why this used to be hardcoded
+    // English and ignored the language switch (same fix as Dashboard).
+    private string FormatRelative(DateTime dt)
     {
         var diff = DateTime.UtcNow - dt.ToUniversalTime();
-        if (diff.TotalMinutes < 1) return "just now";
-        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} min";
-        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} h";
-        return $"{(int)diff.TotalDays} d";
+        if (diff.TotalMinutes < 1) return L.T("time.just_now");
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} {L.T("time.minutes_ago")}";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} {L.T("time.hours_ago")}";
+        return $"{(int)diff.TotalDays} {L.T("time.days_ago")}";
     }
 
     private async Task LoadProfileAsync()

@@ -1,5 +1,7 @@
 using THWTicketApp.Shared.Models;
+using THWTicketApp.Tests.Helpers;
 using THWTicketApp.Web.Components;
+using THWTicketApp.Web.Services;
 
 namespace THWTicketApp.Tests.Components;
 
@@ -68,23 +70,45 @@ public class TicketActivityFeedTests
         Assert.Equal(TicketActivityFeed.ActivityKind.History, feed[2].Kind);
     }
 
+    private static TicketActivityFeed BuildComponent(string language)
+    {
+        var localization = new LocalizationService(new InMemoryLocalStorageService());
+        if (language != "de")
+            localization.SetLanguageAsync(language).GetAwaiter().GetResult();
+        return new TicketActivityFeed { L = localization };
+    }
+
     [Theory]
     [InlineData(30, "gerade eben")]                    // <1 min
-    [InlineData(60 * 5, "vor 5 Min.")]                 // 5 min
-    [InlineData(60 * 60 * 3, "vor 3 Std.")]            // 3 hours
-    [InlineData(60 * 60 * 24 * 2, "vor 2 Tagen")]      // 2 days
-    public void FormatRelative_picksReadableUnit(int secondsAgo, string expected)
+    [InlineData(60 * 5, "5 Min. her")]                 // 5 min
+    [InlineData(60 * 60 * 3, "3 Std. her")]            // 3 hours
+    [InlineData(60 * 60 * 24 * 2, "2 Tage her")]       // 2 days
+    public void FormatRelative_german_picksReadableUnit(int secondsAgo, string expected)
     {
+        var feed = BuildComponent("de");
         var when = DateTime.Now.AddSeconds(-secondsAgo);
-        Assert.Equal(expected, TicketActivityFeed.FormatRelative(when));
+        Assert.Equal(expected, feed.FormatRelative(when));
+    }
+
+    [Theory]
+    [InlineData(30, "just now")]                        // <1 min
+    [InlineData(60 * 5, "5 min ago")]                  // 5 min
+    [InlineData(60 * 60 * 3, "3 h ago")]               // 3 hours
+    [InlineData(60 * 60 * 24 * 2, "2 d ago")]          // 2 days
+    public void FormatRelative_english_picksReadableUnit(int secondsAgo, string expected)
+    {
+        var feed = BuildComponent("en");
+        var when = DateTime.Now.AddSeconds(-secondsAgo);
+        Assert.Equal(expected, feed.FormatRelative(when));
     }
 
     [Fact]
     public void FormatRelative_olderThanWeek_fallsBackToAbsoluteDate()
     {
+        var feed = BuildComponent("de");
         var when = DateTime.Now.AddDays(-30);
-        var result = TicketActivityFeed.FormatRelative(when);
-        Assert.DoesNotContain("vor", result);
+        var result = feed.FormatRelative(when);
+        Assert.DoesNotContain("her", result);
         Assert.Contains(when.Year.ToString(), result);
     }
 }
