@@ -675,6 +675,21 @@ public class SyncServiceTests
     }
 
     [Fact]
+    public async Task CheckConflict_sameInstantDifferentPrecision_returnsNull()
+    {
+        // Server emits 3 fractional digits; the client baseline is
+        // DateTime.ToString("O") with 7. Same instant — must NOT be a conflict
+        // (a raw string compare here would wrongly flag every queued action).
+        _api.GetTicketRawAsync("1001").Returns((200,
+            "{\"_id\":\"t1\",\"updated\":\"2026-04-01T10:00:00.000Z\",\"status\":{\"_id\":\"s1\"}}"));
+
+        var result = await _sut.CheckConflictAsync(
+            ActionTargetingTicket(ticketUpdatedAt: "2026-04-01T10:00:00.0000000Z"));
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task CheckConflict_driftedUpdatedTimestamp_returnsTicketUpdated()
     {
         _api.GetTicketRawAsync("1001").Returns((200,
