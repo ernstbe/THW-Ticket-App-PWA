@@ -275,6 +275,9 @@
     }
 
     private bool _initialized;
+    // Periodically retries queued offline actions so the SyncService backoff
+    // schedule actually advances even without a connectivity flip.
+    private System.Threading.Timer? _syncTimer;
 
     protected override async Task OnInitializedAsync()
     {
@@ -363,8 +366,17 @@
 
             // Offline detection
             _isOffline = !await JsRuntime.InvokeAsync<bool>("pwaHelpers.isOnline");
+            AppState.IsOnline = !_isOffline;
+            AppState.NotifyStateChanged();
             _dotNetRef = DotNetObjectReference.Create(this);
             await JsRuntime.InvokeVoidAsync("window.registerConnectivityHandler", _dotNetRef);
+
+            // Drain anything queued while offline in a previous session, then
+            // keep retrying on an interval so the per-action backoff advances.
+            _ = TrySyncPendingAsync();
+            _syncTimer = new System.Threading.Timer(
+                _ => _ = InvokeAsync(TrySyncPendingAsync), null,
+                TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
 
             // PWA install prompt
             _isInstalled = await JsRuntime.InvokeAsync<bool>("window.isPwaInstalled");
@@ -519,8 +531,23 @@
     [JSInvokable]
     public void OnConnectivityChanged(bool isOnline)
     {
+        var cameOnline = isOnline && _isOffline;
         _isOffline = !isOnline;
+        AppState.IsOnline = isOnline;
+        AppState.NotifyStateChanged();
         InvokeAsync(StateHasChanged);
+        // Connection just returned — replay anything that queued while offline.
+        if (cameOnline) _ = TrySyncPendingAsync();
+    }
+
+    // Drains the offline queue, but only when we're actually online and
+    // authenticated. Best-effort: SyncService logs failures and reschedules
+    // its own retries internally.
+    private async Task TrySyncPendingAsync()
+    {
+        if (_pendingActions <= 0 || !AppState.IsOnline || !ApiService.IsAuthenticated) return;
+        try { await SyncService.SyncPendingActionsAsync(); }
+        catch { /* best-effort; SyncService handles per-action retry/backoff */ }
     }
 
     private void RecoverFromError() => _errorBoundary?.Recover();
@@ -540,6 +567,7 @@
         Navigation.LocationChanged -= OnLocationChanged;
         if (_shortcutModule != null)
             _ = _shortcutModule.InvokeVoidAsync("unregister");
+        _syncTimer?.Dispose();
         _dotNetRef?.Dispose();
     }
 

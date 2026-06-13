@@ -207,8 +207,15 @@ public class SyncService : ISyncService
         await UpdatePendingCount();
     }
 
+    // Guards against overlapping drains (e.g. the startup pass and a
+    // connectivity-restored pass firing at once). WASM is single-threaded, so
+    // a plain flag is sufficient.
+    private bool _syncing;
+
     public async Task<bool> SyncPendingActionsAsync()
     {
+        if (_syncing) return false;
+        _syncing = true;
         try
         {
             var json = await _indexedDb.GetPendingActionsAsync();
@@ -280,6 +287,10 @@ public class SyncService : ISyncService
         {
             await AppendLogAsync("error", null, "Sync loop crashed: " + ex.Message, ex);
             return false;
+        }
+        finally
+        {
+            _syncing = false;
         }
     }
 
