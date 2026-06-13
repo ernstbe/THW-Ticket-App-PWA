@@ -1259,6 +1259,28 @@ public class TrueDeskApiService : ITrueDeskApiService
     }
 
     // -----------------------------------------------------------------
+    // Linked tickets (v2, bidirectional)
+    // -----------------------------------------------------------------
+
+    public async Task<bool> LinkTicketAsync(string ticketUid, int targetUid, string linkType)
+    {
+        if (string.IsNullOrWhiteSpace(ticketUid) || targetUid <= 0)
+            return false;
+        var payload = new { targetUid, linkType };
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/tickets/{ticketUid}/links", content));
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UnlinkTicketAsync(string ticketUid, int targetUid)
+    {
+        if (string.IsNullOrWhiteSpace(ticketUid) || targetUid <= 0)
+            return false;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/tickets/{ticketUid}/links/{targetUid}"));
+        return response.IsSuccessStatusCode;
+    }
+
+    // -----------------------------------------------------------------
     // Batch operations (v2)
     // -----------------------------------------------------------------
 
