@@ -75,6 +75,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(11, "13.06.2026", "Profilbild",
         [
             "Du kannst jetzt ein eigenes Profilbild hochladen — im Profil unter „Profilbild ändern“."
+        ]),
+        new WhatsNewEntry(12, "13.06.2026", "Mehrere Tickets auf einmal bearbeiten",
+        [
+            "In der Ticketliste kannst du über die Mehrfachauswahl jetzt mehrere Tickets gleichzeitig einer Person zuweisen. Vor dem Sammel-Löschen kommt außerdem eine Sicherheitsabfrage."
         ])
     ];
 
