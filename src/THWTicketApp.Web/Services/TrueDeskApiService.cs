@@ -1371,6 +1371,17 @@ public class TrueDeskApiService : ITrueDeskApiService
         }
     }
 
+    public async Task<string?> ExportMyDataAsync()
+    {
+        // v2-only endpoint (trudesk PR feat/dsgvo-account-export). The
+        // response body is the export document itself — return it verbatim
+        // so the page can hand it to the download helper unchanged.
+        var response = await SendWithAutoRefreshAsync(() =>
+            _httpClient.GetAsync($"{V2BaseUrl}/accounts/me/export"));
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadAsStringAsync();
+    }
+
     public async Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber)
     {
         if (string.IsNullOrWhiteSpace(fullname)) return false;

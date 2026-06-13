@@ -6,6 +6,8 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject THWTicketApp.Web.Services.LocalizationService L
+@inject THWTicketApp.Web.Services.AppStateService AppState
+@inject IJSRuntime JsRuntime
 
 <PageTitle>@L.T("profile.title") - THW Ticket App</PageTitle>
 
@@ -160,6 +162,32 @@
             </MudCardContent>
         </MudCard>
     </MudItem>
+
+    @* DSGVO data export (Art. 15) *@
+    <MudItem xs="12" md="6">
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">@L.T("profile.my_data_title")</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@L.T("profile.my_data_subtitle")</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Download"
+                           OnClick="ExportMyDataAsync"
+                           Disabled="@(_isExporting || !AppState.IsOnline)">
+                    @L.T("profile.export_data")
+                </MudButton>
+                @if (!AppState.IsOnline)
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2">
+                        @L.T("profile.export_offline")
+                    </MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
 </MudGrid>
 
 @code {
@@ -175,6 +203,7 @@
     private string _passwordError = string.Empty;
     private bool _isSaving;
     private bool _isLoading = true;
+    private bool _isExporting;
 
     private List<SessionInfo> _sessions = new();
     private bool _sessionsLoading = true;
@@ -375,6 +404,37 @@
         }
         catch (Exception ex) { Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error); }
         finally { _isSaving = false; }
+    }
+
+    private async Task ExportMyDataAsync()
+    {
+        if (!AppState.IsOnline)
+        {
+            Snackbar.Add(L.T("profile.export_offline"), Severity.Warning);
+            return;
+        }
+
+        _isExporting = true;
+        try
+        {
+            var json = await ApiService.ExportMyDataAsync();
+            if (string.IsNullOrEmpty(json))
+            {
+                Snackbar.Add(L.T("profile.export_failed"), Severity.Error);
+                return;
+            }
+
+            // Same CSP-safe download path as Reports/Settings: base64 data
+            // URL via the named pwa-helpers function — no eval.
+            var filename = $"datenexport-{_username ?? "benutzer"}-{DateTime.Now:yyyy-MM-dd}.json";
+            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+            await JsRuntime.InvokeVoidAsync("pwaHelpers.downloadBase64", "application/json", base64, filename);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error);
+        }
+        finally { _isExporting = false; }
     }
 
     private async Task ChangePasswordAsync()

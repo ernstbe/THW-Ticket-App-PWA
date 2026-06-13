@@ -465,6 +465,11 @@ public class LocalizationService
         ["profile.sessions_revoke_others_confirm"] = "Alle anderen Sitzungen werden sofort beendet. Dieses Gerät bleibt angemeldet.",
         ["profile.sessions_revoked"] = "Sitzung beendet.",
         ["profile.sessions_revoke_failed"] = "Abmelden fehlgeschlagen.",
+        ["profile.my_data_title"] = "Meine Daten",
+        ["profile.my_data_subtitle"] = "Auskunft über deine gespeicherten Daten (Art. 15 DSGVO).",
+        ["profile.export_data"] = "Meine Daten exportieren (DSGVO)",
+        ["profile.export_failed"] = "Export fehlgeschlagen. Bitte später erneut versuchen.",
+        ["profile.export_offline"] = "Der Datenexport ist offline nicht verfügbar.",
 
         // PWA
         ["pwa.install_hint"] = "App zum Startbildschirm hinzufügen für schnelleren Zugriff.",
@@ -1225,6 +1230,11 @@ public class LocalizationService
         ["profile.sessions_revoke_others_confirm"] = "All other sessions will end immediately. This device stays signed in.",
         ["profile.sessions_revoked"] = "Session ended.",
         ["profile.sessions_revoke_failed"] = "Sign out failed.",
+        ["profile.my_data_title"] = "My Data",
+        ["profile.my_data_subtitle"] = "Access to your stored personal data (Art. 15 GDPR).",
+        ["profile.export_data"] = "Export my data (GDPR)",
+        ["profile.export_failed"] = "Export failed. Please try again later.",
+        ["profile.export_offline"] = "The data export is not available offline.",
 
         // PWA
         ["pwa.install_hint"] = "Add app to home screen for faster access.",
