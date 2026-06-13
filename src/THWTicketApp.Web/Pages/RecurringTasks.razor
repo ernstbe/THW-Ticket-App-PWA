@@ -185,13 +185,21 @@ else if (_isLoading)
         <MudSwitch @bind-Value="_formEnabled" Label="@L.T("recurring.enabled")" Color="Color.Primary" />
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="() => _dialogVisible = false">@L.T("common.cancel")</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveTaskAsync">@L.T("common.save")</MudButton>
+        <MudButton OnClick="() => _dialogVisible = false" Disabled="_isSaving">@L.T("common.cancel")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveTaskAsync" Disabled="_isSaving">
+            @if (_isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @L.T("common.save")
+        </MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     private bool _isLoading;
+    private bool _isSaving;
+    private bool _isDeleting;
     private RecurringTask[] _tasks = [];
     private bool _dialogVisible;
     private RecurringTask? _editingTask;
@@ -406,6 +414,11 @@ else if (_isLoading)
 
     private async Task SaveTaskAsync()
     {
+        // Guard against double-submit: a second tap while the create/update
+        // POST is in flight (dialog stays open during the await) would
+        // create a duplicate recurring task.
+        if (_isSaving) return;
+
         if (string.IsNullOrWhiteSpace(_formName))
         {
             Snackbar.Add(L.T("recurring.name_required"), Severity.Warning);
@@ -422,40 +435,52 @@ else if (_isLoading)
             return;
         }
 
-        var data = BuildPayload(
-            name: _formName,
-            description: _formDescription,
-            ticketSubject: _formTicketSubject,
-            ticketIssue: _formTicketIssue,
-            scheduleType: _formScheduleType,
-            dayOfMonth: _formDayOfMonth,
-            daysBeforeDeadline: _formDaysBeforeDeadline,
-            enabled: _formEnabled,
-            typeId: _formTypeId,
-            priorityId: _formPriorityId,
-            groupId: _formGroupId,
-            checklist: _formChecklist);
-
-        bool success;
-        if (_editingTask != null)
-            success = await ApiService.UpdateRecurringTaskAsync(_editingTask.Id, data);
-        else
-            success = await ApiService.CreateRecurringTaskAsync(data);
-
-        if (success)
+        _isSaving = true;
+        StateHasChanged();
+        try
         {
-            _dialogVisible = false;
-            Snackbar.Add(L.T("common.success"), Severity.Success);
-            await LoadTasksAsync();
+            var data = BuildPayload(
+                name: _formName,
+                description: _formDescription,
+                ticketSubject: _formTicketSubject,
+                ticketIssue: _formTicketIssue,
+                scheduleType: _formScheduleType,
+                dayOfMonth: _formDayOfMonth,
+                daysBeforeDeadline: _formDaysBeforeDeadline,
+                enabled: _formEnabled,
+                typeId: _formTypeId,
+                priorityId: _formPriorityId,
+                groupId: _formGroupId,
+                checklist: _formChecklist);
+
+            bool success;
+            if (_editingTask != null)
+                success = await ApiService.UpdateRecurringTaskAsync(_editingTask.Id, data);
+            else
+                success = await ApiService.CreateRecurringTaskAsync(data);
+
+            if (success)
+            {
+                _dialogVisible = false;
+                Snackbar.Add(L.T("common.success"), Severity.Success);
+                await LoadTasksAsync();
+            }
+            else
+            {
+                Snackbar.Add(L.T("common.error"), Severity.Error);
+            }
         }
-        else
+        finally
         {
-            Snackbar.Add(L.T("common.error"), Severity.Error);
+            _isSaving = false;
+            StateHasChanged();
         }
     }
 
     private async Task DeleteTaskAsync(RecurringTask task)
     {
+        if (_isDeleting) return;
+
         var parameters = new DialogParameters<ConfirmDialog>
         {
             { x => x.Title, L.T("common.delete") },
@@ -467,14 +492,22 @@ else if (_isLoading)
         var result = await dialog.Result;
         if (result is null || result.Canceled) return;
 
-        if (await ApiService.DeleteRecurringTaskAsync(task.Id))
+        _isDeleting = true;
+        try
         {
-            Snackbar.Add(L.T("common.success"), Severity.Success);
-            await LoadTasksAsync();
+            if (await ApiService.DeleteRecurringTaskAsync(task.Id))
+            {
+                Snackbar.Add(L.T("common.success"), Severity.Success);
+                await LoadTasksAsync();
+            }
+            else
+            {
+                Snackbar.Add(L.T("common.error"), Severity.Error);
+            }
         }
-        else
+        finally
         {
-            Snackbar.Add(L.T("common.error"), Severity.Error);
+            _isDeleting = false;
         }
     }
 
