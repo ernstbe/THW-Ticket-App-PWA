@@ -56,7 +56,7 @@ public sealed class WhatsNewService
         [
             "Neue Tickets können jetzt auch ohne Internetverbindung angelegt werden — inklusive Fälligkeitsdatum und Vorlagen-Checkliste. Sie werden automatisch übertragen, sobald die Verbindung wieder steht."
         ]),
-        new WhatsNewEntry(8, "13.06.2026", "Leerzeilen in Beschreibungen",
+        new WhatsNewEntry(9, "13.06.2026", "Leerzeilen in Beschreibungen",
         [
             "Leerzeilen in der Ticket-Beschreibung bleiben jetzt erhalten — beim Speichern und beim erneuten Bearbeiten wird der Text so dargestellt, wie du ihn eingegeben hast."
         ])
