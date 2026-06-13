@@ -9,6 +9,9 @@
 @inject OnboardingService Onboarding
 @inject LocalizationService L
 @inject NavigationManager Navigation
+@inject WebPushService WebPush
+@inject LocalStorageService LocalStorage
+@inject ISnackbar Snackbar
 @implements IDisposable
 
 @if (Onboarding.IsVisible)
@@ -33,6 +36,32 @@
                     <MudText Typo="Typo.body2" Color="Color.Secondary" Style="max-width:400px;">
                         @L.T($"onboarding.step{_step + 1}_body")
                     </MudText>
+
+                    @* Push opt-in lives on the final step. The browser only
+                       grants push after an explicit gesture + permission, so
+                       this is the moment we ask. *@
+                    @if (_step == StepCount - 1)
+                    {
+                        <div class="mt-4 d-flex flex-column align-center gap-2" style="width:100%;">
+                            @if (!_pushSupported)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@L.T("onboarding.push_unsupported")</MudText>
+                            }
+                            else if (_pushSubscribed)
+                            {
+                                <MudChip T="string" Color="Color.Success" Variant="Variant.Text"
+                                         Icon="@Icons.Material.Filled.CheckCircle">@L.T("onboarding.push_enabled")</MudChip>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.NotificationsActive"
+                                           OnClick="OnEnablePushAsync" Disabled="_pushBusy">
+                                    @L.T("onboarding.push_enable")
+                                </MudButton>
+                            }
+                        </div>
+                    }
                 </div>
 
                 @* Progress dots — visual stepper without taking space *@
@@ -79,8 +108,14 @@
 }
 
 @code {
-    private const int StepCount = 8;
+    private const int StepCount = 9;
     private int _step;
+
+    // Push opt-in step state (lazily loaded when the user reaches it).
+    private bool _pushSupported;
+    private bool _pushSubscribed;
+    private bool _pushBusy;
+    private bool _pushStateLoaded;
 
     private string CurrentIcon => _step switch
     {
@@ -92,6 +127,7 @@
         5 => Icons.Material.Filled.Keyboard,
         6 => Icons.Material.Filled.Fingerprint,
         7 => Icons.Material.Filled.TipsAndUpdates,
+        8 => Icons.Material.Filled.NotificationsActive,
         _ => Icons.Material.Filled.CheckCircle
     };
 
@@ -103,16 +139,56 @@
     private void OnStateChanged()
     {
         // Reset to first step every time the tour is opened — re-runs from
-        // Settings always start at step 0.
-        if (Onboarding.IsVisible) _step = 0;
+        // Settings always start at step 0, and the push state is re-read.
+        if (Onboarding.IsVisible)
+        {
+            _step = 0;
+            _pushStateLoaded = false;
+        }
         InvokeAsync(StateHasChanged);
     }
 
-    private void NextStep() => _step = Math.Min(StepCount - 1, _step + 1);
+    private async Task NextStep()
+    {
+        _step = Math.Min(StepCount - 1, _step + 1);
+        if (_step == StepCount - 1) await EnsurePushStateAsync();
+    }
+
     private void PrevStep() => _step = Math.Max(0, _step - 1);
 
     private async Task SkipAsync() => await Onboarding.SkipAsync();
     private async Task FinishAsync() => await Onboarding.CompleteAsync();
+
+    // Read support/subscription state once when the push step is first shown.
+    private async Task EnsurePushStateAsync()
+    {
+        if (_pushStateLoaded) return;
+        _pushStateLoaded = true;
+        _pushSupported = await WebPush.IsSupportedAsync();
+        if (_pushSupported) _pushSubscribed = await WebPush.IsSubscribedAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnEnablePushAsync()
+    {
+        _pushBusy = true;
+        try
+        {
+            if (await WebPush.EnableAsync())
+            {
+                // Keep the Settings screen consistent: the push toggle lives
+                // under the master notifications switch, so turn that on too.
+                await LocalStorage.SetItemAsync("settings_notifications", "true");
+                _pushSubscribed = true;
+                Snackbar.Add(L.T("onboarding.push_enabled"), Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(L.T("settings.push_enable_failed"), Severity.Error);
+            }
+        }
+        finally { _pushBusy = false; }
+    }
 
     public void Dispose() => Onboarding.StateChanged -= OnStateChanged;
 }
