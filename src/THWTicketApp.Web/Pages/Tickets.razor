@@ -380,7 +380,7 @@ else
             var json = await ApiService.GetAssigneesAsync();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var response = JsonSerializer.Deserialize<GetUserResponse>(json, options);
-            _assignableUsers = (response?.Users ?? [])
+            _assignableUsers = (response?.UsersOrAccounts ?? [])
                 .Where(u => !u.Deleted)
                 .OrderBy(u => u.Fullname ?? u.Username, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -620,7 +620,7 @@ else
         if (string.IsNullOrEmpty(userId)) return;
         try
         {
-            if (await ApiService.AssignTicketAsync(ticket.Id, userId))
+            if (await ApiService.AssignTicketAsync(ticket.Id, ticket.Uid, userId))
             { Snackbar.Add(L.T("tickets.assigned"), Severity.Success); await LoadTicketsAsync(); }
         }
         catch { Snackbar.Add(L.T("tickets.assign_failed"), Severity.Error); }
@@ -641,7 +641,7 @@ else
                 Snackbar.Add(L.T("offline.queued"), Severity.Info);
                 return;
             }
-            if (await ApiService.UpdateTicketStatusAsync(ticketId, statusId))
+            if (await ApiService.UpdateTicketStatusAsync(ticketId, ticketUid, statusId))
             {
                 Snackbar.Add(string.Format(L.T("tickets.status_changed"), args.Status.Name), Severity.Success);
                 await LoadTicketsAsync();
@@ -675,7 +675,7 @@ else
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
             var closedStatus = statuses.FirstOrDefault(s => s.IsResolved);
-            if (closedStatus != null && await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
+            if (closedStatus != null && await ApiService.UpdateTicketStatusAsync(ticket.Id, ticket.Uid, closedStatus.Id!))
             { Snackbar.Add(L.T("tickets.closed_success"), Severity.Success); await LoadTicketsAsync(); }
         }
         catch (HttpRequestException) { Snackbar.Add(L.T("offline.action_unavailable"), Severity.Warning); }

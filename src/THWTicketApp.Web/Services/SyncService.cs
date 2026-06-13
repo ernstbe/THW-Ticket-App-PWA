@@ -337,18 +337,18 @@ public class SyncService : ISyncService
     {
         "AddComment" => await _apiService.AddCommentAsync(action.TicketUid.ToString(), action.OwnerId!, action.Content!),
         "AddNote" => await _apiService.AddNoteAsync(action.TicketUid.ToString(), action.OwnerId!, action.Content!),
-        "AssignTicket" => await _apiService.AssignTicketAsync(action.TicketId!, action.TargetUserId!),
-        "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!),
+        "AssignTicket" => await _apiService.AssignTicketAsync(action.TicketId!, action.TicketUid, action.TargetUserId!),
+        "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!, action.TicketUid),
         "SetAdditionalAssignees" => await _apiService.SetAdditionalAssigneesAsync(action.TicketId!, action.TargetUserIds ?? []),
-        "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.StatusId!),
+        "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.TicketUid, action.StatusId!),
         "CreateTicket" => await _apiService.CreateTicketAsync(
             action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId,
             ParseOptionalDate(action.DueDate), action.ChecklistTitles) != null,
         "UpdateTicketFields" => await ApplyUpdateTicketFieldsAsync(action),
-        "DeleteTicket" => await _apiService.DeleteTicketAsync(action.TicketId!),
+        "DeleteTicket" => await _apiService.DeleteTicketAsync(action.TicketId!, action.TicketUid),
         "UploadAttachment" => await ApplyUploadAttachmentAsync(action),
-        "AddTag" => await _apiService.AddTagToTicketAsync(action.TicketId!, action.TagId!),
-        "RemoveTag" => await _apiService.RemoveTagFromTicketAsync(action.TicketId!, action.TagId!),
+        "AddTag" => await _apiService.AddTagToTicketAsync(action.TicketId!, action.TicketUid, action.TagId!),
+        "RemoveTag" => await _apiService.RemoveTagFromTicketAsync(action.TicketId!, action.TicketUid, action.TagId!),
         _ => false
     };
 

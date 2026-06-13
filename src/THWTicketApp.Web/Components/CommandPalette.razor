@@ -159,18 +159,27 @@
             var json = await ApiService.SearchTicketsAsync(query);
             ct.ThrowIfCancellationRequested();
 
-            // The API can return either a wrapped or unwrapped array.
+            // v1 search returns { tickets: [...] } (or a bare array). v2 routes to
+            // /es/search, which on a live Elasticsearch cluster returns the raw ES
+            // envelope { hits: { hits: [ { _source: {...} } ] } }; with the Mongo
+            // fallback it still returns { tickets: [...] }. Handle all three, and
+            // unwrap _source when present.
             using var doc = System.Text.Json.JsonDocument.Parse(json);
             var root = doc.RootElement;
             System.Text.Json.JsonElement arr;
             if (root.ValueKind == System.Text.Json.JsonValueKind.Array) arr = root;
-            else if (root.TryGetProperty("tickets", out var t)) arr = t;
+            else if (root.TryGetProperty("tickets", out var t) && t.ValueKind == System.Text.Json.JsonValueKind.Array) arr = t;
+            else if (root.TryGetProperty("hits", out var outerHits)
+                     && outerHits.TryGetProperty("hits", out var innerHits)
+                     && innerHits.ValueKind == System.Text.Json.JsonValueKind.Array) arr = innerHits;
             else return new();
 
             var results = new List<PaletteAction>();
-            foreach (var el in arr.EnumerateArray().Take(10))
+            foreach (var raw in arr.EnumerateArray().Take(10))
             {
-                var uid = el.TryGetProperty("uid", out var u) ? u.GetInt32().ToString() : null;
+                // ES hits wrap the document under _source; the other shapes are flat.
+                var el = raw.TryGetProperty("_source", out var src) ? src : raw;
+                var uid = ReadUid(el);
                 var subject = el.TryGetProperty("subject", out var s) ? s.GetString() : null;
                 if (uid == null || subject == null) continue;
 
@@ -190,6 +199,18 @@
             return results;
         }
         catch { return new(); }
+    }
+
+    // uid may arrive as a JSON number (Mongo/v1) or a string (some ES mappings).
+    private static string? ReadUid(System.Text.Json.JsonElement el)
+    {
+        if (!el.TryGetProperty("uid", out var u)) return null;
+        return u.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.Number => u.GetInt32().ToString(),
+            System.Text.Json.JsonValueKind.String => u.GetString(),
+            _ => null
+        };
     }
 
     private async Task Execute(PaletteAction action)

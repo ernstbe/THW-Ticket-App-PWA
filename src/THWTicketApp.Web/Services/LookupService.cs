@@ -1,4 +1,5 @@
 using System.Text.Json;
+using THWTicketApp.Shared.Helpers;
 using THWTicketApp.Shared.Models;
 using THWTicketApp.Shared.Services;
 
@@ -43,7 +44,10 @@ public sealed class LookupService : ILookupService, IDisposable
     private async Task<(IReadOnlyList<TicketType> Types, IReadOnlyList<Priority> Priorities)> LoadAsync()
     {
         var json = await _api.GetTicketTypesAsync();
-        IReadOnlyList<TicketType> types = JsonSerializer.Deserialize<TicketType[]>(json, JsonOptions) ?? [];
+        // v1 /tickets/types returns a raw array; v2 /tickets/info/types wraps it
+        // as { ticketTypes: [...] }. DeserializeWrappedArray handles the raw
+        // array case too, so both shapes resolve through one call.
+        IReadOnlyList<TicketType> types = JsonHelper.DeserializeWrappedArray<TicketType>(json, "ticketTypes", "types", JsonOptions);
         IReadOnlyList<Priority> priorities = types
             .SelectMany(t => t.Priorities)
             .DistinctBy(p => p.Id)
