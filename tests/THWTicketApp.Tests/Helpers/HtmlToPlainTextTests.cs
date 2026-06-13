@@ -73,4 +73,30 @@ public class HtmlToPlainTextTests
         var result = HtmlToPlainText.Convert(input);
         Assert.Equal("a\n\nb", result);
     }
+
+    [Fact]
+    public void Convert_rawNewlines_arePreservedVerbatim()
+    {
+        // trudesk UPDATE stores the body as raw text with literal newlines;
+        // the empty lines the user typed must survive re-opening the editor.
+        var input = "Zeile A\n\n\nZeile B";
+        Assert.Equal("Zeile A\n\n\nZeile B", HtmlToPlainText.Convert(input));
+    }
+
+    [Fact]
+    public void Convert_multipleBrTags_arePreserved()
+    {
+        // trudesk ticket CREATE turns each newline into a <br>, so a blank
+        // line is two <br>'s — they must not collapse into a single break.
+        Assert.Equal("a\n\nb", HtmlToPlainText.Convert("a<br><br>b"));
+    }
+
+    [Fact]
+    public void Convert_paragraphWithBrBlankLines_keepsEveryLine()
+    {
+        // The exact CREATE shape: a single <p> wrapper around <br>-joined
+        // lines, including two blank lines the user inserted.
+        var input = "<p>A<br><br><br>B</p>";
+        Assert.Equal("A\n\n\nB", HtmlToPlainText.Convert(input));
+    }
 }
