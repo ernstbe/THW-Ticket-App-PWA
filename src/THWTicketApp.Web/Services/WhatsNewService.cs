@@ -68,7 +68,10 @@ public sealed class WhatsNewService
         [
             "Leerzeilen in der Ticket-Beschreibung bleiben jetzt erhalten — beim Speichern und beim erneuten Bearbeiten wird der Text so dargestellt, wie du ihn eingegeben hast."
         ]),
-        // Id 10 ist für den parallelen Linked-Tickets-PR (#175) reserviert.
+        new WhatsNewEntry(10, "13.06.2026", "Verknüpfte Tickets",
+        [
+            "Tickets können jetzt miteinander verknüpft werden (verwandt, blockiert, Duplikat) — in der Ticket-Ansicht unter „Verknüpfte Tickets“. Die Verknüpfung erscheint automatisch auch beim verknüpften Ticket."
+        ]),
         new WhatsNewEntry(11, "13.06.2026", "Profilbild",
         [
             "Du kannst jetzt ein eigenes Profilbild hochladen — im Profil unter „Profilbild ändern“."

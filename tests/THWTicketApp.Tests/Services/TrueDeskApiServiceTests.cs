@@ -721,6 +721,42 @@ public class TrueDeskApiServiceTests
     }
 
     // -----------------------------------------------------------------
+    // Linked tickets (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task LinkTicketAsync_postsTargetAndTypeToV2LinksEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true}");
+        var ok = await _sut.LinkTicketAsync("42", 99, "blocks");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/42/links", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"targetUid\":99", LastBody);
+        Assert.Contains("\"linkType\":\"blocks\"", LastBody);
+    }
+
+    [Fact]
+    public async Task LinkTicketAsync_returnsFalseOnInvalidTarget()
+    {
+        var ok = await _sut.LinkTicketAsync("42", 0, "related");
+        Assert.False(ok);
+        Assert.Empty(_handler.Requests);
+    }
+
+    [Fact]
+    public async Task UnlinkTicketAsync_deletesV2LinkByTargetUid()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        var ok = await _sut.UnlinkTicketAsync("42", 99);
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Delete, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/42/links/99", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    // -----------------------------------------------------------------
     // Profile picture (v2)
     // -----------------------------------------------------------------
 

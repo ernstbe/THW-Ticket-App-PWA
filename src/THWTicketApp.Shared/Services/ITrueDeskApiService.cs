@@ -158,6 +158,10 @@ public interface ITrueDeskApiService
     Task<bool> UpdateChecklistItemAsync(string ticketUid, string itemId, string? title = null, bool? completed = null);
     Task<bool> DeleteChecklistItemAsync(string ticketUid, string itemId);
 
+    // Linked tickets (v2, bidirectional). linkType: "related" | "duplicate" | "blocks".
+    Task<bool> LinkTicketAsync(string ticketUid, int targetUid, string linkType);
+    Task<bool> UnlinkTicketAsync(string ticketUid, int targetUid);
+
     // Batch operations (v2)
     Task<(int Deleted, int Failed)> BatchDeleteTicketsAsync(IEnumerable<string> ticketIds);
     Task<(int Updated, int Failed)> BatchUpdateTicketsAsync(IEnumerable<Dictionary<string, object?>> batch);
