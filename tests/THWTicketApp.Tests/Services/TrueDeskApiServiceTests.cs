@@ -949,4 +949,30 @@ public class TrueDeskApiServiceTests
         Assert.Null(profile.WorkNumber);
         Assert.Null(profile.MobileNumber);
     }
+
+    // -----------------------------------------------------------------
+    // DSGVO data export (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task ExportMyDataAsync_callsV2MeExportEndpoint()
+    {
+        var exportJson = """{"profile":{"username":"hans"},"tickets":[],"comments":[]}""";
+        _handler.SetDefault(HttpStatusCode.OK, exportJson);
+
+        var body = await _sut.ExportMyDataAsync();
+
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts/me/export", LastRequest.RequestUri!.AbsolutePath);
+        // The body is the file the user saves — it must come back verbatim.
+        Assert.Equal(exportJson, body);
+    }
+
+    [Fact]
+    public async Task ExportMyDataAsync_returnsNullOnError()
+    {
+        _handler.SetDefault(HttpStatusCode.Unauthorized);
+        var body = await _sut.ExportMyDataAsync();
+        Assert.Null(body);
+    }
 }
