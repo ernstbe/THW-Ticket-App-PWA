@@ -522,14 +522,19 @@ public class TrueDeskApiService : ITrueDeskApiService
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> DeleteTicketAsync(string ticketId)
+    // ticketUid is required for v2: its ticket routes match on :uid, while v1
+    // matches on the Mongo _id. We branch the URL path the same way
+    // EditTicketAsync does (IsV2 ? uid : _id) so the live v1 behaviour stays
+    // byte-for-byte identical.
+    public async Task<bool> DeleteTicketAsync(string ticketId, int ticketUid)
     {
         if (string.IsNullOrWhiteSpace(ticketId)) return false;
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{BaseUrl}/tickets/{ticketId}"));
+        var identifier = IsV2 ? ticketUid.ToString() : ticketId;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{BaseUrl}/tickets/{identifier}"));
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> UpdateTicketStatusAsync(string ticketId, string statusId)
+    public async Task<bool> UpdateTicketStatusAsync(string ticketId, int ticketUid, string statusId)
     {
         if (string.IsNullOrWhiteSpace(ticketId) || string.IsNullOrWhiteSpace(statusId))
             return false;
@@ -537,25 +542,28 @@ public class TrueDeskApiService : ITrueDeskApiService
         var ticketData = new Dictionary<string, object?> { ["status"] = statusId };
         object payload = IsV2 ? new { ticket = ticketData } : ticketData;
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{ticketId}", content));
+        var identifier = IsV2 ? ticketUid.ToString() : ticketId;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{identifier}", content));
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> AssignTicketAsync(string ticketId, string userId)
+    public async Task<bool> AssignTicketAsync(string ticketId, int ticketUid, string userId)
     {
         var ticketData = new Dictionary<string, object?> { ["assignee"] = userId };
         object payload = IsV2 ? new { ticket = ticketData } : ticketData;
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{ticketId}", content));
+        var identifier = IsV2 ? ticketUid.ToString() : ticketId;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{identifier}", content));
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> ClearTicketAssigneeAsync(string ticketId)
+    public async Task<bool> ClearTicketAssigneeAsync(string ticketId, int ticketUid)
     {
         var ticketData = new Dictionary<string, object?> { ["assignee"] = null };
         object payload = IsV2 ? new { ticket = ticketData } : ticketData;
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{ticketId}", content));
+        var identifier = IsV2 ? ticketUid.ToString() : ticketId;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{identifier}", content));
         return response.IsSuccessStatusCode;
     }
 
@@ -1152,38 +1160,43 @@ public class TrueDeskApiService : ITrueDeskApiService
     // do a read-modify-write cycle via GetTicketRawAsync + PUT /tickets/:uid.
     // -----------------------------------------------------------------
 
-    public async Task<bool> UpdateTicketTagsAsync(string ticketId, IEnumerable<string> tagIds)
+    // Tag mutations target the same ticket update endpoint, so they need the
+    // same _id (v1) vs uid (v2) branching. The read-modify-write helpers also
+    // GET the ticket first — and v2's GET matches on uid too — so the uid is
+    // threaded all the way through.
+    public async Task<bool> UpdateTicketTagsAsync(string ticketId, int ticketUid, IEnumerable<string> tagIds)
     {
         if (string.IsNullOrWhiteSpace(ticketId)) return false;
         var payload = new Dictionary<string, object?> { ["tags"] = tagIds.ToArray() };
         object body = IsV2 ? new { ticket = payload } : (object)payload;
         var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{ticketId}", content));
+        var identifier = IsV2 ? ticketUid.ToString() : ticketId;
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync($"{BaseUrl}/tickets/{identifier}", content));
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> AddTagToTicketAsync(string ticketId, string tagId)
+    public async Task<bool> AddTagToTicketAsync(string ticketId, int ticketUid, string tagId)
     {
         if (string.IsNullOrWhiteSpace(ticketId) || string.IsNullOrWhiteSpace(tagId)) return false;
-        var current = await ReadTicketTagsAsync(ticketId);
+        var current = await ReadTicketTagsAsync(ticketId, ticketUid);
         if (current == null) return false;
         if (current.Contains(tagId)) return true; // already present, no-op
         current.Add(tagId);
-        return await UpdateTicketTagsAsync(ticketId, current);
+        return await UpdateTicketTagsAsync(ticketId, ticketUid, current);
     }
 
-    public async Task<bool> RemoveTagFromTicketAsync(string ticketId, string tagId)
+    public async Task<bool> RemoveTagFromTicketAsync(string ticketId, int ticketUid, string tagId)
     {
         if (string.IsNullOrWhiteSpace(ticketId) || string.IsNullOrWhiteSpace(tagId)) return false;
-        var current = await ReadTicketTagsAsync(ticketId);
+        var current = await ReadTicketTagsAsync(ticketId, ticketUid);
         if (current == null) return false;
         if (!current.Remove(tagId)) return true; // already absent, no-op
-        return await UpdateTicketTagsAsync(ticketId, current);
+        return await UpdateTicketTagsAsync(ticketId, ticketUid, current);
     }
 
-    private async Task<List<string>?> ReadTicketTagsAsync(string ticketId)
+    private async Task<List<string>?> ReadTicketTagsAsync(string ticketId, int ticketUid)
     {
-        var (status, body) = await GetTicketRawAsync(ticketId);
+        var (status, body) = await GetTicketRawAsync(IsV2 ? ticketUid.ToString() : ticketId);
         if (status < 200 || status >= 300) return null;
 
         try

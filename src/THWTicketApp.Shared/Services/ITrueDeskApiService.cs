@@ -49,11 +49,11 @@ public interface ITrueDeskApiService
     /// that must leave the server-side due date untouched.
     /// </summary>
     Task<bool> EditTicketAsync(Ticket ticket, bool includeDueDate = true);
-    Task<bool> DeleteTicketAsync(string ticketId);
-    Task<bool> UpdateTicketStatusAsync(string ticketId, string statusId);
+    Task<bool> DeleteTicketAsync(string ticketId, int ticketUid);
+    Task<bool> UpdateTicketStatusAsync(string ticketId, int ticketUid, string statusId);
 
-    Task<bool> AssignTicketAsync(string ticketId, string userId);
-    Task<bool> ClearTicketAssigneeAsync(string ticketId);
+    Task<bool> AssignTicketAsync(string ticketId, int ticketUid, string userId);
+    Task<bool> ClearTicketAssigneeAsync(string ticketId, int ticketUid);
     /// <summary>
     /// Replaces the whole additionalAssignees array of a ticket. An empty
     /// list clears it. The server de-duplicates and drops the primary
@@ -149,9 +149,9 @@ public interface ITrueDeskApiService
     Task<bool> DeleteNoticeAsync(string noticeId);
 
     // Ticket tags — implemented on top of the existing ticket PUT endpoint
-    Task<bool> UpdateTicketTagsAsync(string ticketId, IEnumerable<string> tagIds);
-    Task<bool> AddTagToTicketAsync(string ticketId, string tagId);
-    Task<bool> RemoveTagFromTicketAsync(string ticketId, string tagId);
+    Task<bool> UpdateTicketTagsAsync(string ticketId, int ticketUid, IEnumerable<string> tagIds);
+    Task<bool> AddTagToTicketAsync(string ticketId, int ticketUid, string tagId);
+    Task<bool> RemoveTagFromTicketAsync(string ticketId, int ticketUid, string tagId);
 
     // Ticket checklist (v2)
     Task<bool> AddChecklistItemAsync(string ticketUid, string title);

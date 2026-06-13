@@ -244,12 +244,12 @@ public class SyncServiceTests
             TicketId = "t1",
             TicketUid = 1001
         });
-        _api.DeleteTicketAsync("t1").Returns(true);
+        _api.DeleteTicketAsync("t1", 1001).Returns(true);
 
         var result = await _sut.SyncPendingActionsAsync();
 
         Assert.True(result);
-        await _api.Received(1).DeleteTicketAsync("t1");
+        await _api.Received(1).DeleteTicketAsync("t1", 1001);
         await _db.Received(1).RemovePendingActionAsync(1);
     }
 
@@ -598,7 +598,7 @@ public class SyncServiceTests
             TicketId = "t1",
             TicketUid = 1001
         });
-        _api.DeleteTicketAsync("t1").Returns(true);
+        _api.DeleteTicketAsync("t1", 1001).Returns(true);
 
         await _sut.SyncPendingActionsAsync();
 
@@ -782,11 +782,11 @@ public class SyncServiceTests
             TicketUid = 42,
             TagId = "tag-abc"
         });
-        _api.AddTagToTicketAsync("t1", "tag-abc").Returns(true);
+        _api.AddTagToTicketAsync("t1", 42, "tag-abc").Returns(true);
 
         await _sut.SyncPendingActionsAsync();
 
-        await _api.Received(1).AddTagToTicketAsync("t1", "tag-abc");
+        await _api.Received(1).AddTagToTicketAsync("t1", 42, "tag-abc");
         await _db.Received(1).RemovePendingActionAsync(300);
     }
 
@@ -801,11 +801,11 @@ public class SyncServiceTests
             TicketUid = 42,
             TagId = "tag-xyz"
         });
-        _api.RemoveTagFromTicketAsync("t1", "tag-xyz").Returns(true);
+        _api.RemoveTagFromTicketAsync("t1", 42, "tag-xyz").Returns(true);
 
         await _sut.SyncPendingActionsAsync();
 
-        await _api.Received(1).RemoveTagFromTicketAsync("t1", "tag-xyz");
+        await _api.Received(1).RemoveTagFromTicketAsync("t1", 42, "tag-xyz");
         await _db.Received(1).RemovePendingActionAsync(301);
     }
 
@@ -821,7 +821,7 @@ public class SyncServiceTests
             TagId = "tag-abc",
             RetryCount = 0
         });
-        _api.AddTagToTicketAsync("t1", "tag-abc").Returns(false);
+        _api.AddTagToTicketAsync("t1", 42, "tag-abc").Returns(false);
 
         await _sut.SyncPendingActionsAsync();
 
