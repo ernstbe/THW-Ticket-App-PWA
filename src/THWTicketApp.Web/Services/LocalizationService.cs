@@ -787,6 +787,20 @@ public class LocalizationService
         ["a11y.toggle_darkmode"] = "Dark Mode umschalten",
         ["a11y.logout"] = "Abmelden",
         ["a11y.main_navigation"] = "Hauptnavigation",
+
+        // Statistics
+        ["nav.statistics"] = "Statistik",
+        ["stats.kpi_open"] = "Offene Tickets",
+        ["stats.kpi_created"] = "Erstellt ({0} Tage)",
+        ["stats.kpi_closed"] = "Geschlossen ({0} Tage)",
+        ["stats.kpi_avg_response"] = "Ø Reaktionszeit",
+        ["stats.volume_title"] = "Ticketaufkommen",
+        ["stats.status_title"] = "Status-Verteilung",
+        ["stats.workload_title"] = "Auslastung pro Bearbeiter",
+        ["stats.timespan_days"] = "{0} Tage",
+        ["stats.no_data"] = "Keine Daten verfügbar.",
+        ["stats.open"] = "Offen",
+        ["stats.closed"] = "Geschlossen",
     };
 
     private static readonly Dictionary<string, string> En = new()
@@ -1538,5 +1552,19 @@ public class LocalizationService
         ["a11y.toggle_darkmode"] = "Toggle dark mode",
         ["a11y.logout"] = "Log out",
         ["a11y.main_navigation"] = "Main navigation",
+
+        // Statistics
+        ["nav.statistics"] = "Statistics",
+        ["stats.kpi_open"] = "Open Tickets",
+        ["stats.kpi_created"] = "Created ({0} days)",
+        ["stats.kpi_closed"] = "Closed ({0} days)",
+        ["stats.kpi_avg_response"] = "Avg. Response Time",
+        ["stats.volume_title"] = "Ticket Volume",
+        ["stats.status_title"] = "Status Distribution",
+        ["stats.workload_title"] = "Workload per Agent",
+        ["stats.timespan_days"] = "{0} days",
+        ["stats.no_data"] = "No data available.",
+        ["stats.open"] = "Open",
+        ["stats.closed"] = "Closed",
     };
 }

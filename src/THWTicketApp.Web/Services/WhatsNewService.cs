@@ -59,6 +59,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(7, "12.06.2026", "Datenexport (DSGVO)",
         [
             "Datenexport: Du kannst deine gespeicherten Daten jetzt als Datei herunterladen (DSGVO-Auskunft) — im Profil unter „Meine Daten“."
+        ]),
+        new WhatsNewEntry(8, "12.06.2026", "Neue Statistik-Seite",
+        [
+            "Neue Statistik-Seite: Ticketaufkommen, Status-Verteilung und Auslastung auf einen Blick — erreichbar über den Menüpunkt „Statistik“."
         ])
     ];
 
