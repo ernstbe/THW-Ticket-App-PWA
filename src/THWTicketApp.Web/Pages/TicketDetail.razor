@@ -201,7 +201,7 @@ else
         <div>
             @if (!string.IsNullOrEmpty(_ticket.Issue))
             {
-                @((MarkupString)Markdown.ToHtml(_ticket.Issue, _mdPipeline))
+                @RenderMarkdown(_ticket.Issue)
             }
             else { <em>Keine Beschreibung.</em> }
         </div>
@@ -268,7 +268,7 @@ else
                 {
                     @if (!string.IsNullOrEmpty(_ticket.Issue))
                     {
-                        @((MarkupString)Markdown.ToHtml(_ticket.Issue, _mdPipeline))
+                        @RenderMarkdown(_ticket.Issue)
                     }
                     else
                     {
@@ -753,6 +753,13 @@ else
         .UseAdvancedExtensions()
         .UseSoftlineBreakAsHardlineBreak()
         .Build();
+
+    // Render a user-typed Issue body to HTML. MarkdownBlankLines.Preserve runs
+    // first so empty lines the user added survive Markdig's blank-line collapse
+    // (see the helper for the full why); the pipeline then turns each line into
+    // a hard break.
+    private static MarkupString RenderMarkdown(string? text)
+        => (MarkupString)Markdown.ToHtml(MarkdownBlankLines.Preserve(text), _mdPipeline);
 
     // Checklist
     private string _newChecklistTitle = string.Empty;
