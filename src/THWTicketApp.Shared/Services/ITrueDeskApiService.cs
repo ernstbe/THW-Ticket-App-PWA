@@ -167,6 +167,15 @@ public interface ITrueDeskApiService
     Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber);
 
     /// <summary>
+    /// Uploads the authenticated user's avatar (multipart, v2 only). Returns
+    /// the new stored image filename on success, or null on failure.
+    /// </summary>
+    Task<string?> UploadProfileImageAsync(Stream fileStream, string fileName);
+
+    /// <summary>Absolute URL for a user avatar filename, or null when empty.</summary>
+    string? BuildUserImageUrl(string? image);
+
+    /// <summary>
     /// Downloads the authenticated user's DSGVO data export (Art. 15) from
     /// the v2-only endpoint GET /accounts/me/export. Returns the raw JSON
     /// document as a string (the body IS the file the user saves), or null

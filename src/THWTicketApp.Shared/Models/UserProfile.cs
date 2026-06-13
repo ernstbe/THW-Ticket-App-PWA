@@ -16,6 +16,11 @@ public sealed class UserProfile
     public string? WorkNumber { get; set; }
     public string? MobileNumber { get; set; }
     /// <summary>
+    /// Filename of the user's avatar (stored on the trudesk user, served
+    /// under <c>/uploads/users/</c>). Null/empty when no picture was uploaded.
+    /// </summary>
+    public string? Image { get; set; }
+    /// <summary>
     /// Group ids visible to this user, as resolved server-side by
     /// trudesk's <c>accountsApi.sessionUser</c>: for admins/agents the
     /// Team → Department → Groups chain; for customers the direct

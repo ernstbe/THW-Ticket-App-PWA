@@ -721,6 +721,40 @@ public class TrueDeskApiServiceTests
     }
 
     // -----------------------------------------------------------------
+    // Profile picture (v2)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task UploadProfileImageAsync_postsMultipartToV2AndReturnsFilename()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"image\":\"aProfile_u1_abcd1234.jpg\"}");
+        using var stream = new MemoryStream(new byte[] { 1, 2, 3 });
+        var result = await _sut.UploadProfileImageAsync(stream, "avatar.png");
+
+        Assert.Equal("aProfile_u1_abcd1234.jpg", result);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts/profile/picture", LastRequest.RequestUri!.AbsolutePath);
+        Assert.StartsWith("multipart/form-data", LastRequest.Content!.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
+    public async Task UploadProfileImageAsync_returnsNullOnFailure()
+    {
+        _handler.SetDefault(HttpStatusCode.BadRequest, "{\"success\":false}");
+        using var stream = new MemoryStream(new byte[] { 1 });
+        var result = await _sut.UploadProfileImageAsync(stream, "avatar.png");
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void BuildUserImageUrl_buildsUploadsUrlFromServerOrigin()
+    {
+        Assert.Equal("https://host.test/uploads/users/a.jpg", _sut.BuildUserImageUrl("a.jpg"));
+        Assert.Null(_sut.BuildUserImageUrl(null));
+        Assert.Null(_sut.BuildUserImageUrl("  "));
+    }
+
+    // -----------------------------------------------------------------
     // Batch operations (v2)
     // -----------------------------------------------------------------
 
