@@ -469,7 +469,21 @@ public class SyncService : ISyncService
                 return null;
 
             var serverUpdated = updatedEl.GetString();
-            if (string.IsNullOrEmpty(serverUpdated) || serverUpdated == action.TicketUpdatedAt)
+            if (string.IsNullOrEmpty(serverUpdated))
+                return null;
+
+            // Compare as instants, not strings. The baseline is the client's
+            // DateTime.ToString("O") (7 fractional digits) while the server
+            // emits its own ISO format (often 3 digits), so a raw string
+            // compare almost never matches and would flag EVERY queued action
+            // as a conflict. A sub-second tolerance absorbs the format/rounding
+            // drift; we fall back to the string compare only if either side is
+            // unparseable.
+            var sameInstant = TryParseUtc(serverUpdated, out var serverDt)
+                              && TryParseUtc(action.TicketUpdatedAt, out var baselineDt)
+                ? Math.Abs((serverDt - baselineDt).TotalSeconds) < 1
+                : serverUpdated == action.TicketUpdatedAt;
+            if (sameInstant)
                 return null;
 
             // Ticket has drifted. Is it specifically a status change while our
