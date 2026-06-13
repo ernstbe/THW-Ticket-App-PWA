@@ -844,8 +844,16 @@ else
             if (_ticket != null)
             {
                 TrudeskTranslationHelper.TranslateTicket(_ticket);
-                _editSubject = _ticket.Subject ?? string.Empty;
-                _editIssue = _ticket.Issue ?? string.Empty;
+                // Don't clobber the inline-edit-bound fields while their editor is open: a background
+                // realtime refresh (AnyTicketChanged) would otherwise wipe the user's unsaved text mid-typing.
+                if (!_editingTitle)
+                {
+                    _editSubject = _ticket.Subject ?? string.Empty;
+                }
+                if (!_editingDescription)
+                {
+                    _editIssue = _ticket.Issue ?? string.Empty;
+                }
                 _dueDateLocal = _ticket.DueDate == DateTime.MinValue ? null : _ticket.DueDate;
                 _ = RecentTickets.RecordAsync(
                     _ticket.Uid.ToString(),
