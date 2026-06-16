@@ -66,10 +66,11 @@
             }
             <MudNavLink Href="team" Match="NavLinkMatch.All"
                         Icon="@Icons.Material.Filled.Groups">@L.T("nav.team")</MudNavLink>
-            <MudNavLink Href="statistics" Match="NavLinkMatch.All"
-                        Icon="@Icons.Material.Filled.BarChart">@L.T("nav.statistics")</MudNavLink>
+            @* Statistik / Berichte ausgeblendet auf Nutzerwunsch — Pages bleiben im Code. *@
             @if (_showHiddenNavLinks)
             {
+                <MudNavLink Href="statistics" Match="NavLinkMatch.All"
+                            Icon="@Icons.Material.Filled.BarChart">@L.T("nav.statistics")</MudNavLink>
                 <MudNavLink Href="reports" Match="NavLinkMatch.All"
                             Icon="@Icons.Material.Filled.BarChart">@L.T("nav.reports")</MudNavLink>
             }
