@@ -35,6 +35,9 @@ public sealed record AssigneeWorkload(int TicketCount, int ClosedCount, double A
 /// <summary>One slice of the status distribution donut.</summary>
 public sealed record StatusSlice(string Name, int Count, string Color);
 
+/// <summary>One assignee's row in the workload breakdown.</summary>
+public sealed record WorkloadEntry(string Name, AssigneeWorkload Stats);
+
 /// <summary>
 /// Pure parsing/aggregation helpers for the statistics page. No I/O,
 /// no Blazor dependencies — fully unit-testable.
@@ -108,6 +111,43 @@ public static class StatsParser
         {
             return new AssigneeWorkload(0, 0, 0);
         }
+    }
+
+    /// <summary>
+    /// Parses the group-scoped workload response
+    /// (<c>GET /tickets/stats/workload</c> → <c>{ workload: [{ name, ticketCount, closedCount, avgResponse }] }</c>).
+    /// Returns an empty list for malformed input. Rows are returned in
+    /// the order the server sent them (already sorted by ticket count).
+    /// </summary>
+    public static List<WorkloadEntry> ParseWorkload(string? json)
+    {
+        var result = new List<WorkloadEntry>();
+        if (string.IsNullOrWhiteSpace(json)) return result;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return result;
+            if (!root.TryGetProperty("workload", out var arr) || arr.ValueKind != JsonValueKind.Array) return result;
+
+            foreach (var item in arr.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object) continue;
+                var name = item.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
+                var stats = new AssigneeWorkload(
+                    ReadInt(item, "ticketCount") ?? 0,
+                    ReadInt(item, "closedCount") ?? 0,
+                    ReadDouble(item, "avgResponse") ?? 0);
+                result.Add(new WorkloadEntry(string.IsNullOrWhiteSpace(name) ? "?" : name, stats));
+            }
+        }
+        catch (JsonException)
+        {
+            // Malformed payload → empty list (caller shows "no data").
+        }
+
+        return result;
     }
 
     /// <summary>

@@ -79,6 +79,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(12, "13.06.2026", "Mehrere Tickets auf einmal bearbeiten",
         [
             "In der Ticketliste kannst du über die Mehrfachauswahl jetzt mehrere Tickets gleichzeitig einer Person zuweisen. Vor dem Sammel-Löschen kommt außerdem eine Sicherheitsabfrage."
+        ]),
+        new WhatsNewEntry(13, "16.06.2026", "Statistik respektiert Gruppen",
+        [
+            "Die Statistik-Seite zeigt jetzt nur noch Zahlen aus den Gruppen, die du auch in der Ticketliste sehen darfst. Kennzahlen, Verlauf und Auslastung pro Person sind damit auf deinen Bereich beschränkt — die Jugend sieht keine Stab-Zahlen mehr und umgekehrt."
         ])
     ];
 
