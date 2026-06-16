@@ -145,6 +145,52 @@ public class StatsParserTests
         Assert.Equal(0, result.OpenCount);
     }
 
+    // --- ParseWorkload ---
+
+    [Fact]
+    public void ParseWorkload_ParsesRowsInServerOrder()
+    {
+        var json = """
+        { "success": true, "workload": [
+            { "id": "a", "name": "Anna Admin", "ticketCount": 8, "closedCount": 3, "avgResponse": 2.0 },
+            { "id": "b", "name": "Bert Boss", "ticketCount": 2, "closedCount": 2, "avgResponse": 0 }
+        ] }
+        """;
+
+        var result = StatsParser.ParseWorkload(json);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("Anna Admin", result[0].Name);
+        Assert.Equal(8, result[0].Stats.TicketCount);
+        Assert.Equal(3, result[0].Stats.ClosedCount);
+        Assert.Equal(5, result[0].Stats.OpenCount);
+        Assert.Equal(2.0, result[0].Stats.AvgResponseHours);
+        Assert.Equal("Bert Boss", result[1].Name);
+        Assert.Equal(0, result[1].Stats.OpenCount);
+    }
+
+    [Fact]
+    public void ParseWorkload_MissingName_FallsBackToPlaceholder()
+    {
+        var json = """{ "workload": [ { "id": "x", "ticketCount": 1, "closedCount": 0 } ] }""";
+
+        var result = StatsParser.ParseWorkload(json);
+
+        Assert.Single(result);
+        Assert.Equal("?", result[0].Name);
+        Assert.Equal(1, result[0].Stats.TicketCount);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("{ broken")]
+    [InlineData("""{ "success": true }""")]
+    public void ParseWorkload_MalformedOrMissing_ReturnsEmptyList(string? json)
+    {
+        Assert.Empty(StatsParser.ParseWorkload(json));
+    }
+
     // --- BuildVolumeSeries ---
 
     [Fact]

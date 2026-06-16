@@ -323,34 +323,14 @@
         StateHasChanged();
         try
         {
-            var json = await ApiService.GetAssigneesAsync();
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            // v1 returns { users: [...] }, v2 returns { accounts: [...] }.
-            var agents = JsonHelper.DeserializeWrappedArray<User>(json, "users", options);
-            if (agents.Length == 0)
-                agents = JsonHelper.DeserializeWrappedArray<User>(json, "accounts", options);
-
-            var rows = new List<AssigneeWorkloadRow>();
-            foreach (var agent in agents.Where(a => !a.Deleted))
-            {
-                var userId = agent.Id; // falls back to _id internally
-                if (string.IsNullOrEmpty(userId)) continue;
-
-                try
-                {
-                    // Workload = tickets where the user is the ASSIGNEE.
-                    // (The /stats/user endpoint counts requesters instead.)
-                    var statsJson = await ApiService.GetTicketStatsForAssigneeAsync(userId);
-                    var stats = StatsParser.ParseAssigneeStats(statsJson);
-                    rows.Add(new AssigneeWorkloadRow(agent.Fullname ?? agent.Username ?? L.T("common.unknown"), stats));
-                }
-                catch
-                {
-                    // One failing agent must not take down the whole list.
-                }
-            }
-
-            _workloads = rows.OrderByDescending(r => r.Stats.TicketCount).ToList();
+            // Single group-scoped call: the server only counts tickets the
+            // current user may see (same Jugend/Stab gate as the ticket list)
+            // and returns one row per assignee, sorted by ticket count.
+            var json = await ApiService.GetWorkloadStatsAsync();
+            _workloads = StatsParser.ParseWorkload(json)
+                .Select(e => new AssigneeWorkloadRow(
+                    string.IsNullOrWhiteSpace(e.Name) ? L.T("common.unknown") : e.Name, e.Stats))
+                .ToList();
         }
         catch (Exception ex)
         {

@@ -794,6 +794,15 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
+    // Per-assignee workload, scoped server-side to the caller's visible
+    // groups — only assignees on tickets the user may see are returned.
+    public async Task<string> GetWorkloadStatsAsync()
+    {
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/tickets/stats/workload"));
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync();
+    }
+
     // Documents (v2)
     public async Task<string> GetDocumentsAsync()
     {
