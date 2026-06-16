@@ -380,7 +380,7 @@ else
         if (string.IsNullOrEmpty(userId)) return;
         try
         {
-            if (await ApiService.AssignTicketAsync(ticket.Id, userId))
+            if (await ApiService.AssignTicketAsync(ticket.Id, ticket.Uid, userId))
             {
                 Snackbar.Add(L.T("tickets.assigned"), Severity.Success);
                 await LoadDashboardAsync();
@@ -406,7 +406,7 @@ else
             var statuses = JsonHelper.DeserializeWrappedArray<Status>(statusJson, "status", options);
             var closedStatus = statuses.FirstOrDefault(s => s.IsResolved);
             if (closedStatus == null) return;
-            if (await ApiService.UpdateTicketStatusAsync(ticket.Id, closedStatus.Id!))
+            if (await ApiService.UpdateTicketStatusAsync(ticket.Id, ticket.Uid, closedStatus.Id!))
             {
                 Snackbar.Add(L.T("tickets.closed_success"), Severity.Success);
                 await LoadDashboardAsync();

@@ -393,8 +393,8 @@ else
             {
                 var usersJson = await ApiService.GetAssigneesAsync();
                 var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersJson, options);
-                if (userResponse?.Users != null)
-                    _users = userResponse.Users;
+                if (userResponse != null)
+                    _users = userResponse.UsersOrAccounts;
             }
             catch { /* Assignees unavailable for this role — hide dropdown */ }
 

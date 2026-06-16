@@ -21,6 +21,11 @@ public static class JsonHelper
         if (root.ValueKind == JsonValueKind.Array)
             return JsonSerializer.Deserialize<T[]>(json, options) ?? [];
 
+        // Anything that isn't an object (e.g. a bare `null` payload) has no
+        // properties to inspect — TryGetProperty would throw. Bail out empty.
+        if (root.ValueKind != JsonValueKind.Object)
+            return [];
+
         // v2 response: check for { data: ... } wrapper first
         if (root.TryGetProperty("data", out var dataEl))
         {
@@ -41,5 +46,20 @@ public static class JsonHelper
             return JsonSerializer.Deserialize<T[]>(el.GetRawText(), options) ?? [];
 
         return [];
+    }
+
+    /// <summary>
+    /// Like <see cref="DeserializeWrappedArray{T}(string, string, JsonSerializerOptions?)"/>
+    /// but tolerates two possible wrapper keys, trying each in order. Used for
+    /// endpoints whose v1 and v2 shapes differ only by the wrapper name
+    /// (e.g. v1 { users: [...] } vs v2 { accounts: [...] }, or
+    /// v1 { types: [...] } vs v2 { ticketTypes: [...] }). The first key that
+    /// yields a non-empty array wins; otherwise an empty array is returned.
+    /// </summary>
+    public static T[] DeserializeWrappedArray<T>(string json, string primaryProperty, string fallbackProperty, JsonSerializerOptions? options = null)
+    {
+        var result = DeserializeWrappedArray<T>(json, primaryProperty, options);
+        if (result.Length > 0) return result;
+        return DeserializeWrappedArray<T>(json, fallbackProperty, options);
     }
 }

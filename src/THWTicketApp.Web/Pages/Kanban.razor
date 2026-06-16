@@ -675,7 +675,7 @@ else
 
         try
         {
-            var success = await ApiService.UpdateTicketStatusAsync(ticketId, newStatusId);
+            var success = await ApiService.UpdateTicketStatusAsync(ticketId, ticketUid, newStatusId);
             if (success)
             {
                 Snackbar.Add($"#{item.Uid} → {targetName}", Severity.Success);

@@ -25,6 +25,17 @@ public class TrueDeskApiServiceTests
     private HttpRequestMessage LastRequest => _handler.Requests[^1];
     private string LastBody => _handler.RequestBodies[^1];
 
+    // Builds a second SUT pointed at an /api/v2 base URL, sharing the same
+    // capturing handler, so v2-path assertions can run alongside the v1 ones.
+    private TrueDeskApiService MakeV2Sut()
+    {
+        var httpClient = new HttpClient(_handler);
+        var settings = new AppSettings { ApiBaseUrl = "https://host.test/api/v2", ConnectionTimeoutSeconds = 30 };
+        var jsRuntime = Substitute.For<IJSRuntime>();
+        var localStorage = new LocalStorageService(jsRuntime);
+        return new TrueDeskApiService(httpClient, settings, localStorage, Substitute.For<IJSRuntime>());
+    }
+
     // -----------------------------------------------------------------
     // Teams
     // -----------------------------------------------------------------
@@ -223,9 +234,10 @@ public class TrueDeskApiServiceTests
     public async Task UpdateTicketTagsAsync_putsTagsArrayToTicket()
     {
         _handler.SetDefault(HttpStatusCode.OK);
-        await _sut.UpdateTicketTagsAsync("t1", new[] { "tag-a", "tag-b" });
+        await _sut.UpdateTicketTagsAsync("t1", 1001, new[] { "tag-a", "tag-b" });
 
         Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        // v1 keys ticket mutations off the Mongo _id, not the uid.
         Assert.Equal("/api/v1/tickets/t1", LastRequest.RequestUri!.AbsolutePath);
         Assert.Contains("tag-a", LastBody);
         Assert.Contains("tag-b", LastBody);
@@ -281,7 +293,7 @@ public class TrueDeskApiServiceTests
             "{\"_id\":\"t1\",\"tags\":[{\"_id\":\"tag-a\"}]}");
         _handler.RespondTo(HttpMethod.Put, "/api/v1/tickets/t1", HttpStatusCode.OK);
 
-        var ok = await _sut.AddTagToTicketAsync("t1", "tag-b");
+        var ok = await _sut.AddTagToTicketAsync("t1", 1001, "tag-b");
 
         Assert.True(ok);
         Assert.Equal(2, _handler.Requests.Count);
@@ -298,7 +310,7 @@ public class TrueDeskApiServiceTests
         _handler.RespondTo(HttpMethod.Get, "/api/v1/tickets/t1", HttpStatusCode.OK,
             "{\"_id\":\"t1\",\"tags\":[\"tag-a\"]}");
 
-        var ok = await _sut.AddTagToTicketAsync("t1", "tag-a");
+        var ok = await _sut.AddTagToTicketAsync("t1", 1001, "tag-a");
 
         Assert.True(ok);
         // Only the GET should have been made — no PUT follow-up
@@ -313,7 +325,7 @@ public class TrueDeskApiServiceTests
             "{\"_id\":\"t1\",\"tags\":[\"tag-a\",\"tag-b\",\"tag-c\"]}");
         _handler.RespondTo(HttpMethod.Put, "/api/v1/tickets/t1", HttpStatusCode.OK);
 
-        var ok = await _sut.RemoveTagFromTicketAsync("t1", "tag-b");
+        var ok = await _sut.RemoveTagFromTicketAsync("t1", 1001, "tag-b");
 
         Assert.True(ok);
         var putBody = _handler.RequestBodies[1];
@@ -328,7 +340,7 @@ public class TrueDeskApiServiceTests
         _handler.RespondTo(HttpMethod.Get, "/api/v1/tickets/t1", HttpStatusCode.OK,
             "{\"_id\":\"t1\",\"tags\":[\"tag-a\"]}");
 
-        var ok = await _sut.RemoveTagFromTicketAsync("t1", "tag-zzz");
+        var ok = await _sut.RemoveTagFromTicketAsync("t1", 1001, "tag-zzz");
 
         Assert.True(ok);
         Assert.Single(_handler.Requests);
@@ -339,9 +351,127 @@ public class TrueDeskApiServiceTests
     {
         _handler.RespondTo(HttpMethod.Get, "/api/v1/tickets/t1", HttpStatusCode.NotFound);
 
-        var ok = await _sut.AddTagToTicketAsync("t1", "tag-a");
+        var ok = await _sut.AddTagToTicketAsync("t1", 1001, "tag-a");
 
         Assert.False(ok);
+    }
+
+    // -----------------------------------------------------------------
+    // Ticket mutations: v1 keys off _id, v2 keys off uid (Fix A)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task DeleteTicketAsync_v1_usesId()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await _sut.DeleteTicketAsync("t1", 1001);
+
+        Assert.Equal(HttpMethod.Delete, LastRequest.Method);
+        Assert.Equal("/api/v1/tickets/t1", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task DeleteTicketAsync_v2_usesUid()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await MakeV2Sut().DeleteTicketAsync("t1", 1001);
+
+        Assert.Equal(HttpMethod.Delete, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/1001", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task UpdateTicketStatusAsync_v1_usesIdFlatPayload()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await _sut.UpdateTicketStatusAsync("t1", 1001, "s-open");
+
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v1/tickets/t1", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"status\":\"s-open\"", LastBody);
+        Assert.DoesNotContain("\"ticket\"", LastBody);
+    }
+
+    [Fact]
+    public async Task UpdateTicketStatusAsync_v2_usesUidWrappedPayload()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await MakeV2Sut().UpdateTicketStatusAsync("t1", 1001, "s-open");
+
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/1001", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"ticket\"", LastBody);
+        Assert.Contains("\"status\":\"s-open\"", LastBody);
+    }
+
+    [Fact]
+    public async Task AssignTicketAsync_v1_usesId()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await _sut.AssignTicketAsync("t1", 1001, "u9");
+
+        Assert.Equal("/api/v1/tickets/t1", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"assignee\":\"u9\"", LastBody);
+    }
+
+    [Fact]
+    public async Task AssignTicketAsync_v2_usesUid()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await MakeV2Sut().AssignTicketAsync("t1", 1001, "u9");
+
+        Assert.Equal("/api/v2/tickets/1001", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"ticket\"", LastBody);
+        Assert.Contains("\"assignee\":\"u9\"", LastBody);
+    }
+
+    [Fact]
+    public async Task ClearTicketAssigneeAsync_v1_usesId()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await _sut.ClearTicketAssigneeAsync("t1", 1001);
+
+        Assert.Equal("/api/v1/tickets/t1", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"assignee\":null", LastBody);
+    }
+
+    [Fact]
+    public async Task ClearTicketAssigneeAsync_v2_usesUid()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await MakeV2Sut().ClearTicketAssigneeAsync("t1", 1001);
+
+        Assert.Equal("/api/v2/tickets/1001", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"assignee\":null", LastBody);
+    }
+
+    [Fact]
+    public async Task UpdateTicketTagsAsync_v2_usesUidWrappedPayload()
+    {
+        _handler.SetDefault(HttpStatusCode.OK);
+        await MakeV2Sut().UpdateTicketTagsAsync("t1", 1001, new[] { "tag-a" });
+
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v2/tickets/1001", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"ticket\"", LastBody);
+        Assert.Contains("tag-a", LastBody);
+    }
+
+    [Fact]
+    public async Task AddTagToTicketAsync_v2_getsAndPutsByUid()
+    {
+        _handler.RespondTo(HttpMethod.Get, "/api/v2/tickets/1001", HttpStatusCode.OK,
+            "{\"_id\":\"t1\",\"uid\":1001,\"tags\":[{\"_id\":\"tag-a\"}]}");
+        _handler.RespondTo(HttpMethod.Put, "/api/v2/tickets/1001", HttpStatusCode.OK);
+
+        var ok = await MakeV2Sut().AddTagToTicketAsync("t1", 1001, "tag-b");
+
+        Assert.True(ok);
+        Assert.Equal(2, _handler.Requests.Count);
+        Assert.Equal("/api/v2/tickets/1001", _handler.Requests[0].RequestUri!.AbsolutePath);
+        Assert.Equal("/api/v2/tickets/1001", _handler.Requests[1].RequestUri!.AbsolutePath);
+        Assert.Contains("tag-a", _handler.RequestBodies[1]);
+        Assert.Contains("tag-b", _handler.RequestBodies[1]);
     }
 
     // -----------------------------------------------------------------

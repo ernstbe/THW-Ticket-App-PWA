@@ -171,9 +171,9 @@
 
             _teamMembers.Clear();
 
-            if (userResponse?.Users != null)
+            if (userResponse != null)
             {
-                var activeUsers = userResponse.Users.Where(u => !u.Deleted).ToList();
+                var activeUsers = userResponse.UsersOrAccounts.Where(u => !u.Deleted).ToList();
 
                 foreach (var user in activeUsers)
                 {
