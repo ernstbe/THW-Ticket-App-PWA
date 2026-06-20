@@ -83,6 +83,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(13, "16.06.2026", "Statistik respektiert Gruppen",
         [
             "Die Statistik-Seite zeigt jetzt nur noch Zahlen aus den Gruppen, die du auch in der Ticketliste sehen darfst. Kennzahlen, Verlauf und Auslastung pro Person sind damit auf deinen Bereich beschränkt — die Jugend sieht keine Stab-Zahlen mehr und umgekehrt."
+        ]),
+        new WhatsNewEntry(14, "20.06.2026", "Leerzeilen in Kommentaren",
+        [
+            "Leerzeilen in Kommentaren und Notizen bleiben jetzt erhalten und werden korrekt angezeigt — vorher wurden sie beim Speichern zusammengefasst. Gilt für neue Kommentare; bereits gespeicherte lassen sich nicht nachträglich wiederherstellen."
         ])
     ];
 
