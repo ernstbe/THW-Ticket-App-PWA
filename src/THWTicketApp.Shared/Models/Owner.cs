@@ -10,4 +10,7 @@ public class Owner
     public string? Fullname { get; set; }
     public string? Email { get; set; }
     public string? Title { get; set; }
+
+    /// <summary>Avatar image filename (trudesk serves it from /uploads/users/).</summary>
+    public string? Image { get; set; }
 }
