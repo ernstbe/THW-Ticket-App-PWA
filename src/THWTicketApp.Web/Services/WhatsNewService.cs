@@ -87,6 +87,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(14, "20.06.2026", "Leerzeilen in Kommentaren",
         [
             "Leerzeilen in Kommentaren und Notizen bleiben jetzt erhalten und werden korrekt angezeigt — vorher wurden sie beim Speichern zusammengefasst. Gilt für neue Kommentare; bereits gespeicherte lassen sich nicht nachträglich wiederherstellen."
+        ]),
+        new WhatsNewEntry(15, "20.06.2026", "Bearbeiten wird nicht mehr unterbrochen",
+        [
+            "Wenn jemand anderes ein Ticket ändert, während du gerade Titel oder Beschreibung bearbeitest, wird deine Eingabe nicht mehr überschrieben. Die Aktualisierung wird nachgeholt, sobald du fertig bist — und im Hintergrund lädt die Ansicht ohne störendes Aufblitzen nach."
         ])
     ];
 

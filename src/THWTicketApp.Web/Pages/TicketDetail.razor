@@ -50,7 +50,7 @@ else
         {
             <MudTextField @bind-Value="_editSubject" Variant="Variant.Outlined" Margin="Margin.Dense"
                           Immediate="true" Style="flex:1;"
-                          OnKeyDown="@(async (e) => { if (e.Key == "Enter") await SaveTitleAsync(); else if (e.Key == "Escape") CancelTitleEdit(); })" />
+                          OnKeyDown="@(async (e) => { if (e.Key == "Enter") await SaveTitleAsync(); else if (e.Key == "Escape") await CancelTitleEdit(); })" />
             <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small"
                            OnClick="SaveTitleAsync" />
             <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
@@ -729,6 +729,12 @@ else
     private string _editIssue = string.Empty;
     private DateTime? _dueDateLocal;
 
+    // True while an inline editor (title/description) is open. A realtime
+    // refresh that arrives during an edit is deferred (see _pendingRefresh)
+    // so the ticket model isn't swapped out from under the open editor.
+    private bool IsInlineEditing => _editingTitle || _editingDescription;
+    private bool _pendingRefresh;
+
     // Composer state — hidden behind the toggle icon next to the
     // comments header. Defaults to closed so the conversation stays
     // visible without a giant text field crowding it.
@@ -820,7 +826,7 @@ else
             {
                 await Task.Delay(400, token);
                 if (token.IsCancellationRequested) return;
-                await LoadTicketAsync();
+                await LoadTicketAsync(background: true);
             }
             catch (TaskCanceledException) { }
         });
@@ -828,10 +834,26 @@ else
 
     // ─── Data loading ────────────────────────────────────────────────────
 
-    private async Task LoadTicketAsync()
+    private async Task LoadTicketAsync(bool background = false)
     {
-        _isLoading = true;
-        StateHasChanged();
+        // A realtime-triggered refresh must never interrupt an open inline
+        // editor: defer it and replay once the editor closes (see
+        // ApplyPendingRefreshAsync). A foreground load (initial open, post-save)
+        // always proceeds.
+        if (background && IsInlineEditing)
+        {
+            _pendingRefresh = true;
+            return;
+        }
+        _pendingRefresh = false;
+
+        // Background refreshes stay silent — flipping _isLoading would flash the
+        // loading skeleton over whatever the user is doing on every socket event.
+        if (!background)
+        {
+            _isLoading = true;
+            StateHasChanged();
+        }
         try
         {
             var json = await ApiService.GetTicketAsync(TicketUid.ToString());
@@ -865,7 +887,21 @@ else
         {
             Snackbar.Add($"{L.T("common.error")}: {ErrorHelper.Categorize(ex).Message}", Severity.Error);
         }
-        finally { _isLoading = false; StateHasChanged(); }
+        finally
+        {
+            if (!background) _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    // Replays a realtime refresh that was deferred because an inline editor was
+    // open. Called when the title/description editor closes (save or cancel).
+    private async Task ApplyPendingRefreshAsync()
+    {
+        if (_pendingRefresh && !IsInlineEditing)
+        {
+            await LoadTicketAsync(background: true);
+        }
     }
 
     private async Task LoadReferenceDataAsync()
@@ -914,7 +950,11 @@ else
         _editSubject = _ticket?.Subject ?? string.Empty;
         _editingTitle = true;
     }
-    private void CancelTitleEdit() => _editingTitle = false;
+    private async Task CancelTitleEdit()
+    {
+        _editingTitle = false;
+        await ApplyPendingRefreshAsync();
+    }
 
     private async Task SaveTitleAsync()
     {
@@ -960,7 +1000,11 @@ else
         _editIssue = HtmlToPlainText.Convert(_ticket?.Issue);
         _editingDescription = true;
     }
-    private void CancelDescriptionEdit() => _editingDescription = false;
+    private async Task CancelDescriptionEdit()
+    {
+        _editingDescription = false;
+        await ApplyPendingRefreshAsync();
+    }
 
     private async Task SaveDescriptionAsync()
     {
