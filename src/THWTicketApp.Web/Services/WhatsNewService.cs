@@ -91,6 +91,10 @@ public sealed class WhatsNewService
         new WhatsNewEntry(15, "20.06.2026", "Bearbeiten wird nicht mehr unterbrochen",
         [
             "Wenn jemand anderes ein Ticket ändert, während du gerade Titel oder Beschreibung bearbeitest, wird deine Eingabe nicht mehr überschrieben. Die Aktualisierung wird nachgeholt, sobald du fertig bist — und im Hintergrund lädt die Ansicht ohne störendes Aufblitzen nach."
+        ]),
+        new WhatsNewEntry(16, "20.06.2026", "Profilbilder in der Aktivität",
+        [
+            "Im Aktivitätsverlauf eines Tickets erscheint jetzt das Profilbild der jeweiligen Person neben Kommentaren, Notizen und Verlaufseinträgen. Wer kein Bild hochgeladen hat, bekommt weiterhin die farbigen Initialen."
         ])
     ];
 

@@ -23,7 +23,7 @@ else
         @foreach (var ev in Items)
         {
             <div class="d-flex align-start gap-3" data-event-kind="@ev.Kind">
-                <UserAvatar Name="@ev.AuthorName" Size="Size.Small" />
+                <UserAvatar Name="@ev.AuthorName" ImageUrl="@Api.GetUserAvatarUrl(ev.AuthorImage)" Size="Size.Small" />
                 <div style="flex:1; min-width:0;">
                     <div class="d-flex align-center gap-2 flex-wrap">
                         <MudText Typo="Typo.subtitle2">@ev.AuthorName</MudText>
@@ -69,6 +69,7 @@ else
     // Injected explicitly (rather than via @inject) so unit tests can supply
     // a LocalizationService instance when exercising FormatRelative directly.
     [Inject] internal LocalizationService L { get; set; } = default!;
+    [Inject] internal ITrueDeskApiService Api { get; set; } = default!;
 
     [Parameter, EditorRequired] public Ticket? Ticket { get; set; }
 
@@ -98,6 +99,7 @@ else
                 Kind = ActivityKind.Comment,
                 Date = c.Date,
                 AuthorName = c.Owner?.Fullname,
+                AuthorImage = c.Owner?.Image,
                 Body = c.Text
             }));
 
@@ -107,6 +109,7 @@ else
                 Kind = ActivityKind.Note,
                 Date = n.Date,
                 AuthorName = n.Owner?.Fullname,
+                AuthorImage = n.Owner?.Image,
                 Body = n.Content
             }));
 
@@ -116,6 +119,7 @@ else
                 Kind = ActivityKind.History,
                 Date = h.Date,
                 AuthorName = h.Owner?.Fullname ?? "System",
+                AuthorImage = h.Owner?.Image,
                 HistoryAction = h.TranslatedAction,
                 // Translate the English description and drop it when it just
                 // restates the action label (e.g. "Ticket was created.").
@@ -152,6 +156,7 @@ else
         public ActivityKind Kind { get; init; }
         public DateTime Date { get; init; }
         public string? AuthorName { get; init; }
+        public string? AuthorImage { get; init; }
         public string? Body { get; init; }
         public string? HistoryAction { get; init; }
     }

@@ -632,6 +632,16 @@ public class TrueDeskApiService : ITrueDeskApiService
         return $"{ServerUrl}{attachmentPath}";
     }
 
+    public string? GetUserAvatarUrl(string? image)
+    {
+        if (string.IsNullOrWhiteSpace(image)) return null;
+        // trudesk hands out "defaultProfile.jpg" for users who never uploaded a
+        // picture — treat that (and any default* placeholder) as "no avatar" so
+        // the UserAvatar component renders coloured initials instead.
+        if (image.StartsWith("defaultProfile", StringComparison.OrdinalIgnoreCase)) return null;
+        return $"{ServerUrl}/uploads/users/{image}";
+    }
+
     public async Task<bool> DeleteAttachmentAsync(string ticketId, string attachmentId)
     {
         // /tickets/:tid/attachments/remove/:aid only exists in v1

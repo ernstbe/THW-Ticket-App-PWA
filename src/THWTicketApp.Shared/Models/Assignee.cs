@@ -11,4 +11,7 @@ public class Assignee
     public string? Email { get; set; }
     public string? Title { get; set; }
     public bool Deleted { get; set; }
+
+    /// <summary>Avatar image filename (trudesk serves it from /uploads/users/).</summary>
+    public string? Image { get; set; }
 }

@@ -55,6 +55,31 @@ public class TicketActivityFeedTests
     }
 
     [Fact]
+    public void BuildFeed_carriesAuthorNameAndImageFromOwners()
+    {
+        var t = new Ticket
+        {
+            Comments = new List<Comment>
+            {
+                new() { Date = DateTime.Now, Text = "c", Owner = new Assignee { Fullname = "Hans Müller", Image = "hans.jpg" } }
+            },
+            Notes = new List<Note>
+            {
+                new() { Date = DateTime.Now.AddMinutes(-1), Content = "n", Owner = new Owner { Fullname = "Eva Beispiel", Image = "eva.png" } }
+            }
+        };
+
+        var feed = TicketActivityFeed.BuildFeed(t);
+        var comment = feed.Single(e => e.Kind == TicketActivityFeed.ActivityKind.Comment);
+        var note = feed.Single(e => e.Kind == TicketActivityFeed.ActivityKind.Note);
+
+        Assert.Equal("Hans Müller", comment.AuthorName);
+        Assert.Equal("hans.jpg", comment.AuthorImage);
+        Assert.Equal("Eva Beispiel", note.AuthorName);
+        Assert.Equal("eva.png", note.AuthorImage);
+    }
+
+    [Fact]
     public void BuildFeed_tagsEventsWithCorrectKind()
     {
         var t = new Ticket
