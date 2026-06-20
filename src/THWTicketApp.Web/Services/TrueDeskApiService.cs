@@ -1340,7 +1340,10 @@ public class TrueDeskApiService : ITrueDeskApiService
         {
             var json = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
-            var updated = doc.RootElement.TryGetProperty("success", out var s) ? s.GetInt32() : 0;
+            // Server returns { success: true, updated: <n>, failed: <n> }.
+            // (Older builds put the count in `success`; fall back for safety.)
+            var updated = doc.RootElement.TryGetProperty("updated", out var u) ? u.GetInt32()
+                : (doc.RootElement.TryGetProperty("success", out var s) && s.ValueKind == JsonValueKind.Number ? s.GetInt32() : 0);
             var failed = doc.RootElement.TryGetProperty("failed", out var f) ? f.GetInt32() : 0;
             return (updated, failed);
         }
