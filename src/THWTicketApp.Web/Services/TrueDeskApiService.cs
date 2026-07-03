@@ -14,6 +14,10 @@ public class TrueDeskApiService : ITrueDeskApiService
     private readonly AppSettings _settings;
     private readonly LocalStorageService _localStorage;
     private readonly IJSRuntime _jsRuntime;
+    // Optional so existing unit-test constructions (4-arg) keep compiling; DI
+    // always supplies it. Used to purge the offline cache on logout / foreign
+    // login so a shared device doesn't leak the previous user's data.
+    private readonly IIndexedDbService? _indexedDb;
     private string? _authToken;
     private string? _refreshToken;
 
@@ -21,12 +25,13 @@ public class TrueDeskApiService : ITrueDeskApiService
     public string? CurrentUserId { get; private set; }
     public string? LastError { get; private set; }
 
-    public TrueDeskApiService(HttpClient httpClient, AppSettings settings, LocalStorageService localStorage, IJSRuntime jsRuntime)
+    public TrueDeskApiService(HttpClient httpClient, AppSettings settings, LocalStorageService localStorage, IJSRuntime jsRuntime, IIndexedDbService? indexedDb = null)
     {
         _httpClient = httpClient;
         _settings = settings;
         _localStorage = localStorage;
         _jsRuntime = jsRuntime;
+        _indexedDb = indexedDb;
         _httpClient.Timeout = TimeSpan.FromSeconds(_settings.ConnectionTimeoutSeconds);
     }
 
@@ -132,6 +137,21 @@ public class TrueDeskApiService : ITrueDeskApiService
                 }
 
                 CurrentUsername = username;
+
+                // Foreign login on a shared device (including a passkey-locked
+                // device where a different person logs in fresh instead of
+                // unlocking): if the account differs from whatever identity was
+                // cached here, purge the previous user's offline data before we
+                // start caching this user's (#217).
+                var previousUserId = await _localStorage.GetItemAsync("auth_userid");
+                if (string.IsNullOrEmpty(previousUserId))
+                    previousUserId = await _localStorage.GetItemAsync("locked_auth_userid");
+                if (!string.IsNullOrEmpty(previousUserId)
+                    && !string.Equals(previousUserId, CurrentUserId, StringComparison.Ordinal))
+                {
+                    await ClearOfflineCacheAsync();
+                }
+
                 await _localStorage.SetItemAsync("auth_token", _authToken ?? string.Empty);
                 await _localStorage.SetItemAsync("auth_refresh_token", _refreshToken ?? string.Empty);
                 await _localStorage.SetItemAsync("auth_username", username);
@@ -262,6 +282,20 @@ public class TrueDeskApiService : ITrueDeskApiService
         await _localStorage.RemoveItemAsync("auth_username");
         await _localStorage.RemoveItemAsync("auth_userid");
         await ClearLockedAuthAsync();
+        // Full logout ends the session: purge the offline cache so the next user
+        // on a shared device can't read the previous user's tickets, queued
+        // offline actions or sync log (#217).
+        await ClearOfflineCacheAsync();
+    }
+
+    // Best-effort wipe of the IndexedDB stores. Swallows failures so a cache
+    // problem can never block logout/login itself.
+    private async Task ClearOfflineCacheAsync()
+    {
+        if (_indexedDb == null) return;
+        try { await _indexedDb.ClearTicketCacheAsync(); } catch { }
+        try { await _indexedDb.ClearPendingActionsAsync(); } catch { }
+        try { await _indexedDb.ClearSyncLogAsync(); } catch { }
     }
 
     private async Task ClearLockedAuthAsync()
@@ -315,6 +349,10 @@ public class TrueDeskApiService : ITrueDeskApiService
         _refreshToken = null;
         CurrentUsername = null;
         CurrentUserId = null;
+        // Drop the cached admin flag too — otherwise a different user who logs
+        // in on this same (Scoped, whole-session) instance after the lock
+        // inherits the locker's admin UI until a page reload (#208).
+        _isAdminCached = null;
         SetAuthHeader(null);
         await _localStorage.RemoveItemAsync("auth_token");
         await _localStorage.RemoveItemAsync("auth_refresh_token");
