@@ -262,11 +262,13 @@
 
                 <div class="d-flex justify-space-between align-center mb-3">
                     <MudText>@L.T("settings.idlelock_enable")</MudText>
-                    <MudSwitch @bind-Value="_idleLockEnabled" Color="Color.Primary" T="bool"
+                    <MudSwitch @bind-Value="_idleLockEnabled" @bind-Value:after="SaveIdleLockAsync"
+                               Color="Color.Primary" T="bool"
                                Disabled="@(!_passkeyRegistered)" />
                 </div>
 
-                <MudSelect T="int" @bind-Value="_idleLockMinutes" Label="@L.T("settings.idlelock_timeout")"
+                <MudSelect T="int" @bind-Value="_idleLockMinutes" @bind-Value:after="SaveIdleLockAsync"
+                           Label="@L.T("settings.idlelock_timeout")"
                            Variant="Variant.Outlined" Dense="true"
                            Disabled="@(!_idleLockEnabled || !_passkeyRegistered)">
                     <MudSelectItem Value="5">5 Min</MudSelectItem>
@@ -763,6 +765,15 @@
         await LocalStorage.SetItemAsync("settings_apiurl", _apiBaseUrl);
         await LocalStorage.SetItemAsync("settings_timeout", _connectionTimeout.ToString());
         Snackbar.Add(L.T("settings.saved"), Severity.Success);
+    }
+
+    // Auto-Lock has no Save button and its switch/select previously only mutated
+    // local fields — SaveSettingsAsync (the only caller of IdleLock.SaveSettingsAsync)
+    // is never invoked, so the control was inert (#215). Persist + start/stop the
+    // watcher immediately whenever either control changes.
+    private async Task SaveIdleLockAsync()
+    {
+        await IdleLock.SaveSettingsAsync(_idleLockEnabled && _passkeyRegistered, _idleLockMinutes);
     }
 
     private async Task SaveSettingsAsync()
