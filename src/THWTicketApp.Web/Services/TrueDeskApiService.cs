@@ -1320,12 +1320,17 @@ public class TrueDeskApiService : ITrueDeskApiService
     {
         var ids = ticketIds.ToArray();
         if (ids.Length == 0) return (0, 0);
-        var payload = new { ids };
-        var request = new HttpRequestMessage(HttpMethod.Delete, $"{V2BaseUrl}/tickets/batch")
-        {
-            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
-        };
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.SendAsync(request));
+        var payloadJson = JsonSerializer.Serialize(new { ids });
+        // Build the HttpRequestMessage (and its content) INSIDE the factory:
+        // SendWithAutoRefreshAsync re-invokes it on a 401+refresh, and an
+        // HttpRequestMessage/StringContent can only be sent once — reusing a
+        // single instance throws InvalidOperationException on the retry
+        // (see UnsubscribeWebPushAsync for the same pattern).
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.SendAsync(
+            new HttpRequestMessage(HttpMethod.Delete, $"{V2BaseUrl}/tickets/batch")
+            {
+                Content = new StringContent(payloadJson, Encoding.UTF8, "application/json")
+            }));
         if (!response.IsSuccessStatusCode) return (0, ids.Length);
         try
         {
