@@ -83,6 +83,24 @@ public class HtmlToPlainTextTests
         Assert.Equal("Zeile A\n\n\nZeile B", HtmlToPlainText.Convert(input));
     }
 
+    [Theory]
+    // Regression for #218: a raw-text UPDATE body that contains an angle-bracket
+    // token (not real HTML) must keep the token verbatim, not strip it.
+    [InlineData("VLAN-Tag <VLAN> auf Port 3 setzen", "VLAN-Tag <VLAN> auf Port 3 setzen")]
+    [InlineData("Platzhalter <Name> ersetzen", "Platzhalter <Name> ersetzen")]
+    [InlineData("Server <Server01> prüfen", "Server <Server01> prüfen")]
+    public void Convert_rawTextWithAngleBracketToken_keepsToken(string input, string expected)
+        => Assert.Equal(expected, HtmlToPlainText.Convert(input));
+
+    [Fact]
+    public void Convert_rawTextWithTokenAndBlankLines_keepsBothVerbatim()
+    {
+        // The full data-loss case: token stripped AND the user's blank lines
+        // collapsed on the edit round-trip. Both must survive.
+        var input = "Konfig <VLAN>\n\n\nAbschnitt zwei";
+        Assert.Equal("Konfig <VLAN>\n\n\nAbschnitt zwei", HtmlToPlainText.Convert(input));
+    }
+
     [Fact]
     public void Convert_multipleBrTags_arePreserved()
     {

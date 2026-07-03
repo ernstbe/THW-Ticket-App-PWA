@@ -26,6 +26,15 @@ public static class HtmlToPlainText
     private static readonly Regex AnyTagRegex = new(@"<[^>]+>", RegexOptions.Compiled);
     private static readonly Regex CollapseBlankLines = new(@"\n{3,}", RegexOptions.Compiled);
 
+    // Recognizes the HTML (trudesk CREATE / rich-editor) shape by an actual
+    // known HTML tag — NOT any "<...>" token. A raw-text UPDATE body that merely
+    // contains an identifier like <VLAN>, <Name> or <Server01> must not be
+    // mistaken for markup and stripped. Tag name is anchored with \b so <codex>
+    // does not match <code>, etc.
+    private static readonly Regex HtmlTagRegex = new(
+        @"</?(?:p|br|div|span|ul|ol|li|a|strong|b|em|i|u|s|strike|del|ins|h[1-6]|blockquote|pre|code|table|thead|tbody|tr|td|th|hr|img)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // Placeholder that shields explicit <br> breaks while the structural
     // blank-line collapse runs, so multiple <br>'s are never merged. (Raw
     // newlines in tagless bodies are shielded by skipping the collapse
@@ -36,10 +45,14 @@ public static class HtmlToPlainText
     {
         if (string.IsNullOrEmpty(html)) return string.Empty;
 
-        // A body with no tags is the raw-newline shape (trudesk UPDATE): its
-        // newlines are the user's own and must be kept verbatim, so only the
-        // tag-derived padding collapse is skipped for it.
-        var hasTags = AnyTagRegex.IsMatch(html);
+        // The raw-newline shape (trudesk UPDATE) carries no HTML tags: keep the
+        // user's text — including any <VLAN>-style token and their blank lines —
+        // verbatim, only decoding entities. Running the tag transforms below on
+        // it would delete such tokens and collapse blank lines (data loss).
+        if (!HtmlTagRegex.IsMatch(html))
+        {
+            return WebUtility.HtmlDecode(html).Trim();
+        }
 
         // Protect explicit <br> breaks, then map structural tags to whitespace
         // before stripping the rest so paragraphs and list items survive.
@@ -55,12 +68,9 @@ public static class HtmlToPlainText
         s = WebUtility.HtmlDecode(s);
 
         // Collapse runs of >2 blank lines that successive </p>'s (or cosmetic
-        // newlines between block tags) introduce — but only for HTML bodies,
-        // and never across the protected user breaks.
-        if (hasTags)
-        {
-            s = CollapseBlankLines.Replace(s, "\n\n");
-        }
+        // newlines between block tags) introduce — never across the protected
+        // user breaks, which are restored afterwards.
+        s = CollapseBlankLines.Replace(s, "\n\n");
 
         // Restore the protected user breaks as real newlines.
         s = s.Replace(BreakPlaceholder, '\n');
