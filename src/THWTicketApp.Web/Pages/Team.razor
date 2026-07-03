@@ -112,7 +112,9 @@
                             </td>
                             <td>
                                 <MudText Typo="Typo.body2" Style="font-weight: 600;">@member.Name</MudText>
-                                @if (!string.IsNullOrEmpty(member.Email))
+                                @* E-Mail-Adressen (teils privat) nur für Admins zeigen —
+                                   Datenschutz: normale Agents brauchen sie nicht. *@
+                                @if (_isAdmin && !string.IsNullOrEmpty(member.Email))
                                 {
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">@member.Email</MudText>
                                 }
@@ -137,6 +139,7 @@
 
 @code {
     private bool _isLoading;
+    private bool _isAdmin;
     private List<TeamMemberStats> _teamMembers = [];
     private int _totalTeamMembers;
     private double _averageWorkload;
@@ -149,6 +152,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        try { _isAdmin = await ApiService.IsCurrentUserAdminAsync(); }
+        catch { _isAdmin = false; } // fail closed: hide emails if the check fails
         await LoadTeamDataAsync();
     }
 
