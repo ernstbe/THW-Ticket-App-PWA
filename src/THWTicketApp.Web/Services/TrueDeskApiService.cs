@@ -114,7 +114,15 @@ public class TrueDeskApiService : ITrueDeskApiService
                         var parts = _authToken.Split('.');
                         if (parts.Length == 3)
                         {
-                            var payload64 = parts[1];
+                            // JWT payloads are base64URL, not standard base64:
+                            // translate the URL-safe alphabet back before decoding.
+                            // Without this, Convert.FromBase64String throws on the
+                            // '-'/'_' present in essentially any real payload, the
+                            // throw is swallowed, and CurrentUserId stays null
+                            // (owner:null on create, empty auth_userid) — #203.
+                            var payload64 = parts[1]
+                                .Replace('-', '+')
+                                .Replace('_', '/');
                             // Fix base64 padding
                             switch (payload64.Length % 4)
                             {
