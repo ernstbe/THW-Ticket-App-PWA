@@ -541,8 +541,16 @@ else
 
     private void ApplyFilters()
     {
+        // A local rebuild (filter chip / sort change) supersedes any active
+        // server-search result set: clear the flag so the local text filter below
+        // is applied. Without this, changing a filter or sort while a server search
+        // was active rebuilt the list from _allTickets and silently DROPPED the
+        // search — showing the wrong tickets while the search box still read the
+        // query (#256).
+        _isServerSearchActive = false;
+
         var source = _allTickets.AsEnumerable();
-        if (!_isServerSearchActive && !string.IsNullOrWhiteSpace(_searchText))
+        if (!string.IsNullOrWhiteSpace(_searchText))
         {
             var search = _searchText.ToLowerInvariant();
             source = source.Where(t =>
