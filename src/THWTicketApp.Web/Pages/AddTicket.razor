@@ -95,6 +95,7 @@ else
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudSelect T="Priority" @bind-Value="_selectedPriority" Label="@L.T("detail.priority")" Variant="Variant.Outlined"
+                           Required="true" RequiredError="@L.T("tickets.priority_required")"
                            ToStringFunc="@(p => p?.TranslatedName ?? "")" Class="mb-4">
                     @foreach (var priority in _priorities)
                     {
@@ -213,6 +214,10 @@ else
     private string _issue = string.Empty;
     private bool _draftRestoredBanner;
     private System.Threading.Timer? _saveDebounce;
+    // Set once the draft has been intentionally removed (submit/queue/discard).
+    // A debounced save already parked at its await can otherwise complete
+    // afterwards and resurrect the draft (#278).
+    private bool _draftFinalized;
     private TicketType? _selectedType;
     private Priority? _selectedPriority;
     private Group? _selectedGroup;
@@ -301,6 +306,9 @@ else
         _saveDebounce?.Dispose();
         _saveDebounce = new System.Threading.Timer(async _ =>
         {
+            // The draft was already finalized (submitted/queued/discarded) while
+            // this callback was pending — don't resurrect it (#278).
+            if (_draftFinalized) return;
             try
             {
                 if (string.IsNullOrWhiteSpace(_subject) && string.IsNullOrWhiteSpace(_issue))
@@ -322,6 +330,7 @@ else
         _subject = string.Empty;
         _issue = string.Empty;
         _draftRestoredBanner = false;
+        _draftFinalized = true;
         _saveDebounce?.Dispose();
         await LocalStorage.RemoveItemAsync(DraftKey);
     }
@@ -443,6 +452,7 @@ else
 
             // Successful submit — drop the draft so the next /tickets/add
             // visit starts fresh.
+            _draftFinalized = true;
             _saveDebounce?.Dispose();
             await LocalStorage.RemoveItemAsync(DraftKey);
 
@@ -509,6 +519,7 @@ else
             _selectedGroup?.Id, _selectedAssignee?.Id,
             _dueDate, _templateChecklist);
 
+        _draftFinalized = true;
         _saveDebounce?.Dispose();
         await LocalStorage.RemoveItemAsync(DraftKey);
 
@@ -559,7 +570,11 @@ else
     {
         _selectedType = type;
         _priorities = TypePriorityCoupling.PrioritiesForType(type, _allPriorities);
-        _selectedPriority = TypePriorityCoupling.EnsureSelected(_priorities, _selectedPriority);
+        // EnsureSelected returns null when the current priority isn't offered by
+        // the new type; fall back to the first available so the required field is
+        // never left blank (which otherwise sent priority=null → create 4xx/5xx) — #282.
+        _selectedPriority = TypePriorityCoupling.EnsureSelected(_priorities, _selectedPriority)
+            ?? _priorities.FirstOrDefault();
     }
 
     private void OnTemplateSelected(TicketTemplate? template)
@@ -590,6 +605,11 @@ else
             if (match != null) _selectedPriority = match;
         }
         _templateChecklist = new List<string>(template.Checklist);
+        // Persist the template-applied content: OnTemplateSelected assigns the
+        // fields directly (not via OnSubjectChanged), so without this the stored
+        // draft still holds the pre-template text and a reload would discard the
+        // applied template (#286).
+        ScheduleDraftSave();
         StateHasChanged();
     }
 
