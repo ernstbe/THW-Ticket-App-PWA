@@ -115,7 +115,11 @@ else if (_isLoading)
 
 @if (!_isLoading && _tasks.Length == 0)
 {
-    <MudText Color="Color.Secondary" Class="mt-4">@L.T("recurring.none")</MudText>
+    <EmptyState Icon="@Icons.Material.Outlined.EventRepeat"
+                Title="@L.T("recurring.none")"
+                Description="@L.T("recurring.empty_description")"
+                ActionLabel="@L.T("recurring.new")"
+                ActionCallback="ShowCreateDialog" />
 }
 
 @* Create / Edit Dialog *@
