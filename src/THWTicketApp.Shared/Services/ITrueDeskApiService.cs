@@ -41,7 +41,7 @@ public interface ITrueDeskApiService
     /// validates `checklist` on the ticketsV2 create and stores the items
     /// with completed:false).
     /// </summary>
-    Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null, IReadOnlyList<string>? checklist = null);
+    Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null, IReadOnlyList<string>? checklist = null, string? ownerId = null);
     /// <summary>
     /// Updates ticket fields. When <paramref name="includeDueDate"/> is true
     /// (default), dueDate is always sent — MinValue goes out as an explicit
