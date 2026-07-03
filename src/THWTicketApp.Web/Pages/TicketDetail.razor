@@ -213,7 +213,7 @@ else
                 <div style="margin-bottom:1em;">
                     <strong>@(c.Owner?.Fullname ?? "?")</strong>
                     <span>— @c.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</span>
-                    <div>@((MarkupString)Markdown.ToHtml(c.Text ?? string.Empty, _mdPipeline))</div>
+                    <div>@((MarkupString)SafeHtml.Sanitize(Markdown.ToHtml(c.Text ?? string.Empty, _mdPipeline)))</div>
                 </div>
             }
         }
@@ -225,7 +225,7 @@ else
                 <div style="margin-bottom:1em;">
                     <strong>@(n.Owner?.Fullname ?? "?")</strong>
                     <span>— @n.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</span>
-                    <div>@((MarkupString)Markdown.ToHtml(n.Content ?? string.Empty, _mdPipeline))</div>
+                    <div>@((MarkupString)SafeHtml.Sanitize(Markdown.ToHtml(n.Content ?? string.Empty, _mdPipeline)))</div>
                 </div>
             }
         }
@@ -367,7 +367,7 @@ else
                                 }
                                 else
                                 {
-                                    @((MarkupString)Markdown.ToHtml(_newComment, _mdPipeline))
+                                    @((MarkupString)SafeHtml.Sanitize(Markdown.ToHtml(_newComment, _mdPipeline)))
                                 }
                             </MudPaper>
                         }
@@ -759,10 +759,6 @@ else
     private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .UseSoftlineBreakAsHardlineBreak()
-        // DisableHtml: comments/notes/issue bodies are authored by any ticket
-        // participant and rendered via (MarkupString), so raw HTML must be
-        // escaped rather than passed through to the DOM (stored XSS).
-        .DisableHtml()
         .Build();
 
     // Render a user-typed Issue body to HTML. MarkdownBlankLines.Preserve runs
@@ -770,7 +766,7 @@ else
     // (see the helper for the full why); the pipeline then turns each line into
     // a hard break.
     private static MarkupString RenderMarkdown(string? text)
-        => (MarkupString)Markdown.ToHtml(MarkdownBlankLines.Preserve(text), _mdPipeline);
+        => (MarkupString)SafeHtml.Sanitize(Markdown.ToHtml(MarkdownBlankLines.Preserve(text), _mdPipeline));
 
     // Checklist
     private string _newChecklistTitle = string.Empty;

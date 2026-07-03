@@ -203,7 +203,7 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <div class="report-rendered">
-                        @((MarkupString)Markdown.ToHtml(_generatedReport, _mdPipeline))
+                        @((MarkupString)SafeHtml.Sanitize(Markdown.ToHtml(_generatedReport, _mdPipeline)))
                     </div>
                 </MudCardContent>
             </MudCard>
@@ -251,10 +251,6 @@
     private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .UseSoftlineBreakAsHardlineBreak()
-        // DisableHtml: the report is built from ticket data (subjects, notes,
-        // comments) any user can set and rendered via (MarkupString) — escape
-        // raw HTML instead of passing it through (XSS).
-        .DisableHtml()
         .Build();
     private List<WeeklyCount> _weeklyTrend = [];
     private string _avgResolutionTime = "-";
