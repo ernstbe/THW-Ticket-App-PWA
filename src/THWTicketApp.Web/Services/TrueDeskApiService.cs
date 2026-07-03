@@ -654,7 +654,7 @@ public class TrueDeskApiService : ITrueDeskApiService
     }
 
     // Attachments
-    public async Task<bool> UploadAttachmentAsync(string ticketId, Stream fileStream, string fileName)
+    public async Task<bool> UploadAttachmentAsync(string ticketId, Stream fileStream, string fileName, string? contentType = null)
     {
         // Buffer once so the retry can rebuild the multipart content. On a
         // 401+refresh SendWithAutoRefreshAsync re-invokes the factory, and a
@@ -662,7 +662,10 @@ public class TrueDeskApiService : ITrueDeskApiService
         // upload stream (IBrowserFile.OpenReadStream) is non-seekable, so reusing
         // it throws InvalidOperationException on the retry (#254).
         var bytes = await ReadAllBytesAsync(fileStream);
-        var mime = GetMimeType(fileName);
+        // Prefer the browser-provided MIME; only fall back to the extension map
+        // (which returns octet-stream for webp/heic/tiff/mp3/wav — types the
+        // server rejects even though the extension is allowed) — #284.
+        var mime = !string.IsNullOrWhiteSpace(contentType) ? contentType! : GetMimeType(fileName);
 
         // Token-authenticated endpoint added in trudesk-thw PR #96.
         // Ticket id is in the URL, ownerId is taken from req.user server-side —

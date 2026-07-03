@@ -64,7 +64,7 @@ public interface ITrueDeskApiService
     Task<bool> AddCommentAsync(string ticketUid, string ownerId, string newComment);
     Task<bool> AddNoteAsync(string ticketUid, string ownerId, string note);
 
-    Task<bool> UploadAttachmentAsync(string ticketId, Stream fileStream, string fileName);
+    Task<bool> UploadAttachmentAsync(string ticketId, Stream fileStream, string fileName, string? contentType = null);
     Task<Stream?> DownloadAttachmentAsync(string attachmentPath);
     string GetAttachmentUrl(string attachmentPath);
     /// <summary>Builds an avatar URL from a trudesk user image filename, or null
