@@ -721,6 +721,10 @@ else
 
     private Ticket? _ticket;
     private bool _isLoading;
+    // Which TicketUid the currently displayed data belongs to. Guards
+    // OnParametersSetAsync so it only reloads when the route parameter actually
+    // changes (not on every parameter set).
+    private int? _loadedUid;
 
     // Inline editing state
     private bool _editingTitle;
@@ -793,12 +797,43 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadTicketAsync();
+        // Ticket-INDEPENDENT, one-time setup only. The ticket itself (and its
+        // per-ticket favorite/subscription state) loads in OnParametersSetAsync:
+        // navigating straight from /tickets/5 to /tickets/9 reuses this component
+        // instance and does NOT re-run OnInitializedAsync, so loading here would
+        // leave #5 on screen while the URL says #9 (issue #194).
         _ = LoadReferenceDataAsync();
-        await LoadFavoriteStateAsync();
         await LoadQuickRepliesAsync();
-        await LoadSubscriptionStateAsync();
         Realtime.AnyTicketChanged += OnRealtimeChange;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedUid == TicketUid) return;
+        _loadedUid = TicketUid;
+
+        // Switching tickets on the reused instance: drop any per-ticket UI state
+        // so a half-typed comment or an open inline editor from the previous
+        // ticket doesn't bleed into this one.
+        ResetPerTicketState();
+
+        await LoadTicketAsync();
+        await LoadFavoriteStateAsync();
+        await LoadSubscriptionStateAsync();
+    }
+
+    private void ResetPerTicketState()
+    {
+        _refreshDebounceCts?.Cancel();
+        _editingTitle = false;
+        _editingDescription = false;
+        _pendingRefresh = false;
+        _newComment = string.Empty;
+        _newNote = string.Empty;
+        _newChecklistTitle = string.Empty;
+        _showQuickReplyEditor = false;
+        _linkTicketUid = 0;
+        _linkType = "related";
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
