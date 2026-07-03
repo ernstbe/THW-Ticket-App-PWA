@@ -55,18 +55,17 @@ public class GroupTicketStatsData
     public List<TagCount> Tags { get; set; } = [];
 }
 
+// The v2 /tickets/stats/assignee/:user (and /user/:user) endpoints return the
+// stats FLAT — sendApiSuccess does Object.assign({ success: true }, { ticketCount,
+// closedCount, avgResponse, ... }). These fields are therefore top-level, NOT
+// under a "data" wrapper; reading them from a nested object made the Team page
+// show 0 for every member (frontend review BUG-3).
 public class UserTicketStats
 {
     public bool Success { get; set; }
-    public UserTicketStatsData? Data { get; set; }
-}
-
-public class UserTicketStatsData
-{
     public int TicketCount { get; set; }
     public int ClosedCount { get; set; }
     public double AvgResponse { get; set; }
-    public List<TicketStatGraphData> GraphData { get; set; } = [];
 }
 
 public class TagCount

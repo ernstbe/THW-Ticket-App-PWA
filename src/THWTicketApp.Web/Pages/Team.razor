@@ -191,12 +191,12 @@
                         {
                             var statsJson = await ApiService.GetTicketStatsForAssigneeAsync(userId);
                             var userStats = JsonSerializer.Deserialize<UserTicketStats>(statsJson, options);
-                            var total = userStats?.Data?.TicketCount ?? 0;
-                            var closed = userStats?.Data?.ClosedCount ?? 0;
+                            var total = userStats?.TicketCount ?? 0;
+                            var closed = userStats?.ClosedCount ?? 0;
                             member.AssignedTickets = total;
                             member.OpenTickets = Math.Max(0, total - closed);
                             member.ClosedTickets = closed;
-                            member.AvgResponseHours = userStats?.Data?.AvgResponse ?? 0;
+                            member.AvgResponseHours = userStats?.AvgResponse ?? 0;
                         }
                         catch { }
                     }
