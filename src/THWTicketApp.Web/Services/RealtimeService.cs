@@ -62,6 +62,10 @@ public class RealtimeService : IAsyncDisposable
             _module ??= await _jsRuntime.InvokeAsync<IJSObjectReference>(
                 "import", "./js/realtime-interop.js");
 
+            // Dispose any reference from a previous connect — RealtimeService is
+            // scoped (≈singleton in WASM) and ConnectAsync can run again on the
+            // same instance, which would otherwise leak the old ref (#220).
+            _dotNetRef?.Dispose();
             _dotNetRef = DotNetObjectReference.Create(this);
             var serverUrl = _settings.ApiBaseUrl.Replace("/api/v1", "").Replace("/api/v2", "");
             await _module.InvokeAsync<bool>("connect", serverUrl, token, _dotNetRef);

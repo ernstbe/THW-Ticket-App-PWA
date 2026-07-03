@@ -101,6 +101,9 @@
 
         await Task.Delay(100); // Wait for video element to render
 
+        // Dispose the ref from a prior (re)start — the camera can fail and be
+        // restarted from the same page instance, leaking the old ref otherwise (#221).
+        _dotNetRef?.Dispose();
         _dotNetRef = DotNetObjectReference.Create(this);
         var started = await _module.InvokeAsync<bool>("startScanner", "scanner-video", _dotNetRef);
         if (!started)
