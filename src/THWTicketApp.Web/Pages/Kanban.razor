@@ -355,8 +355,10 @@ else
         // LoadBoardAsync clears it again if the saved id no longer matches
         // any group the user can see (e.g. they were removed from Jugend).
         _groupFilter = await LocalStorage.GetItemAsync(GroupFilterStorageKey);
-        await LoadBoardAsync();
+        // Subscribe BEFORE the initial load so a change arriving mid-load isn't
+        // missed — it now sets _reloadPending and re-runs once the load finishes (#288).
         Realtime.AnyTicketChanged += OnRealtimeChange;
+        await LoadBoardAsync();
     }
 
     private void OnRealtimeChange(string ticketId)
@@ -386,7 +388,23 @@ else
 
     private async Task LoadBoardAsync()
     {
-        if (_isLoading) return;
+        // Never rebuild the board while a drag is in flight: replacing the
+        // MudDropContainer detaches the dragged element, `dragend` never fires,
+        // and ClearDragState never runs — leaving _draggedItem set and columns
+        // stuck disabled. Defer the refresh to dragend instead (#287).
+        if (_draggedItem != null)
+        {
+            _reloadPending = true;
+            return;
+        }
+        // A refresh requested while another load is running must not be dropped;
+        // remember it and re-run once the current load finishes (#288).
+        if (_isLoading)
+        {
+            _reloadPending = true;
+            return;
+        }
+        _reloadPending = false;
         _isLoading = true;
         _errorMessage = null;
         StateHasChanged();
@@ -518,6 +536,13 @@ else
         {
             _isLoading = false;
             StateHasChanged();
+            // A refresh arrived while we were loading (and we're not mid-drag) —
+            // run it now (#288).
+            if (_reloadPending && _draggedItem == null)
+            {
+                _reloadPending = false;
+                _ = InvokeAsync(LoadBoardAsync);
+            }
         }
     }
 
@@ -642,6 +667,9 @@ else
         => _draggedItem != null && !IsStatusAllowedForItem(_draggedItem, statusId);
 
     private KanbanTicketItem? _draggedItem;
+    // Set when a board refresh is requested during a drag or an in-flight load;
+    // drained on dragend / load-complete so the refresh isn't lost (#287, #288).
+    private bool _reloadPending;
 
     private void OnDragStart(KanbanTicketItem item)
     {
@@ -654,6 +682,12 @@ else
         if (_draggedItem == null) return;
         _draggedItem = null;
         StateHasChanged();
+        // A realtime refresh was deferred while dragging — run it now (#287).
+        if (_reloadPending)
+        {
+            _reloadPending = false;
+            _ = InvokeAsync(LoadBoardAsync);
+        }
     }
 
     private async Task MoveCardAsync(KanbanTicketItem item, string newStatusId)
