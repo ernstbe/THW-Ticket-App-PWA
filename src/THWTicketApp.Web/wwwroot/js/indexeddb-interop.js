@@ -84,11 +84,15 @@ export async function getCachedTicketCount() {
 
 export async function clearTicketCache() {
     const database = await openDb();
-    const tx = database.transaction('tickets', 'readwrite');
-    tx.objectStore('tickets').clear();
-    const metaTx = database.transaction('meta', 'readwrite');
-    metaTx.objectStore('meta').delete('lastCacheTime');
-    return true;
+    // One atomic tx over both stores; await commit and reject on failure (#258).
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction(['tickets', 'meta'], 'readwrite');
+        tx.objectStore('tickets').clear();
+        tx.objectStore('meta').delete('lastCacheTime');
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('clearTicketCache transaction aborted'));
+    });
 }
 
 export async function enqueuePendingAction(actionJson) {
@@ -131,16 +135,28 @@ export async function getPendingActionCount() {
 
 export async function removePendingAction(id) {
     const database = await openDb();
-    const tx = database.transaction('pendingActions', 'readwrite');
-    tx.objectStore('pendingActions').delete(id);
-    return true;
+    // Await COMMIT. A lost removal is worse than a lost write: the C# side logs
+    // "Synced successfully" and, on the next drain, re-reads and RE-APPLIES the
+    // already-synced action (duplicate comment/status/upload), or strands it as a
+    // bogus self-conflict. Reject on error/abort so it surfaces (#253).
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction('pendingActions', 'readwrite');
+        tx.objectStore('pendingActions').delete(id);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('removePendingAction transaction aborted'));
+    });
 }
 
 export async function clearPendingActions() {
     const database = await openDb();
-    const tx = database.transaction('pendingActions', 'readwrite');
-    tx.objectStore('pendingActions').clear();
-    return true;
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction('pendingActions', 'readwrite');
+        tx.objectStore('pendingActions').clear();
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('clearPendingActions transaction aborted'));
+    });
 }
 
 export async function markActionConflicted(id, reason, conflictType) {
@@ -149,19 +165,20 @@ export async function markActionConflicted(id, reason, conflictType) {
         const tx = database.transaction('pendingActions', 'readwrite');
         const store = tx.objectStore('pendingActions');
         const request = store.get(id);
+        let found = false;
         request.onsuccess = () => {
             const action = request.result;
-            if (action) {
-                action.isConflicted = true;
-                action.conflictReason = reason;
-                action.conflictType = conflictType || 'TicketUpdated';
-                store.put(action);
-                resolve(true);
-            } else {
-                resolve(false);
-            }
+            if (!action) return;
+            found = true;
+            action.isConflicted = true;
+            action.conflictReason = reason;
+            action.conflictType = conflictType || 'TicketUpdated';
+            store.put(action);
         };
         request.onerror = () => reject(request.error);
+        // Resolve only once the put COMMITS; reject on failure (#258).
+        tx.oncomplete = () => resolve(found);
+        tx.onabort = () => reject(tx.error || new Error('markActionConflicted transaction aborted'));
     });
 }
 
@@ -184,16 +201,22 @@ export async function updateRetryState(id, nextRetryAtIso, retryCount, errorMess
         const tx = database.transaction('pendingActions', 'readwrite');
         const store = tx.objectStore('pendingActions');
         const request = store.get(id);
+        let found = false;
         request.onsuccess = () => {
             const action = request.result;
-            if (!action) { resolve(false); return; }
+            if (!action) return;
+            found = true;
             action.retryCount = retryCount;
             action.nextRetryAt = nextRetryAtIso;
             action.lastErrorMessage = errorMessage || null;
             store.put(action);
-            resolve(true);
         };
         request.onerror = () => reject(request.error);
+        // Resolve only once the put COMMITS — otherwise a failed put was reported
+        // as success, so retryCount/nextRetryAt never persisted and the action
+        // busy-retried with no backoff and was never aged out (#258).
+        tx.oncomplete = () => resolve(found);
+        tx.onabort = () => reject(tx.error || new Error('updateRetryState transaction aborted'));
     });
 }
 
@@ -206,14 +229,18 @@ export async function updateActionBaseline(id, ticketUpdatedAtIso) {
         const tx = database.transaction('pendingActions', 'readwrite');
         const store = tx.objectStore('pendingActions');
         const request = store.get(id);
+        let found = false;
         request.onsuccess = () => {
             const action = request.result;
-            if (!action) { resolve(false); return; }
+            if (!action) return;
+            found = true;
             action.ticketUpdatedAt = ticketUpdatedAtIso;
             store.put(action);
-            resolve(true);
         };
         request.onerror = () => reject(request.error);
+        // Resolve only once the put COMMITS; reject on failure (#258).
+        tx.oncomplete = () => resolve(found);
+        tx.onabort = () => reject(tx.error || new Error('updateActionBaseline transaction aborted'));
     });
 }
 
