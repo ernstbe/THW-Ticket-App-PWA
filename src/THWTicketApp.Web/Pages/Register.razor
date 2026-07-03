@@ -231,7 +231,9 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = ex.Message;
+            // Localized generic message; raw exception to the console only (#276).
+            Console.Error.WriteLine($"Registration failed: {ex}");
+            _errorMessage = L.T("register.failed");
             await LoadCaptchaAsync();
         }
         finally
@@ -257,7 +259,9 @@
                        e.Contains("exist", StringComparison.OrdinalIgnoreCase) => L.T("register.email_exists"),
             var e when e.Contains("Password", StringComparison.OrdinalIgnoreCase) &&
                        e.Contains("requirement", StringComparison.OrdinalIgnoreCase) => L.T("register.password_hint"),
-            _ => error
+            // Don't echo an unmapped raw backend string to the user (#276) — show
+            // a generic message; the caller has already logged the detail.
+            _ => L.T("register.failed")
         };
     }
 }

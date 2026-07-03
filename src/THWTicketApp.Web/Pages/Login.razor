@@ -156,6 +156,11 @@
 
     private async Task LoginAsync()
     {
+        // Re-entrancy guard: the fields/button only become Disabled on the next
+        // render, so Enter key auto-repeat (or Enter-then-click) can fire this
+        // twice before _isLoading is set, launching two concurrent logins (#275).
+        if (_isLoading) return;
+
         await _form.ValidateAsync();
         if (!_form.IsValid) return;
 
@@ -178,7 +183,10 @@
         }
         catch (Exception ex)
         {
-            _errorMessage = $"{L.T("login.connection_error")}: {ex.Message}";
+            // Show a localized, generic message; the raw exception (which can
+            // include the configured internal API URL) goes to the console only (#276).
+            Console.Error.WriteLine($"Login failed: {ex}");
+            _errorMessage = L.T("login.connection_error");
         }
         finally
         {
@@ -188,7 +196,7 @@
 
     private async Task LoginWithPasskeyAsync()
     {
-        if (_webauthnModule == null) return;
+        if (_webauthnModule == null || _isLoading) return;
         _isLoading = true;
         _errorMessage = null;
         StateHasChanged();
