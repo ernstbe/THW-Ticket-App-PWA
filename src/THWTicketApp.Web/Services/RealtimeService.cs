@@ -169,7 +169,11 @@ public class RealtimeService : IAsyncDisposable
                 break;
             case "notificationUpdate":
                 NotificationUpdate?.Invoke();
-                break;
+                // Do NOT fall through to TicketEvent: this is the notification
+                // bell-count heartbeat (the backend pushes it to every client
+                // every ~5s, with no ticket), and BrowserNotificationService would
+                // otherwise pop a generic "Ticket Event" OS notification for it (#255).
+                return;
         }
 
         TicketEvent?.Invoke(eventName, ticketId, ticketUid);
