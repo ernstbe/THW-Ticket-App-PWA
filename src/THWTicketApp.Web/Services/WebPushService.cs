@@ -81,22 +81,36 @@ public class WebPushService : IAsyncDisposable
     /// </summary>
     public async Task<bool> EnableAsync()
     {
-        var module = await GetModuleAsync();
-        if (!await module.InvokeAsync<bool>("isSupported")) return false;
+        // Contract: returns false on any failure. The JS subscribe/permission
+        // dance rejects for many normal conditions (NotAllowedError, AbortError
+        // from the push service, invalid/mismatched VAPID key, no active service
+        // worker, transient push-service failure) and GetModuleAsync can throw if
+        // the module fails to load. Those surface as JSException — catch here so
+        // callers (Settings/Onboarding, which have no catch) don't hit Blazor's
+        // error path (#206).
+        try
+        {
+            var module = await GetModuleAsync();
+            if (!await module.InvokeAsync<bool>("isSupported")) return false;
 
-        var perm = await module.InvokeAsync<string>("getPermission");
-        if (perm == "default") perm = await module.InvokeAsync<string>("requestPermission");
-        if (perm != "granted") return false;
+            var perm = await module.InvokeAsync<string>("getPermission");
+            if (perm == "default") perm = await module.InvokeAsync<string>("requestPermission");
+            if (perm != "granted") return false;
 
-        var vapid = await _api.GetWebPushVapidPublicKeyAsync();
-        if (string.IsNullOrEmpty(vapid)) return false;
+            var vapid = await _api.GetWebPushVapidPublicKeyAsync();
+            if (string.IsNullOrEmpty(vapid)) return false;
 
-        var sub = await module.InvokeAsync<SubscriptionDto?>("subscribe", vapid);
-        if (sub == null || string.IsNullOrEmpty(sub.Endpoint) || sub.Keys == null) return false;
+            var sub = await module.InvokeAsync<SubscriptionDto?>("subscribe", vapid);
+            if (sub == null || string.IsNullOrEmpty(sub.Endpoint) || sub.Keys == null) return false;
 
-        var deviceId = await _localStorage.GetItemAsync("device_id");
-        var userAgent = await _jsRuntime.InvokeAsync<string>("pwaHelpers.getUserAgent");
-        return await _api.SubscribeWebPushAsync(sub.Endpoint, sub.Keys.P256dh ?? "", sub.Keys.Auth ?? "", deviceId, userAgent);
+            var deviceId = await _localStorage.GetItemAsync("device_id");
+            var userAgent = await _jsRuntime.InvokeAsync<string>("pwaHelpers.getUserAgent");
+            return await _api.SubscribeWebPushAsync(sub.Endpoint, sub.Keys.P256dh ?? "", sub.Keys.Auth ?? "", deviceId, userAgent);
+        }
+        catch (JSException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
