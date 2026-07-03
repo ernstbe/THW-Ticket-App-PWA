@@ -30,11 +30,25 @@ function urlBase64ToUint8Array(base64String) {
     return out;
 }
 
+// navigator.serviceWorker.ready NEVER resolves (per spec) until a registration
+// with an *active* worker exists. In contexts where the SW API is present but no
+// active worker is (Firefox private windows, enterprise policy, a failed SW
+// script fetch, some Safari configs), awaiting `.ready` hangs forever — which
+// stalls logout (DisableAsync is a logout hook), Settings render and onboarding
+// (#216). getRegistration() resolves to undefined instead, so we can bail
+// cleanly. Returns an active registration or null.
+async function getActiveRegistration() {
+    if (!isSupported()) return null;
+    const reg = await navigator.serviceWorker.getRegistration();
+    return reg && reg.active ? reg : null;
+}
+
 // Returns { endpoint, keys: { p256dh, auth } } — exactly the shape the
 // backend POST /api/v1/account/push/subscribe expects.
 export async function subscribe(vapidPublicKey) {
     if (!isSupported()) throw new Error('Push not supported');
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await getActiveRegistration();
+    if (!reg) throw new Error('No active service worker');
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
         sub = await reg.pushManager.subscribe({
@@ -46,8 +60,8 @@ export async function subscribe(vapidPublicKey) {
 }
 
 export async function unsubscribe() {
-    if (!isSupported()) return null;
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await getActiveRegistration();
+    if (!reg) return null;
     const sub = await reg.pushManager.getSubscription();
     if (!sub) return null;
     const endpoint = sub.endpoint;
@@ -56,8 +70,8 @@ export async function unsubscribe() {
 }
 
 export async function getCurrentSubscription() {
-    if (!isSupported()) return null;
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await getActiveRegistration();
+    if (!reg) return null;
     const sub = await reg.pushManager.getSubscription();
     return sub ? subscriptionToJson(sub) : null;
 }
