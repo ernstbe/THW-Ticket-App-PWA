@@ -342,14 +342,25 @@
         {
             var weekStart = now.Date.AddDays(-((int)now.DayOfWeek + 7 * i));
             var weekEnd = weekStart.AddDays(7);
-            var created = tickets.Count(t => t.Date >= weekStart && t.Date < weekEnd);
-            var closed = tickets.Count(t => t.ClosedDate.HasValue && t.ClosedDate.Value >= weekStart && t.ClosedDate.Value < weekEnd);
+            // Ticket dates are UTC (parsed from trailing-Z timestamps); the week
+            // boundaries are local. Convert to local before bucketing so tickets
+            // near a boundary aren't attributed to the wrong week in DE (#277).
+            var created = tickets.Count(t => InLocalWeek(t.Date, weekStart, weekEnd));
+            var closed = tickets.Count(t => t.ClosedDate.HasValue && InLocalWeek(t.ClosedDate.Value, weekStart, weekEnd));
             _weeklyTrend.Add(new WeeklyCount(weekStart.ToString("dd.MM"), created, closed));
         }
 
         var maxVal = _weeklyTrend.Count > 0 ? _weeklyTrend.Max(w => Math.Max(w.Created, w.Closed)) : 1;
         foreach (var w in _weeklyTrend)
             w.MaxValue = maxVal > 0 ? maxVal : 1;
+    }
+
+    // Compares a UTC ticket timestamp against local week boundaries by first
+    // converting it to local time (#277).
+    private static bool InLocalWeek(DateTime utc, DateTime localStart, DateTime localEnd)
+    {
+        var local = utc.ToLocalTime();
+        return local >= localStart && local < localEnd;
     }
 
     private void ComputeResolutionTime(Ticket[] tickets)
@@ -400,7 +411,8 @@
             else
             {
                 if (TicketDueDateHelper.IsOverdue(t.DueDate)) breached++;
-                else if (t.DueDate < DateTime.Now.AddHours(24)) atRisk++;
+                // DueDate is UTC; compare against UtcNow, not local Now (#277).
+                else if (t.DueDate < DateTime.UtcNow.AddHours(24)) atRisk++;
                 else met++;
             }
         }
