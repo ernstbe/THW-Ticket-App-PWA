@@ -852,9 +852,24 @@
 
         try
         {
+            var testUrl = _apiBaseUrl.Trim().TrimEnd('/');
+
+            // Only probe absolute http(s) URLs. Rejects typos and non-web schemes
+            // before we send anything anywhere.
+            if (!Uri.TryCreate(testUrl, UriKind.Absolute, out var uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                _connectionStatus = L.T("settings.connection_invalid_url");
+                _connectionSeverity = Severity.Error;
+                return;
+            }
+
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var testUrl = _apiBaseUrl.TrimEnd('/');
-            var response = await HttpClient.GetAsync(testUrl, cts.Token);
+            // Use a FRESH, header-less HttpClient — the injected one carries the
+            // session's Authorization/accesstoken default header, which must never
+            // be sent to this user-entered (possibly attacker-controlled) URL (#212).
+            using var probe = new HttpClient();
+            var response = await probe.GetAsync(uri, cts.Token);
 
             if (response.IsSuccessStatusCode)
             {
