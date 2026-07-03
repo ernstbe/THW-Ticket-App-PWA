@@ -1048,16 +1048,18 @@ public class TrueDeskApiService : ITrueDeskApiService
     }
 
     // Reports (v2)
-    public async Task<string> GetHandoverReportAsync(string format = "json")
+    public async Task<string> GetHandoverReportAsync(string groupId, string format = "json")
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/reports/handover?format={format}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync(
+            $"{V2BaseUrl}/reports/handover?groupId={Uri.EscapeDataString(groupId)}&format={format}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<string> GetSitzungReportAsync(string format = "json")
+    public async Task<string> GetSitzungReportAsync(string since, string format = "json")
     {
-        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/reports/sitzung?format={format}"));
+        var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync(
+            $"{V2BaseUrl}/reports/sitzung?since={Uri.EscapeDataString(since)}&format={format}"));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();
     }

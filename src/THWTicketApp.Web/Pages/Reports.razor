@@ -15,7 +15,21 @@
 
 <div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
     <MudText Typo="Typo.h4">@L.T("nav.reports")</MudText>
-    <div class="d-flex gap-2 align-center">
+    <div class="d-flex gap-2 align-center flex-wrap">
+        @* Report parameters: group (handover) + "seit" date (Sitzung). Both are
+           required by the backend, so they live next to the generate menu. *@
+        <MudSelect T="string" @bind-Value="_reportGroupId" Label="@L.T("detail.group")"
+                   Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                   Style="min-width: 160px;">
+            @foreach (var g in _reportGroups)
+            {
+                <MudSelectItem Value="@g.Id">@g.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudDatePicker @bind-Date="_reportSince" Label="@L.T("reports.since")"
+                       Variant="Variant.Outlined" Margin="Margin.Dense"
+                       PickerVariant="PickerVariant.Dialog" Editable="false"
+                       Style="min-width: 150px;" />
         @* Both report types behind one menu — fixes mobile wrap and
            scales to future report types. *@
         <MudMenu Label="@L.T("reports.generate")"
@@ -266,6 +280,12 @@
     private List<PriorityStatItem> _priorityDistribution = [];
     private List<AssigneeStatItem> _topAssignees = [];
 
+    // Report parameters. The handover report needs a groupId, the Sitzung report
+    // needs an ISO `since` date — the backend 400s without them (#270).
+    private List<Group> _reportGroups = [];
+    private string? _reportGroupId;
+    private DateTime? _reportSince = DateTime.Today.AddDays(-7);
+
     protected override async Task OnInitializedAsync()
     {
         await LoadReportAsync();
@@ -291,6 +311,15 @@
             ComputeSlaCompliance(tickets);
             ComputePriorityDistribution(tickets);
             ComputeTopAssignees(tickets);
+
+            // Groups drive the handover report's required groupId (#270).
+            try
+            {
+                var groupsJson = await ApiService.GetGroupsAsync();
+                _reportGroups = JsonHelper.DeserializeWrappedArray<Group>(groupsJson, "groups", options).ToList();
+                _reportGroupId ??= _reportGroups.FirstOrDefault()?.Id;
+            }
+            catch { /* group selector just stays empty; report button will prompt */ }
         }
         catch (Exception ex)
         {
@@ -432,6 +461,11 @@
 
     private async Task GenerateHandoverReportAsync()
     {
+        if (string.IsNullOrEmpty(_reportGroupId))
+        {
+            Snackbar.Add(L.T("reports.select_group"), Severity.Warning);
+            return;
+        }
         await GenerateReportAsync("handover", L.T("reports.handover"));
     }
 
@@ -446,18 +480,25 @@
         StateHasChanged();
         try
         {
+            // Sitzung needs an ISO date; default to a week back if unset.
+            var since = (_reportSince ?? DateTime.Today.AddDays(-7)).ToString("yyyy-MM-dd");
             var json = type == "handover"
-                ? await ApiService.GetHandoverReportAsync("markdown")
-                : await ApiService.GetSitzungReportAsync("markdown");
+                ? await ApiService.GetHandoverReportAsync(_reportGroupId!, "markdown")
+                : await ApiService.GetSitzungReportAsync(since, "markdown");
 
-            // Try to extract the report content from the response
+            // The server merges the payload at the root (sendApiSuccess), so the
+            // markdown is under the root `markdown` key — NOT data.report (#270).
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("data", out var dataEl))
+            var root = doc.RootElement;
+            if (root.TryGetProperty("markdown", out var mdEl) && mdEl.ValueKind == JsonValueKind.String)
             {
-                if (dataEl.TryGetProperty("report", out var reportEl))
-                    _generatedReport = reportEl.GetString();
-                else
-                    _generatedReport = dataEl.GetRawText();
+                _generatedReport = mdEl.GetString();
+            }
+            else if (root.TryGetProperty("data", out var dataEl))
+            {
+                _generatedReport = dataEl.TryGetProperty("report", out var reportEl)
+                    ? reportEl.GetString()
+                    : dataEl.GetRawText();
             }
             else
             {

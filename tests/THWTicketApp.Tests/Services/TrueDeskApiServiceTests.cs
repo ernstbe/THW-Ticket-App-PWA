@@ -51,6 +51,29 @@ public class TrueDeskApiServiceTests
         Assert.Contains("team1", body);
     }
 
+    // #270: both report endpoints require a query param the client used to omit.
+    [Fact]
+    public async Task GetHandoverReportAsync_sendsGroupIdAndFormat()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"markdown\":\"# x\"}");
+        await _sut.GetHandoverReportAsync("grp1", "markdown");
+
+        Assert.Equal("/api/v2/reports/handover", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("groupId=grp1", LastRequest.RequestUri!.Query);
+        Assert.Contains("format=markdown", LastRequest.RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task GetSitzungReportAsync_sendsSinceAndFormat()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"markdown\":\"# x\"}");
+        await _sut.GetSitzungReportAsync("2026-06-01", "markdown");
+
+        Assert.Equal("/api/v2/reports/sitzung", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("since=2026-06-01", LastRequest.RequestUri!.Query);
+        Assert.Contains("format=markdown", LastRequest.RequestUri!.Query);
+    }
+
     [Fact]
     public async Task GetTeamAsync_usesTeamIdInPath()
     {
