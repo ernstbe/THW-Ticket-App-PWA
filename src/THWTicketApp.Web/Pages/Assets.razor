@@ -76,7 +76,11 @@ else if (_isLoading)
         </MudTd>
     </RowTemplate>
     <NoRecordsContent>
-        <MudText Color="Color.Secondary">@L.T("assets.none")</MudText>
+        <EmptyState Icon="@Icons.Material.Outlined.Inventory2"
+                    Title="@L.T("assets.none")"
+                    Description="@L.T("assets.empty_description")"
+                    ActionLabel="@L.T("assets.new")"
+                    ActionCallback="ShowCreateDialog" />
     </NoRecordsContent>
 </MudTable>
 

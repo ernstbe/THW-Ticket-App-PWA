@@ -217,6 +217,9 @@
     private bool _isDarkMode;
     private bool _isOffline;
     private bool _showInstallBanner;
+    // Persisted so a dismissed install banner stays dismissed across pages and
+    // sessions instead of reappearing on every navigation/reload.
+    private bool _installDismissed;
     private bool _isInstalled;
     private int _unreadNotifications;
     private int _pendingActions;
@@ -379,9 +382,11 @@
                 _ => _ = InvokeAsync(TrySyncPendingAsync), null,
                 TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
 
-            // PWA install prompt
+            // PWA install prompt — skip entirely if already installed or the user
+            // previously dismissed the banner.
             _isInstalled = await JsRuntime.InvokeAsync<bool>("window.isPwaInstalled");
-            if (!_isInstalled)
+            _installDismissed = await LocalStorage.GetItemAsync("install_banner_dismissed") == "true";
+            if (!_isInstalled && !_installDismissed)
                 await JsRuntime.InvokeVoidAsync("window.registerInstallHandler", _dotNetRef);
 
             // Keyboard shortcuts
@@ -472,6 +477,7 @@
     [JSInvokable]
     public void OnInstallAvailable()
     {
+        if (_installDismissed) return;
         _showInstallBanner = true;
         InvokeAsync(StateHasChanged);
     }
@@ -490,7 +496,12 @@
         _showInstallBanner = false;
     }
 
-    private void DismissInstallBanner() => _showInstallBanner = false;
+    private async Task DismissInstallBanner()
+    {
+        _showInstallBanner = false;
+        _installDismissed = true;
+        await LocalStorage.SetItemAsync("install_banner_dismissed", "true");
+    }
 
     [JSInvokable]
     public void OnShortcut(string action)
