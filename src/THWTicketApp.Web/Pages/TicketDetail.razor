@@ -1591,10 +1591,28 @@ else
 
     // ─── Attachments ────────────────────────────────────────────────────
 
-    private void DownloadAttachment(Attachment attachment)
+    private async Task DownloadAttachment(Attachment attachment)
     {
         if (attachment?.Path == null) return;
-        Navigation.NavigateTo(ApiService.GetAttachmentUrl(attachment.Path), true);
+        var url = ApiService.GetAttachmentUrl(attachment.Path);
+
+        // The file is stored on disk under a random hash (attachment_<hash>.ext),
+        // so a plain navigation saves it under that hash. The user's original
+        // filename is kept server-side in attachment.Name — download the blob
+        // under that name so the saved file is recognisable (ISSUE-6).
+        if (!string.IsNullOrEmpty(attachment.Name))
+        {
+            try
+            {
+                var ok = await JsRuntime.InvokeAsync<bool>("pwaHelpers.downloadUrl", url, attachment.Name);
+                if (ok) return;
+            }
+            catch { /* fall back to a plain navigation below */ }
+        }
+
+        // Fallback (cross-origin fetch blocked, or no name): saves under the
+        // on-disk hash name, i.e. the previous behaviour.
+        Navigation.NavigateTo(url, true);
     }
 
     private async Task DeleteAttachmentAsync(Attachment attachment)
