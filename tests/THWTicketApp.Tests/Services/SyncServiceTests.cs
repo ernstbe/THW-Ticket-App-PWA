@@ -609,7 +609,74 @@ public class SyncServiceTests
     // R2.2 — Conflict detection with typed results
     // ---------------------------------------------------------------------
 
-    private PendingActionDto ActionTargetingTicket(string actionType = "AddComment", string? statusId = null, string? ticketUpdatedAt = null)
+    // #214: additive comment/note actions must never be conflict-checked, so an
+    // unrelated field edit on the ticket can't strand them in the conflict queue.
+    [Fact]
+    public async Task Sync_addComment_isNotConflictCheckedOrBlockedByTicketDrift()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 1,
+            ActionType = "AddComment",
+            TicketId = "t1",
+            TicketUid = 1001,
+            OwnerId = "u1",
+            Content = "hi",
+            TicketUpdatedAt = "2026-04-01T10:00:00.0000000Z"
+        });
+        // Ticket has drifted (an unrelated field was edited server-side).
+        _api.GetTicketRawAsync("1001").Returns((200, "{\"_id\":\"t1\",\"updated\":\"2026-04-05T12:00:00.0000000Z\"}"));
+        _api.AddCommentAsync("1001", "u1", "hi").Returns(true);
+        PendingAction? conflict = null;
+        _sut.ConflictDetected += pa => conflict = pa;
+
+        await _sut.SyncPendingActionsAsync();
+
+        // Despite the drift, the comment applies and is not flagged as a conflict.
+        await _api.Received(1).AddCommentAsync("1001", "u1", "hi");
+        await _db.Received(1).RemovePendingActionAsync(1);
+        Assert.Null(conflict);
+        await _db.DidNotReceive().MarkActionConflictedAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    // #204: when an earlier action for a ticket fails, a later queued action for
+    // the SAME ticket must be deferred, not applied out of order.
+    [Fact]
+    public async Task Sync_laterSameTicketAction_deferredWhenEarlierFails()
+    {
+        SetupQueuedActions(
+            new PendingActionDto { Id = 1, ActionType = "UpdateStatus", TicketId = "t1", TicketUid = 1001, StatusId = "s1" },
+            new PendingActionDto { Id = 2, ActionType = "UpdateStatus", TicketId = "t1", TicketUid = 1001, StatusId = "s2" });
+        _api.UpdateTicketStatusAsync("t1", 1001, "s1").Returns(false); // earlier fails
+        _api.UpdateTicketStatusAsync("t1", 1001, "s2").Returns(true);  // later would succeed
+
+        await _sut.SyncPendingActionsAsync();
+
+        // The later action must NOT leapfrog the still-pending earlier one.
+        await _api.DidNotReceive().UpdateTicketStatusAsync("t1", 1001, "s2");
+        await _db.DidNotReceive().RemovePendingActionAsync(2);
+    }
+
+    // A later action for a DIFFERENT ticket is unaffected by an earlier failure.
+    [Fact]
+    public async Task Sync_laterDifferentTicketAction_stillAppliedWhenEarlierFails()
+    {
+        SetupQueuedActions(
+            new PendingActionDto { Id = 1, ActionType = "UpdateStatus", TicketId = "t1", TicketUid = 1001, StatusId = "s1" },
+            new PendingActionDto { Id = 2, ActionType = "UpdateStatus", TicketId = "t2", TicketUid = 1002, StatusId = "s2" });
+        _api.UpdateTicketStatusAsync("t1", 1001, "s1").Returns(false);
+        _api.UpdateTicketStatusAsync("t2", 1002, "s2").Returns(true);
+
+        await _sut.SyncPendingActionsAsync();
+
+        await _api.Received(1).UpdateTicketStatusAsync("t2", 1002, "s2");
+        await _db.Received(1).RemovePendingActionAsync(2);
+    }
+
+    // Default is a drift-eligible action (UpdateStatus). Comment/note actions are
+    // intentionally exempt from the updated-timestamp drift check (#214), so they
+    // are not a suitable default for the generic drift-detection tests.
+    private PendingActionDto ActionTargetingTicket(string actionType = "UpdateStatus", string? statusId = null, string? ticketUpdatedAt = null)
         => new()
         {
             Id = 100,

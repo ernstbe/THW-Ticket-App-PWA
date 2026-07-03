@@ -224,19 +224,44 @@ public class SyncService : ISyncService
             var allSuccess = true;
             var now = DateTime.UtcNow;
 
+            // Tickets whose head-of-line action this drain has NOT applied (it is
+            // conflicted, in backoff, or just failed). A later queued action for
+            // the same ticket must not leapfrog it, otherwise the older mutation
+            // applies last on a subsequent drain and overwrites the newer state
+            // (#204). Queue order is insertion order, so blocking here preserves
+            // per-ticket ordering across drains.
+            var blockedTickets = new HashSet<string>();
+            void Block(PendingActionDto a)
+            {
+                if (!string.IsNullOrEmpty(a.TicketId)) blockedTickets.Add(a.TicketId!);
+            }
+
             for (var i = 0; i < actions.Length; i++)
             {
                 var action = actions[i];
 
-                // Skip already-conflicted actions (user must resolve them explicitly)
+                // Skip already-conflicted actions (user must resolve them explicitly),
+                // and block later same-ticket actions behind them.
                 if (action.IsConflicted)
+                {
+                    Block(action);
                     continue;
+                }
+
+                // An earlier action for this ticket is still pending this drain —
+                // defer this one too so ordering is preserved (#204).
+                if (!string.IsNullOrEmpty(action.TicketId) && blockedTickets.Contains(action.TicketId!))
+                {
+                    allSuccess = false;
+                    continue;
+                }
 
                 // Respect backoff schedule
                 if (!string.IsNullOrEmpty(action.NextRetryAt)
                     && TryParseUtc(action.NextRetryAt, out var nextRetry)
                     && nextRetry > now)
                 {
+                    Block(action);
                     allSuccess = false;
                     continue;
                 }
@@ -256,6 +281,7 @@ public class SyncService : ISyncService
                             pa.ConflictType = c.Type;
                             ConflictDetected?.Invoke(pa);
                             await AppendLogAsync("warn", action, $"Conflict ({c.Type}): {c.Reason}");
+                            Block(action);
                             allSuccess = false;
                             continue;
                         }
@@ -276,12 +302,14 @@ public class SyncService : ISyncService
                     }
                     else
                     {
+                        Block(action);
                         allSuccess = false;
                         await HandleFailureAsync(action, "API call returned failure", null);
                     }
                 }
                 catch (Exception ex)
                 {
+                    Block(action);
                     allSuccess = false;
                     await HandleFailureAsync(action, ex.Message, ex);
                 }
@@ -452,6 +480,13 @@ public class SyncService : ISyncService
 
         // Non-success for any other reason — treat as transient, let retry handle it.
         if (response.statusCode < 200 || response.statusCode >= 300)
+            return null;
+
+        // Additive actions (comment/note) can only conflict with the ticket being
+        // gone or access lost — both handled by the 404/401/403 checks above. They
+        // can never conflict with a mere field edit, so skip the updated-timestamp
+        // drift check that would otherwise strand them in the conflict queue (#214).
+        if (action.ActionType is "AddComment" or "AddNote")
             return null;
 
         // Happy path: parse body and look for update/status drift.
