@@ -477,7 +477,7 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null, IReadOnlyList<string>? checklist = null)
+    public async Task<TicketCreateResult?> CreateTicketAsync(string subject, string? issue, string? typeId, string? priorityId, string? groupId, string? assigneeId, DateTime? dueDate = null, IReadOnlyList<string>? checklist = null, string? ownerId = null)
     {
         if (string.IsNullOrWhiteSpace(subject))
             return null;
@@ -486,7 +486,10 @@ public class TrueDeskApiService : ITrueDeskApiService
         {
             ["subject"] = subject,
             ["issue"] = issue ?? string.Empty,
-            ["owner"] = CurrentUserId,
+            // Prefer an explicit owner (the offline queue captures the author at
+            // enqueue time so a drain under a different session doesn't mis-attribute
+            // the ticket — #280); fall back to the current user for online creates.
+            ["owner"] = !string.IsNullOrEmpty(ownerId) ? ownerId : CurrentUserId,
         };
 
         if (!string.IsNullOrEmpty(typeId)) payload["type"] = typeId;

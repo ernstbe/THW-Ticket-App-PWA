@@ -93,6 +93,9 @@ public class SyncService : ISyncService
             PriorityId = priorityId,
             GroupId = groupId,
             TargetUserId = assigneeId,
+            // Capture the author NOW so a drain under a different session doesn't
+            // attribute the ticket to whoever happens to be logged in then (#280).
+            OwnerId = _apiService.CurrentUserId,
             DueDate = dueDate?.ToString("O"),
             ChecklistTitles = checklist is { Count: > 0 } ? checklist.ToList() : null
         });
@@ -378,7 +381,7 @@ public class SyncService : ISyncService
         "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.TicketUid, action.StatusId!),
         "CreateTicket" => await _apiService.CreateTicketAsync(
             action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId,
-            ParseOptionalDate(action.DueDate), action.ChecklistTitles) != null,
+            ParseOptionalDate(action.DueDate), action.ChecklistTitles, action.OwnerId) != null,
         "UpdateTicketFields" => await ApplyUpdateTicketFieldsAsync(action),
         "DeleteTicket" => await _apiService.DeleteTicketAsync(action.TicketId!, action.TicketUid),
         "UploadAttachment" => await ApplyUploadAttachmentAsync(action),
@@ -647,7 +650,14 @@ public class SyncService : ISyncService
         {
             // Exhausted all retries — drop the action and record a permanent failure.
             await _indexedDb.RemovePendingActionAsync(action.Id);
-            await AppendLogAsync("error", action, $"Gave up after {newRetryCount} failed attempts: {errorMessage}", exception);
+            // A dropped CreateTicket loses the user's authored content entirely
+            // (the draft was removed at enqueue time and the ticket never got a
+            // server id). Preserve the subject/issue in the error log so it stays
+            // recoverable from the Settings sync-log diagnostics (#283).
+            var detail = action.ActionType == "CreateTicket"
+                ? $" [Betreff: \"{action.Subject ?? action.Content}\" | Beschreibung: {Truncate(action.Issue, 500)}]"
+                : string.Empty;
+            await AppendLogAsync("error", action, $"Gave up after {newRetryCount} failed attempts: {errorMessage}{detail}", exception);
             return;
         }
 
@@ -692,6 +702,12 @@ public class SyncService : ISyncService
     {
         if (delay.TotalMinutes >= 1) return $"{(int)delay.TotalMinutes}min";
         return $"{(int)delay.TotalSeconds}s";
+    }
+
+    private static string Truncate(string? value, int max)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        return value.Length <= max ? value : value[..max] + "…";
     }
 
     private static string FormatTimeAgo(DateTime utcTime)

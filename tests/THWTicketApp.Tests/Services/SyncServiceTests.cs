@@ -224,6 +224,17 @@ public class SyncServiceTests
         Assert.Null(dto.ChecklistTitles);
     }
 
+    // #280: the author is captured at enqueue time (not at drain time).
+    [Fact]
+    public async Task EnqueueCreateTicketAsync_capturesCurrentUserAsOwner()
+    {
+        _api.CurrentUserId.Returns("author-1");
+        var dto = await CaptureEnqueuedAsync(() =>
+            _sut.EnqueueCreateTicketAsync("Subject", "Issue", null, null, "g1", null));
+
+        Assert.Equal("author-1", dto.OwnerId);
+    }
+
     // ---------------------------------------------------------------------
     // Sync apply — switch mapping for new action types
     // ---------------------------------------------------------------------
@@ -414,6 +425,32 @@ public class SyncServiceTests
             Arg.Is<DateTime?>(d => d.HasValue),
             Arg.Is<IReadOnlyList<string>?>(c => c != null && c.SequenceEqual(new[] { "Schritt 1", "Schritt 2" })));
         await _db.Received(1).RemovePendingActionAsync(5);
+    }
+
+    // #280: the stored owner is forwarded to CreateTicketAsync on drain.
+    [Fact]
+    public async Task Sync_dispatchesCreateTicketWithStoredOwner()
+    {
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 6,
+            ActionType = "CreateTicket",
+            Subject = "Betreff",
+            Issue = "Text",
+            GroupId = "g1",
+            OwnerId = "author-1"
+        });
+        _api.CreateTicketAsync(
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<DateTime?>(),
+                Arg.Any<IReadOnlyList<string>?>(), Arg.Any<string?>())
+            .Returns(new TicketCreateResult("new-id", 4712));
+
+        await _sut.SyncPendingActionsAsync();
+
+        await _api.Received(1).CreateTicketAsync(
+            "Betreff", "Text", null, null, "g1", null,
+            Arg.Any<DateTime?>(), Arg.Any<IReadOnlyList<string>?>(), "author-1");
     }
 
     [Fact]
