@@ -348,6 +348,7 @@ else
     private CancellationTokenSource? _refreshDebounceCts;
     private IJSObjectReference? _ptrModule;
     private DotNetObjectReference<Tickets>? _ptrRef;
+    private bool _disposed;
 
     protected override async Task OnInitializedAsync()
     {
@@ -393,8 +394,18 @@ else
         if (!firstRender) return;
         try
         {
-            _ptrModule = await JsRuntime.InvokeAsync<IJSObjectReference>(
+            var module = await JsRuntime.InvokeAsync<IJSObjectReference>(
                 "import", "./js/pull-to-refresh-interop.js");
+            // The component can be disposed while the dynamic import is in flight.
+            // Registering now would attach global touch listeners and a
+            // DotNetObjectReference to a dead component that nothing ever cleans
+            // up (Dispose already ran with _ptrModule null) — #223.
+            if (_disposed)
+            {
+                await module.DisposeAsync();
+                return;
+            }
+            _ptrModule = module;
             _ptrRef = DotNetObjectReference.Create(this);
             await _ptrModule.InvokeVoidAsync("register", _ptrRef);
         }
@@ -431,6 +442,7 @@ else
 
     public void Dispose()
     {
+        _disposed = true;
         Realtime.AnyTicketChanged -= OnRealtimeChange;
         _refreshDebounceCts?.Cancel();
         _refreshDebounceCts?.Dispose();
