@@ -354,11 +354,13 @@ public class SyncServiceTests
                 s.CopyTo(copy);
                 capturedBytes = copy.ToArray();
             }),
-            Arg.Any<string>()).Returns(true);
+            Arg.Any<string>(),
+            Arg.Any<string?>()).Returns(true);
 
         await _sut.SyncPendingActionsAsync();
 
-        await _api.Received(1).UploadAttachmentAsync("t1", Arg.Any<Stream>(), "a.bin");
+        // #284: the stored content type is forwarded, not re-derived from the name.
+        await _api.Received(1).UploadAttachmentAsync("t1", Arg.Any<Stream>(), "a.bin", "application/octet-stream");
         Assert.NotNull(capturedBytes);
         Assert.Equal(payload, capturedBytes);
     }

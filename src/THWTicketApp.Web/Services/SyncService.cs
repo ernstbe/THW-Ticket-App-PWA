@@ -428,7 +428,9 @@ public class SyncService : ISyncService
 
         var bytes = Convert.FromBase64String(action.FileContentBase64);
         using var stream = new MemoryStream(bytes);
-        return await _apiService.UploadAttachmentAsync(action.TicketId, stream, action.FileName);
+        // Pass the stored content type instead of re-deriving from the filename
+        // (which would octet-stream webp/heic/… and get rejected) — #284.
+        return await _apiService.UploadAttachmentAsync(action.TicketId, stream, action.FileName, action.FileContentType);
     }
 
     private static bool NeedsConflictCheck(PendingActionDto action)

@@ -240,7 +240,13 @@ else
     // ceiling TicketDetail uses; the server compresses images to 2400 px
     // after receiving them.
     private const long MaxAttachmentBytes = 25L * 1024 * 1024;
-    private readonly List<IBrowserFile> _pendingAttachments = new();
+    // Buffer the file bytes at pick time. IBrowserFile references are only valid
+    // until the next InputFile change event, so holding them across multiple
+    // picks (button + drop, or two picks) makes every earlier batch unreadable
+    // at submit time — the whole batch except the last silently failed (#281).
+    private readonly List<PendingAttachment> _pendingAttachments = new();
+
+    private sealed record PendingAttachment(string Name, string ContentType, long Size, byte[] Content);
 
     private IJSObjectReference? _dropzoneModule;
     private bool _dropzoneRegistered;
@@ -459,8 +465,8 @@ else
                 {
                     try
                     {
-                        using var stream = file.OpenReadStream(MaxAttachmentBytes);
-                        if (!await ApiService.UploadAttachmentAsync(created.Id, stream, file.Name))
+                        using var stream = new MemoryStream(file.Content);
+                        if (!await ApiService.UploadAttachmentAsync(created.Id, stream, file.Name, file.ContentType))
                             failedUploads++;
                     }
                     catch { failedUploads++; }
@@ -521,16 +527,42 @@ else
         Navigation.NavigateTo("tickets");
     }
 
-    private void OnFilesPicked(InputFileChangeEventArgs e)
+    private async Task OnFilesPicked(InputFileChangeEventArgs e)
     {
-        foreach (var file in e.GetMultipleFiles(maximumFileCount: 20))
+        IReadOnlyList<IBrowserFile> files;
+        try
+        {
+            // maximumFileCount defaults to 10 and THROWS above it; allow a
+            // reasonable batch and surface a clear message instead of silently
+            // adding nothing (#274).
+            files = e.GetMultipleFiles(maximumFileCount: 50);
+        }
+        catch (InvalidOperationException)
+        {
+            Snackbar.Add(L.T("tickets.attachments_too_many"), Severity.Warning);
+            return;
+        }
+
+        foreach (var file in files)
         {
             if (file.Size > MaxAttachmentBytes)
             {
                 Snackbar.Add(string.Format(L.T("tickets.attachments_too_large"), file.Name), Severity.Warning);
                 continue;
             }
-            _pendingAttachments.Add(file);
+            try
+            {
+                // Read the bytes NOW, while the IBrowserFile is still valid (#281).
+                using var stream = file.OpenReadStream(MaxAttachmentBytes);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                _pendingAttachments.Add(new PendingAttachment(
+                    file.Name, file.ContentType ?? string.Empty, file.Size, ms.ToArray()));
+            }
+            catch
+            {
+                Snackbar.Add(string.Format(L.T("tickets.attachments_read_failed"), file.Name), Severity.Warning);
+            }
         }
         StateHasChanged();
     }
