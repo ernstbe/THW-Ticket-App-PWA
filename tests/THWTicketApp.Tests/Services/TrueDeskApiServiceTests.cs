@@ -938,6 +938,16 @@ public class TrueDeskApiServiceTests
         Assert.Contains("id1", LastBody);
     }
 
+    // #219: deleting an already-deleted ticket (404) is idempotent success, so an
+    // offline delete isn't retried across the whole backoff schedule and dropped.
+    [Fact]
+    public async Task DeleteTicketAsync_treats404AsSuccess()
+    {
+        _handler.RespondTo(HttpMethod.Delete, "/tickets/t1", HttpStatusCode.NotFound);
+        var ok = await _sut.DeleteTicketAsync("t1", 1001);
+        Assert.True(ok);
+    }
+
     [Fact]
     public async Task BatchDeleteTicketsAsync_returnsZerosOnEmptyInput()
     {

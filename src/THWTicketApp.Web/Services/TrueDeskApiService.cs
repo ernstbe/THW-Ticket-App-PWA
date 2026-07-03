@@ -577,7 +577,11 @@ public class TrueDeskApiService : ITrueDeskApiService
         if (string.IsNullOrWhiteSpace(ticketId)) return false;
         var identifier = IsV2 ? ticketUid.ToString() : ticketId;
         var response = await SendWithAutoRefreshAsync(() => _httpClient.DeleteAsync($"{BaseUrl}/tickets/{identifier}"));
-        return response.IsSuccessStatusCode;
+        // Idempotent: a ticket that's already gone (404) means the delete goal is
+        // already achieved. Report success so an offline delete of an
+        // already-deleted ticket isn't retried across the whole backoff schedule
+        // and finally dropped as a failure (#219).
+        return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound;
     }
 
     public async Task<bool> UpdateTicketStatusAsync(string ticketId, int ticketUid, string statusId)
