@@ -12,7 +12,9 @@ public class RealtimeService : IAsyncDisposable
     private DotNetObjectReference<RealtimeService>? _dotNetRef;
 
     // Legacy generic event kept for backward compatibility with BrowserNotificationService.
-    public event Action<string, string>? TicketEvent;
+    // (eventName, ticketId = Mongo _id, ticketUid = numeric uid). The uid is
+    // carried alongside so notification deep-links can use the int-only route.
+    public event Action<string, string, string>? TicketEvent;
 
     // Strongly-typed per-channel events. Payload: Mongo ticket _id (empty for NotificationUpdate).
     public event Action<string>? TicketCreated;
@@ -96,9 +98,10 @@ public class RealtimeService : IAsyncDisposable
     }
 
     [JSInvokable]
-    public void OnTicketEvent(string eventName, string ticketId)
+    public void OnTicketEvent(string eventName, string ticketId, string ticketUid = "")
     {
         ticketId ??= string.Empty;
+        ticketUid ??= string.Empty;
 
         switch (eventName)
         {
@@ -152,7 +155,7 @@ public class RealtimeService : IAsyncDisposable
                 break;
         }
 
-        TicketEvent?.Invoke(eventName, ticketId);
+        TicketEvent?.Invoke(eventName, ticketId, ticketUid);
     }
 
     public async ValueTask DisposeAsync()
