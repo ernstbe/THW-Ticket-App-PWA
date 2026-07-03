@@ -84,6 +84,9 @@ else
     private static readonly MarkdownPipeline _md = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .UseSoftlineBreakAsHardlineBreak()
+        // DisableHtml: comment/note bodies are attacker-controllable and rendered
+        // via (MarkupString), so raw HTML must be escaped, not passed through (XSS).
+        .DisableHtml()
         .Build();
 
     internal static List<ActivityEvent> BuildFeed(Ticket? ticket, ActivityKind[]? kinds = null)

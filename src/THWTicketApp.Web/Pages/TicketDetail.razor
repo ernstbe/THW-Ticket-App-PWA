@@ -759,6 +759,10 @@ else
     private static readonly MarkdownPipeline _mdPipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .UseSoftlineBreakAsHardlineBreak()
+        // DisableHtml: comments/notes/issue bodies are authored by any ticket
+        // participant and rendered via (MarkupString), so raw HTML must be
+        // escaped rather than passed through to the DOM (stored XSS).
+        .DisableHtml()
         .Build();
 
     // Render a user-typed Issue body to HTML. MarkdownBlankLines.Preserve runs
