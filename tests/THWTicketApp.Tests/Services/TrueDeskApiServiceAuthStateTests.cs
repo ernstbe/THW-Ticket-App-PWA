@@ -67,6 +67,29 @@ public class TrueDeskApiServiceAuthStateTests
         await _db.DidNotReceive().ClearTicketCacheAsync();
     }
 
+    // #203: the v2 JWT payload is base64URL; decoding it as standard base64 threw
+    // on the '-'/'_' chars, was swallowed, and left CurrentUserId null.
+    [Fact]
+    public async Task Authenticate_v2_extractsUserId_fromBase64UrlJwtPayload()
+    {
+        var v2 = new TrueDeskApiService(
+            new HttpClient(_handler),
+            new AppSettings { ApiBaseUrl = "https://host.test/api/v2", ConnectionTimeoutSeconds = 30 },
+            _storage,
+            Substitute.For<IJSRuntime>());
+
+        // header.payload.sig — payload base64URL of {"user":{"_id":"abc??>","fullname":"Max"}},
+        // which contains an underscore, so it only decodes with base64URL translation.
+        const string jwt =
+            "eyJhbGciOiJIUzI1NiJ9." +
+            "eyJ1c2VyIjp7Il9pZCI6ImFiYz8_PiIsImZ1bGxuYW1lIjoiTWF4In19.x";
+        _handler.RespondTo(HttpMethod.Post, "/api/v2/login", HttpStatusCode.OK,
+            $"{{\"token\":\"{jwt}\",\"refreshToken\":\"r\"}}");
+
+        Assert.True(await v2.AuthenticateAsync("u", "p"));
+        Assert.Equal("abc??>", v2.CurrentUserId);
+    }
+
     [Fact]
     public async Task Passkey_lock_clears_cached_admin_flag()
     {
