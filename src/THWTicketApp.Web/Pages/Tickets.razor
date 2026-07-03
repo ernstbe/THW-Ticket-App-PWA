@@ -869,14 +869,12 @@ else
         sb.AppendLine("UID;Subject;Status;Priority;Assignee;Group;Created;Updated");
         foreach (var t in _filteredTickets)
         {
-            sb.AppendLine($"{t.Uid};\"{Escape(t.Subject)}\";\"{Escape(t.Status?.Name)}\";\"{Escape(t.Priority?.Name)}\";\"{Escape(t.Assignee?.Fullname)}\";\"{Escape(t.Group?.Name)}\";{t.Date:yyyy-MM-dd};{t.Updated:yyyy-MM-dd}");
+            sb.AppendLine($"{t.Uid};{SafeCsv.Field(t.Subject)};{SafeCsv.Field(t.Status?.Name)};{SafeCsv.Field(t.Priority?.Name)};{SafeCsv.Field(t.Assignee?.Fullname)};{SafeCsv.Field(t.Group?.Name)};{t.Date:yyyy-MM-dd};{t.Updated:yyyy-MM-dd}");
         }
         var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
         var base64 = Convert.ToBase64String(bytes);
         await JsRuntime.InvokeVoidAsync("pwaHelpers.downloadBase64", "text/csv", base64, "tickets-export.csv");
     }
-
-    private static string Escape(string? s) => s?.Replace("\"", "\"\"") ?? "";
 
     private class SavedFilterItem
     {
