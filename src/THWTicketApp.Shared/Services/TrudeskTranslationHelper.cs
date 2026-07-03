@@ -122,8 +122,8 @@ public static class TrudeskTranslationHelper
                 && prefix.EndsWith(" set to", StringComparison.OrdinalIgnoreCase))
             {
                 var value = trimmed[(colon + 1)..].Trim();
-                // Status-Werte sind oft Englisch ("New", "Closed") — übersetzen.
-                return TranslateStatus(value);
+                // Value can be a status OR priority ("High"→"Hoch") — übersetzen.
+                return TranslateStatusOrPriority(value);
             }
         }
 
@@ -133,7 +133,7 @@ public static class TrudeskTranslationHelper
         {
             var idx = trimmed.IndexOf(" set to: ", StringComparison.OrdinalIgnoreCase);
             var value = trimmed[(idx + " set to: ".Length)..].Trim();
-            return TranslateStatus(value);
+            return TranslateStatusOrPriority(value);
         }
 
         return description;
@@ -152,7 +152,7 @@ public static class TrudeskTranslationHelper
             var prefix = action[..lastColon];
             var suffix = action[(lastColon + 1)..];
             if (HistoryActionTranslations.TryGetValue(prefix, out var prefixTranslated))
-                return $"{prefixTranslated}: {TranslateStatus(suffix)}";
+                return $"{prefixTranslated}: {TranslateStatusOrPriority(suffix)}";
         }
         return action;
     }
@@ -167,6 +167,18 @@ public static class TrudeskTranslationHelper
     {
         if (string.IsNullOrEmpty(name)) return name ?? string.Empty;
         return StatusTranslations.TryGetValue(name, out var translated) ? translated : name;
+    }
+
+    // History rows carry the new VALUE of a changed field but not always which
+    // field it was, so a priority change (High/Critical/…) used to be run through
+    // TranslateStatus and stayed English (#222). Priority and status names don't
+    // overlap, so try both dictionaries.
+    public static string TranslateStatusOrPriority(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return value ?? string.Empty;
+        if (PriorityTranslations.TryGetValue(value, out var p)) return p;
+        if (StatusTranslations.TryGetValue(value, out var s)) return s;
+        return value;
     }
 
     public static void TranslateTicket(THWTicketApp.Shared.Models.Ticket ticket)
