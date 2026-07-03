@@ -444,6 +444,7 @@ else
                 Uid = t.Uid,
                 Subject = t.Subject ?? L.T("kanban.no_subject"),
                 StatusId = t.Status?.Id ?? string.Empty,
+                Updated = t.Updated,
                 PriorityRef = t.Priority,
                 PriorityName = t.Priority?.TranslatedName ?? t.Priority?.Name,
                 PriorityColor = t.Priority?.HtmlColor ?? "#888",
@@ -669,7 +670,7 @@ else
         // Offline: keep the optimistic swap, queue the status change, stay green.
         if (!AppState.IsOnline)
         {
-            await SyncService.EnqueueStatusAsync(ticketId, ticketUid, newStatusId);
+            await SyncService.EnqueueStatusAsync(ticketId, ticketUid, newStatusId, item.Updated);
             Snackbar.Add(L.T("offline.queued"), Severity.Info);
             return;
         }
@@ -691,7 +692,7 @@ else
         catch (HttpRequestException)
         {
             // Network dropped mid-move — keep optimistic swap, queue the change.
-            await SyncService.EnqueueStatusAsync(ticketId, ticketUid, newStatusId);
+            await SyncService.EnqueueStatusAsync(ticketId, ticketUid, newStatusId, item.Updated);
             Snackbar.Add(L.T("offline.queued"), Severity.Info);
         }
         catch
@@ -717,6 +718,9 @@ else
         public int Uid { get; set; }
         public string Subject { get; set; } = string.Empty;
         public string StatusId { get; set; } = string.Empty;
+        // The ticket's server `updated` timestamp, carried so an offline status
+        // move can supply a conflict baseline like the detail/list pages (#273).
+        public DateTime Updated { get; set; }
         public Priority? PriorityRef { get; set; }
         public string? PriorityName { get; set; }
         public string PriorityColor { get; set; } = "#888";
