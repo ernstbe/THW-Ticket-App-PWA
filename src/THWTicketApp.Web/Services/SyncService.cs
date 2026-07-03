@@ -224,8 +224,10 @@ public class SyncService : ISyncService
             var allSuccess = true;
             var now = DateTime.UtcNow;
 
-            foreach (var action in actions)
+            for (var i = 0; i < actions.Length; i++)
             {
+                var action = actions[i];
+
                 // Skip already-conflicted actions (user must resolve them explicitly)
                 if (action.IsConflicted)
                     continue;
@@ -266,6 +268,11 @@ public class SyncService : ISyncService
                         if (action.Id > 0)
                             await _indexedDb.RemovePendingActionAsync(action.Id);
                         await AppendLogAsync("info", action, "Synced successfully");
+                        // Our own apply just bumped the server's 'updated' timestamp.
+                        // Advance the captured baseline of later queued actions for the
+                        // same ticket so their conflict check doesn't misread our own
+                        // change as a concurrent edit by someone else (issue #197).
+                        await RefreshSameTicketBaselinesAsync(action, actions, i + 1);
                     }
                     else
                     {
@@ -453,13 +460,7 @@ public class SyncService : ISyncService
             using var doc = JsonDocument.Parse(response.body);
 
             // Navigate to ticket data (handles both v1 and v2 response formats)
-            JsonElement ticketEl;
-            if (doc.RootElement.TryGetProperty("data", out var dataEl) && dataEl.ValueKind == JsonValueKind.Object)
-                ticketEl = dataEl;
-            else if (doc.RootElement.TryGetProperty("ticket", out var tEl))
-                ticketEl = tEl;
-            else
-                ticketEl = doc.RootElement;
+            var ticketEl = NavigateToTicketElement(doc.RootElement);
 
             // No expected baseline to compare against — skip.
             if (string.IsNullOrEmpty(action.TicketUpdatedAt))
@@ -512,6 +513,78 @@ public class SyncService : ISyncService
             // Body isn't parseable — can't confirm a conflict, let the apply step try.
             return null;
         }
+    }
+
+    // After an action for a ticket applies, every later queued action for that
+    // same ticket still holds the pre-drain baseline while the server has moved
+    // on by exactly our own change. Re-fetch the ticket's current 'updated' and
+    // write it as the new baseline for those successors — in memory (so this
+    // drain sees it) and persisted (so a later drain does too). If another user
+    // edited in the meantime, the successor's own check still sees a newer value
+    // than this refreshed baseline and correctly reports a conflict.
+    private async Task RefreshSameTicketBaselinesAsync(PendingActionDto applied, PendingActionDto[] actions, int fromIndex)
+    {
+        if (applied.TicketUid <= 0)
+            return;
+
+        // Only pay for the extra fetch when a later action actually targets the
+        // same ticket and carries a baseline to refresh.
+        var hasSuccessor = false;
+        for (var j = fromIndex; j < actions.Length; j++)
+        {
+            var s = actions[j];
+            if (!s.IsConflicted && s.TicketUid == applied.TicketUid && !string.IsNullOrEmpty(s.TicketUpdatedAt))
+            {
+                hasSuccessor = true;
+                break;
+            }
+        }
+        if (!hasSuccessor)
+            return;
+
+        var newBaseline = await FetchServerUpdatedAsync(applied.TicketUid);
+        if (string.IsNullOrEmpty(newBaseline))
+            return;
+
+        for (var j = fromIndex; j < actions.Length; j++)
+        {
+            var succ = actions[j];
+            if (succ.IsConflicted || succ.TicketUid != applied.TicketUid || string.IsNullOrEmpty(succ.TicketUpdatedAt))
+                continue;
+            succ.TicketUpdatedAt = newBaseline;
+            if (succ.Id > 0)
+                await _indexedDb.UpdateActionBaselineAsync(succ.Id, newBaseline);
+        }
+    }
+
+    private async Task<string?> FetchServerUpdatedAsync(int ticketUid)
+    {
+        try
+        {
+            var (statusCode, body) = await _apiService.GetTicketRawAsync(ticketUid.ToString());
+            if (statusCode is < 200 or >= 300)
+                return null;
+            using var doc = JsonDocument.Parse(body);
+            var ticketEl = NavigateToTicketElement(doc.RootElement);
+            if (ticketEl.TryGetProperty("updated", out var updatedEl))
+                return updatedEl.GetString();
+        }
+        catch
+        {
+            // Best-effort: if we can't read the new baseline, leave successors as-is.
+        }
+        return null;
+    }
+
+    // trudesk wraps the ticket differently across endpoints/versions
+    // ({ data: {...} } | { ticket: {...} } | the ticket object itself).
+    private static JsonElement NavigateToTicketElement(JsonElement root)
+    {
+        if (root.TryGetProperty("data", out var dataEl) && dataEl.ValueKind == JsonValueKind.Object)
+            return dataEl;
+        if (root.TryGetProperty("ticket", out var tEl))
+            return tEl;
+        return root;
     }
 
     private static string? ExtractStatusId(JsonElement statusEl)

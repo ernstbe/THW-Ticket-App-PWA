@@ -91,6 +91,12 @@ public class IndexedDbService : IIndexedDbService, IAsyncDisposable
         return await module.InvokeAsync<bool>("updateRetryState", id, nextRetryAtIso, retryCount, errorMessage);
     }
 
+    public async Task<bool> UpdateActionBaselineAsync(int id, string ticketUpdatedAtIso)
+    {
+        var module = await GetModuleAsync();
+        return await module.InvokeAsync<bool>("updateActionBaseline", id, ticketUpdatedAtIso);
+    }
+
     public async Task AppendSyncLogAsync(string entryJson)
     {
         var module = await GetModuleAsync();

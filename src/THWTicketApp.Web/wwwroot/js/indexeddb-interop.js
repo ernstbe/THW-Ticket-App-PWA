@@ -187,6 +187,26 @@ export async function updateRetryState(id, nextRetryAtIso, retryCount, errorMess
     });
 }
 
+// Advance a queued action's captured baseline (TicketUpdatedAt). Used after an
+// earlier same-ticket action in the same drain applied and bumped the server's
+// 'updated' value, so this action isn't flagged as a self-inflicted conflict.
+export async function updateActionBaseline(id, ticketUpdatedAtIso) {
+    const database = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction('pendingActions', 'readwrite');
+        const store = tx.objectStore('pendingActions');
+        const request = store.get(id);
+        request.onsuccess = () => {
+            const action = request.result;
+            if (!action) { resolve(false); return; }
+            action.ticketUpdatedAt = ticketUpdatedAtIso;
+            store.put(action);
+            resolve(true);
+        };
+        request.onerror = () => reject(request.error);
+    });
+}
+
 export async function appendSyncLog(entryJson) {
     const database = await openDb();
     const tx = database.transaction('syncLog', 'readwrite');
