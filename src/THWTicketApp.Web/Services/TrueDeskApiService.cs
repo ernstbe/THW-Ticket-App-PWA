@@ -160,7 +160,17 @@ public class TrueDeskApiService : ITrueDeskApiService
                     await ClearOfflineCacheAsync();
                 }
 
-                await _localStorage.SetItemAsync("auth_token", _authToken ?? string.Empty);
+                // A 2xx with no token field (e.g. a v1/v2 response-shape mismatch)
+                // is NOT a successful login. Returning true here would leave
+                // IsAuthenticated false and bounce the user back to /login with no
+                // error — a silent dead-end loop (#271).
+                if (string.IsNullOrEmpty(_authToken))
+                {
+                    LastError = "Login succeeded (HTTP) but no token was returned.";
+                    return false;
+                }
+
+                await _localStorage.SetItemAsync("auth_token", _authToken);
                 await _localStorage.SetItemAsync("auth_refresh_token", _refreshToken ?? string.Empty);
                 await _localStorage.SetItemAsync("auth_username", username);
                 await _localStorage.SetItemAsync("auth_userid", CurrentUserId ?? string.Empty);
