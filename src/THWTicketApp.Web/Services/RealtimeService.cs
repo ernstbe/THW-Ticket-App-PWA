@@ -8,6 +8,7 @@ public class RealtimeService : IAsyncDisposable
     private readonly IJSRuntime _jsRuntime;
     private readonly AppSettings _settings;
     private readonly LocalStorageService _localStorage;
+    private readonly THWTicketApp.Shared.Services.ITrueDeskApiService _api;
     private IJSObjectReference? _module;
     private DotNetObjectReference<RealtimeService>? _dotNetRef;
 
@@ -43,11 +44,23 @@ public class RealtimeService : IAsyncDisposable
     public event Action<bool>? ConnectionStateChanged;
     public bool IsConnected { get; private set; }
 
-    public RealtimeService(IJSRuntime jsRuntime, AppSettings settings, LocalStorageService localStorage)
+    public RealtimeService(IJSRuntime jsRuntime, AppSettings settings, LocalStorageService localStorage, THWTicketApp.Shared.Services.ITrueDeskApiService api)
     {
         _jsRuntime = jsRuntime;
         _settings = settings;
         _localStorage = localStorage;
+        _api = api;
+        // Tear the socket down on ANY logout path (logout button AND idle-lock,
+        // both of which run through ApiService.LogoutAsync's LoggingOut hooks).
+        // Otherwise the connection stays open and authenticated as the logged-out
+        // user: the previous user keeps receiving events/notifications on a shared
+        // device, and the next login opens a duplicate socket (#202).
+        _api.LoggingOut += OnLoggingOutAsync;
+    }
+
+    private async Task OnLoggingOutAsync()
+    {
+        try { await DisconnectAsync(); } catch { /* never break logout */ }
     }
 
     public async Task ConnectAsync()
@@ -164,6 +177,7 @@ public class RealtimeService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _api.LoggingOut -= OnLoggingOutAsync;
         await DisconnectAsync();
         _dotNetRef?.Dispose();
         if (_module != null)
