@@ -17,6 +17,7 @@ public interface IIndexedDbService
     Task<string> GetConflictedActionsAsync();
 
     Task<bool> UpdateRetryStateAsync(int id, string nextRetryAtIso, int retryCount, string? errorMessage);
+    Task<bool> UpdateActionBaselineAsync(int id, string ticketUpdatedAtIso);
 
     Task AppendSyncLogAsync(string entryJson);
     Task<string> GetSyncLogAsync(int limit = 0);

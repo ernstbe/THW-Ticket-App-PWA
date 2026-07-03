@@ -701,6 +701,70 @@ public class SyncServiceTests
         Assert.Equal(ConflictType.TicketUpdated, result!.Type);
     }
 
+    // Regression for #197: two queued edits to the same ticket share one
+    // pre-drain baseline. After the first applies, the server bumps 'updated';
+    // the second must NOT be flagged as a conflict just because of our own change.
+    [Fact]
+    public async Task Sync_secondSameTicketAction_notFlaggedAsSelfConflict()
+    {
+        const string t0 = "2026-04-01T10:00:00.0000000Z";
+        const string t1 = "2026-04-01T10:00:05.0000000Z"; // server bump after our 1st apply
+        SetupQueuedActions(
+            new PendingActionDto { Id = 1, ActionType = "UpdateTicketFields", TicketId = "t1", TicketUid = 1001, Subject = "title", TicketUpdatedAt = t0 },
+            new PendingActionDto { Id = 2, ActionType = "UpdateTicketFields", TicketId = "t1", TicketUid = 1001, Issue = "desc", TicketUpdatedAt = t0 });
+
+        // Call 1 = action #1's conflict check (sees T0 -> no conflict).
+        // Call 2 = post-apply baseline refresh (sees T1, our own change).
+        // Call 3 = action #2's conflict check (sees T1 vs refreshed baseline T1).
+        _api.GetTicketRawAsync("1001").Returns(
+            (200, $"{{\"_id\":\"t1\",\"updated\":\"{t0}\",\"status\":{{\"_id\":\"s1\"}}}}"),
+            (200, $"{{\"_id\":\"t1\",\"updated\":\"{t1}\",\"status\":{{\"_id\":\"s1\"}}}}"),
+            (200, $"{{\"_id\":\"t1\",\"updated\":\"{t1}\",\"status\":{{\"_id\":\"s1\"}}}}"));
+        _api.EditTicketAsync(Arg.Any<Ticket>(), Arg.Any<bool>()).Returns(true);
+
+        PendingAction? conflict = null;
+        _sut.ConflictDetected += pa => conflict = pa;
+
+        var result = await _sut.SyncPendingActionsAsync();
+
+        Assert.Null(conflict);                                          // no false self-conflict
+        await _api.Received(2).EditTicketAsync(Arg.Any<Ticket>(), Arg.Any<bool>());
+        await _db.Received(1).RemovePendingActionAsync(1);
+        await _db.Received(1).RemovePendingActionAsync(2);
+        await _db.Received(1).UpdateActionBaselineAsync(2, t1);         // successor baseline advanced + persisted
+        await _db.DidNotReceive().MarkActionConflictedAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>());
+        Assert.True(result);
+    }
+
+    // The refresh must NOT hide a genuine concurrent edit: if another user
+    // changes the ticket between our two applies, the second still conflicts.
+    [Fact]
+    public async Task Sync_secondSameTicketAction_stillConflictsOnForeignEdit()
+    {
+        const string t0 = "2026-04-01T10:00:00.0000000Z";
+        const string t1 = "2026-04-01T10:00:05.0000000Z"; // our own apply
+        const string t2 = "2026-04-01T10:00:30.0000000Z"; // someone else edits after
+        SetupQueuedActions(
+            new PendingActionDto { Id = 1, ActionType = "UpdateTicketFields", TicketId = "t1", TicketUid = 1001, Subject = "title", TicketUpdatedAt = t0 },
+            new PendingActionDto { Id = 2, ActionType = "UpdateTicketFields", TicketId = "t1", TicketUid = 1001, Issue = "desc", TicketUpdatedAt = t0 });
+
+        _api.GetTicketRawAsync("1001").Returns(
+            (200, $"{{\"_id\":\"t1\",\"updated\":\"{t0}\",\"status\":{{\"_id\":\"s1\"}}}}"), // #1 check
+            (200, $"{{\"_id\":\"t1\",\"updated\":\"{t1}\",\"status\":{{\"_id\":\"s1\"}}}}"), // refresh -> baseline t1
+            (200, $"{{\"_id\":\"t1\",\"updated\":\"{t2}\",\"status\":{{\"_id\":\"s1\"}}}}")); // #2 check sees a newer value
+        _api.EditTicketAsync(Arg.Any<Ticket>(), Arg.Any<bool>()).Returns(true);
+
+        PendingAction? conflict = null;
+        _sut.ConflictDetected += pa => conflict = pa;
+
+        await _sut.SyncPendingActionsAsync();
+
+        Assert.NotNull(conflict);
+        Assert.Equal(ConflictType.TicketUpdated, conflict!.ConflictType);
+        await _api.Received(1).EditTicketAsync(Arg.Any<Ticket>(), Arg.Any<bool>()); // only #1 applied
+        await _db.Received(1).MarkActionConflictedAsync(2, Arg.Any<string>(), Arg.Any<string>());
+    }
+
     [Fact]
     public async Task CheckConflict_updateStatusAgainstDifferentServerStatus_returnsStatusChanged()
     {
