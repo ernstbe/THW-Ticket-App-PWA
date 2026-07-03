@@ -36,9 +36,9 @@ public class TemplatesTests
     // -----------------------------------------------------------------
 
     [Fact]
-    public void ValidateForm_bothFieldsPresent_returnsNull()
+    public void ValidateForm_allFieldsPresent_returnsNull()
     {
-        Assert.Null(Templates.ValidateForm("Name", "Subject"));
+        Assert.Null(Templates.ValidateForm("Name", "Subject", "type1", "prio1"));
     }
 
     [Theory]
@@ -47,7 +47,7 @@ public class TemplatesTests
     [InlineData("   ")]
     public void ValidateForm_missingName_returnsNameError(string? name)
     {
-        Assert.Equal("templates.name_required", Templates.ValidateForm(name, "Subject"));
+        Assert.Equal("templates.name_required", Templates.ValidateForm(name, "Subject", "type1", "prio1"));
     }
 
     [Theory]
@@ -56,7 +56,25 @@ public class TemplatesTests
     [InlineData("   ")]
     public void ValidateForm_missingSubject_returnsSubjectError(string? subject)
     {
-        Assert.Equal("templates.subject_required", Templates.ValidateForm("Name", subject));
+        Assert.Equal("templates.subject_required", Templates.ValidateForm("Name", subject, "type1", "prio1"));
+    }
+
+    // ISSUE-4: type and priority are now required so a template can't be saved
+    // with empty Typ/Priorität.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void ValidateForm_missingType_returnsTypeError(string? typeId)
+    {
+        Assert.Equal("templates.type_required", Templates.ValidateForm("Name", "Subject", typeId, "prio1"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void ValidateForm_missingPriority_returnsPriorityError(string? priorityId)
+    {
+        Assert.Equal("templates.priority_required", Templates.ValidateForm("Name", "Subject", "type1", priorityId));
     }
 
     // -----------------------------------------------------------------

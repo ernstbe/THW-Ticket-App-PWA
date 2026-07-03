@@ -88,14 +88,14 @@ else
         <MudTextField @bind-Value="_formSubject" Label="@L.T("templates.subject")"
                       Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
         <MudSelect T="string" @bind-Value="_formTypeId" Label="@L.T("detail.type")"
-                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Class="mb-2">
+                   Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
             @foreach (var t in _types)
             {
                 <MudSelectItem T="string" Value="@t.Id">@t.TranslatedName</MudSelectItem>
             }
         </MudSelect>
         <MudSelect T="string" @bind-Value="_formPriorityId" Label="@L.T("detail.priority")"
-                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Class="mb-2">
+                   Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
             @foreach (var p in _priorities)
             {
                 <MudSelectItem T="string" Value="@p.Id">@p.TranslatedName</MudSelectItem>
@@ -199,7 +199,7 @@ else
 
     private async Task SaveAsync()
     {
-        var validation = ValidateForm(_formName, _formSubject);
+        var validation = ValidateForm(_formName, _formSubject, _formTypeId, _formPriorityId);
         if (validation != null)
         {
             Snackbar.Add(L.T(validation), Severity.Warning);
@@ -287,10 +287,15 @@ else
         }
     }
 
-    internal static string? ValidateForm(string? name, string? subject)
+    internal static string? ValidateForm(string? name, string? subject, string? typeId, string? priorityId)
     {
         if (string.IsNullOrWhiteSpace(name)) return "templates.name_required";
         if (string.IsNullOrWhiteSpace(subject)) return "templates.subject_required";
+        // Type and priority are required so every template produces a fully
+        // classified ticket — previously they were optional, which let templates
+        // like "Bekleidung Jugend" be saved with empty Typ/Priorität (ISSUE-4).
+        if (string.IsNullOrWhiteSpace(typeId)) return "templates.type_required";
+        if (string.IsNullOrWhiteSpace(priorityId)) return "templates.priority_required";
         return null;
     }
 
