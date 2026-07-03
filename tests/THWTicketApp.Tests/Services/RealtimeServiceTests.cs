@@ -43,6 +43,23 @@ public class RealtimeServiceTests
         Assert.Equal("1098", gotUid);
     }
 
+    // #255: the notificationUpdate bell-count heartbeat must fire NotificationUpdate
+    // but NOT propagate to TicketEvent (which would pop a generic OS notification).
+    [Fact]
+    public void OnTicketEvent_notificationUpdate_raisesNotificationUpdateButNotTicketEvent()
+    {
+        var sut = Build();
+        var ticketEventRaised = false;
+        var notificationRaised = false;
+        sut.TicketEvent += (_, _, _) => ticketEventRaised = true;
+        sut.NotificationUpdate += () => notificationRaised = true;
+
+        sut.OnTicketEvent("notificationUpdate", "", "");
+
+        Assert.True(notificationRaised);
+        Assert.False(ticketEventRaised);
+    }
+
     [Fact]
     public void OnTicketEvent_nullUid_defaultsToEmpty()
     {
