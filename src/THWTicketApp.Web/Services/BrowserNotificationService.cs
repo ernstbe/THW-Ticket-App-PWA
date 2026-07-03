@@ -50,7 +50,7 @@ public class BrowserNotificationService : IAsyncDisposable
         return await module.InvokeAsync<string>("requestPermission");
     }
 
-    private async void OnTicketEvent(string eventName, string ticketId)
+    private async void OnTicketEvent(string eventName, string ticketId, string ticketUid)
     {
         try
         {
@@ -70,7 +70,10 @@ public class BrowserNotificationService : IAsyncDisposable
                 _ => (_localization.T("notify.ticket_event"), string.Format(_localization.T("notify.ticket_event_body"), ticketId))
             };
 
-            var url = string.IsNullOrEmpty(ticketId) ? null : $"/app/tickets/{ticketId}";
+            // Deep-link with the NUMERIC uid: /app/tickets/{TicketUid:int} can't
+            // match the Mongo _id, so a _id-based URL always resolved to NotFound
+            // and the notification never opened the ticket (#209).
+            var url = string.IsNullOrEmpty(ticketUid) ? null : $"/app/tickets/{ticketUid}";
             var module = await GetModuleAsync();
             await module.InvokeAsync<bool>("showNotification", title, body, $"ticket-{ticketId}", url);
         }
