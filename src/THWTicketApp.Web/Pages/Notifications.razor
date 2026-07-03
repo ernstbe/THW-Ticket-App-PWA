@@ -180,7 +180,7 @@ else
                     if (el.TryGetProperty("_id", out var idEl))
                         item.Id = idEl.GetString();
                     if (el.TryGetProperty("title", out var titleEl))
-                        item.Title = titleEl.GetString();
+                        item.Title = TrudeskTranslationHelper.TranslateNotificationTitle(titleEl.GetString());
                     if (el.TryGetProperty("message", out var msgEl))
                         item.Description = msgEl.GetString();
                     if (el.TryGetProperty("description", out var descEl))
