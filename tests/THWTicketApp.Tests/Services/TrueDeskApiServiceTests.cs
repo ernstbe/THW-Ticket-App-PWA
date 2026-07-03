@@ -947,6 +947,52 @@ public class TrueDeskApiServiceTests
         Assert.Empty(_handler.Requests);
     }
 
+    // Regression for #192: the request used to be built once and captured in the
+    // retry lambda. On a 401+refresh SendWithAutoRefreshAsync re-invokes the
+    // lambda, re-sending the same HttpRequestMessage -> InvalidOperationException.
+    // Building the request inside the lambda must let the retry succeed.
+    [Fact]
+    public async Task BatchDeleteTicketsAsync_retriesAfter401WithoutReusingRequest()
+    {
+        // Build the v2 SUT with an in-memory LocalStorage so TryRefreshTokenAsync's
+        // token persistence doesn't NRE against a substitute IJSRuntime (which would
+        // make the refresh silently fail and mask the retry).
+        var v2 = new TrueDeskApiService(
+            new HttpClient(_handler),
+            new AppSettings { ApiBaseUrl = "https://host.test/api/v2", ConnectionTimeoutSeconds = 30 },
+            new InMemoryLocalStorageService(),
+            Substitute.For<IJSRuntime>());
+        SetPrivate(v2, "_authToken", "jwt-expired");
+        SetPrivate(v2, "_refreshToken", "refresh-1");
+
+        // Refresh succeeds with a fresh token.
+        _handler.RespondTo(HttpMethod.Post, "/api/v2/token", HttpStatusCode.OK, "{\"token\":\"jwt-new\"}");
+
+        // First batch DELETE 401s; the retry after refresh succeeds.
+        var deleteCalls = 0;
+        _handler.RespondTo(
+            req => req.Method == HttpMethod.Delete && req.RequestUri!.AbsolutePath.EndsWith("/tickets/batch", StringComparison.Ordinal),
+            _ =>
+            {
+                deleteCalls++;
+                return deleteCalls == 1
+                    ? new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("{}") }
+                    : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"deleted\":2,\"failed\":0}") };
+            });
+
+        // Must not throw InvalidOperationException on the retry.
+        var (deleted, failed) = await v2.BatchDeleteTicketsAsync(new[] { "a", "b" });
+
+        Assert.Equal(2, deleteCalls);        // retried once
+        Assert.Equal(2, deleted);
+        Assert.Equal(0, failed);
+    }
+
+    private static void SetPrivate(object target, string field, object? value) =>
+        target.GetType()
+            .GetField(field, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .SetValue(target, value);
+
     [Fact]
     public async Task BatchUpdateTicketsAsync_sendsPutWithBatch()
     {

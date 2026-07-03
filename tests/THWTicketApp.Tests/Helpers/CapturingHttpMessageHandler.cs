@@ -35,6 +35,16 @@ internal sealed class CapturingHttpMessageHandler : HttpMessageHandler
             _ => new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") }));
     }
 
+    /// <summary>
+    /// Register a fully custom route whose responder can vary per call (e.g. return
+    /// 401 on the first hit and 200 on the retry). Needed to exercise the
+    /// auto-refresh retry path.
+    /// </summary>
+    public void RespondTo(Func<HttpRequestMessage, bool> match, Func<HttpRequestMessage, HttpResponseMessage> respond)
+    {
+        _routes.Add((match, respond));
+    }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Requests.Add(request);
