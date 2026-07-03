@@ -100,7 +100,11 @@
     }
     <MudSpacer />
     <MudText Typo="Typo.body2" Color="Color.Secondary">
-        @_ticketItems.Count(MatchesFilter) / @_ticketItems.Count
+        @* Count only tickets that actually land in a visible column, so the
+           header matches the cards on the board — tickets in the hidden "Neu"
+           status (or, with a type filter, a status outside the type's set) have
+           no column and must not be counted (#272). *@
+        @_ticketItems.Count(t => MatchesFilter(t) && IsInVisibleColumn(t)) / @_ticketItems.Count(IsInVisibleColumn)
     </MudText>
 </div>
 
@@ -543,6 +547,12 @@ else
     private IEnumerable<KanbanTicketItem> FilteredItemsForColumn(string statusId)
         => _filteredItems.Where(t => t.StatusId == statusId);
 
+    // A ticket is only shown if its current status maps to one of the currently
+    // rendered columns (hidden "Neu"/orphaned statuses, or statuses outside a
+    // selected type's set, have no column) — used for the header count (#272).
+    private bool IsInVisibleColumn(KanbanTicketItem item)
+        => _columns.Any(c => c.StatusId == item.StatusId);
+
     private void RecomputeFiltered()
     {
         _filteredItems = _ticketItems.Where(MatchesFilter).ToList();
@@ -606,8 +616,12 @@ else
         if (item.StatusId == newStatusId)
         {
             // Reorder within column — purely visual, no API change.
+            // dropInfo.IndexInZone indexes the RENDERED (filtered) zone, so the
+            // anchor must be resolved against _filteredItems, not the unfiltered
+            // _ticketItems — otherwise a filter hiding cards lands the drop at the
+            // wrong position (#279).
             _ticketItems.Remove(item);
-            var zoneItems = _ticketItems.Where(t => t.StatusId == newStatusId).ToList();
+            var zoneItems = _filteredItems.Where(t => t.StatusId == newStatusId && t != item).ToList();
             var insertIndex = Math.Min(dropInfo.IndexInZone, zoneItems.Count);
             var globalIndex = insertIndex < zoneItems.Count
                 ? _ticketItems.IndexOf(zoneItems[insertIndex])
