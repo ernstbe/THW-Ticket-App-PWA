@@ -249,7 +249,7 @@
 }
 
 @* Ticket list *@
-@if (_isLoading && _filteredTickets.Count == 0)
+@if (!_hasLoaded || (_isLoading && _filteredTickets.Count == 0))
 {
     <MudStack Spacing="2">
         @for (var i = 0; i < 5; i++)
@@ -312,6 +312,12 @@ else
 
     private const int PageSize = 20;
     private bool _isLoading;
+    // False until the first ticket load completes. Before that, _filteredTickets
+    // is legitimately empty (nothing fetched yet) — without this guard the initial
+    // synchronous render, where _isLoading is still false, briefly (and on slower
+    // devices stickily) shows the "Keine Tickets" empty state instead of the
+    // loading skeleton, so the default "Aktiv" view looked empty (BUG-2).
+    private bool _hasLoaded;
     private string _searchText = string.Empty;
     private string _activeFilter = "active";
     private string _activeSort = "updated";
@@ -488,6 +494,7 @@ else
         finally
         {
             _isLoading = false;
+            _hasLoaded = true;
             StateHasChanged();
         }
     }
