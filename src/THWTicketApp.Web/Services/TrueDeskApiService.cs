@@ -656,17 +656,36 @@ public class TrueDeskApiService : ITrueDeskApiService
     // Attachments
     public async Task<bool> UploadAttachmentAsync(string ticketId, Stream fileStream, string fileName)
     {
-        using var content = new MultipartFormDataContent();
-        var streamContent = new StreamContent(fileStream);
-        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(GetMimeType(fileName));
-        content.Add(streamContent, "file", fileName);
+        // Buffer once so the retry can rebuild the multipart content. On a
+        // 401+refresh SendWithAutoRefreshAsync re-invokes the factory, and a
+        // StreamContent's stream is consumed after the first send — the WASM
+        // upload stream (IBrowserFile.OpenReadStream) is non-seekable, so reusing
+        // it throws InvalidOperationException on the retry (#254).
+        var bytes = await ReadAllBytesAsync(fileStream);
+        var mime = GetMimeType(fileName);
 
         // Token-authenticated endpoint added in trudesk-thw PR #96.
         // Ticket id is in the URL, ownerId is taken from req.user server-side —
         // we don't pass them as form fields (would be ignored anyway).
         var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync(
-            $"{V1BaseUrl}/tickets/{ticketId}/attachments", content));
+            $"{V1BaseUrl}/tickets/{ticketId}/attachments", BuildFilePart(bytes, mime, fileName)));
         return response.IsSuccessStatusCode;
+    }
+
+    private static async Task<byte[]> ReadAllBytesAsync(Stream stream)
+    {
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        return ms.ToArray();
+    }
+
+    private static MultipartFormDataContent BuildFilePart(byte[] bytes, string mime, string fileName)
+    {
+        var content = new MultipartFormDataContent();
+        var part = new ByteArrayContent(bytes);
+        part.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(mime);
+        content.Add(part, "file", fileName);
+        return content;
     }
 
     public async Task<Stream?> DownloadAttachmentAsync(string attachmentPath)
@@ -1514,15 +1533,15 @@ public class TrueDeskApiService : ITrueDeskApiService
 
     public async Task<string?> UploadProfileImageAsync(Stream fileStream, string fileName)
     {
-        using var content = new MultipartFormDataContent();
-        var streamContent = new StreamContent(fileStream);
-        streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(GetMimeType(fileName));
-        content.Add(streamContent, "file", fileName);
+        // Buffer once so the 401+refresh retry can rebuild the multipart content
+        // (the upload stream is single-use / non-seekable) — see #254.
+        var bytes = await ReadAllBytesAsync(fileStream);
+        var mime = GetMimeType(fileName);
 
         // v2-only (trudesk feat/account-profile-image). The server targets
         // req.user._id, so we pass no user id. Returns the new image filename.
         var response = await SendWithAutoRefreshAsync(() =>
-            _httpClient.PostAsync($"{V2BaseUrl}/accounts/profile/picture", content));
+            _httpClient.PostAsync($"{V2BaseUrl}/accounts/profile/picture", BuildFilePart(bytes, mime, fileName)));
         if (!response.IsSuccessStatusCode) return null;
         try
         {

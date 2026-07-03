@@ -1003,6 +1003,56 @@ public class TrueDeskApiServiceTests
             .GetField(field, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
             .SetValue(target, value);
 
+    // Mimics the WASM upload stream (IBrowserFile.OpenReadStream): readable once,
+    // NOT seekable — so a StreamContent reused across the retry throws.
+    private sealed class NonSeekableStream : Stream
+    {
+        private readonly MemoryStream _inner;
+        public NonSeekableStream(byte[] data) => _inner = new MemoryStream(data);
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => _inner.Position; set => throw new NotSupportedException(); }
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    // Regression for #254: on a 401+refresh retry the multipart content must be
+    // rebuilt from a buffer, not reuse a consumed non-seekable stream.
+    [Fact]
+    public async Task UploadAttachmentAsync_retriesAfter401_withNonSeekableStream()
+    {
+        var v2 = new TrueDeskApiService(
+            new HttpClient(_handler),
+            new AppSettings { ApiBaseUrl = "https://host.test/api/v2", ConnectionTimeoutSeconds = 30 },
+            new InMemoryLocalStorageService(),
+            Substitute.For<IJSRuntime>());
+        SetPrivate(v2, "_authToken", "jwt-expired");
+        SetPrivate(v2, "_refreshToken", "refresh-1");
+        _handler.RespondTo(HttpMethod.Post, "/api/v2/token", HttpStatusCode.OK, "{\"token\":\"jwt-new\"}");
+
+        var uploadCalls = 0;
+        _handler.RespondTo(
+            req => req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/attachments", StringComparison.Ordinal),
+            _ =>
+            {
+                uploadCalls++;
+                return uploadCalls == 1
+                    ? new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("{}") }
+                    : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
+            });
+
+        using var stream = new NonSeekableStream(new byte[] { 1, 2, 3, 4, 5 });
+        var ok = await v2.UploadAttachmentAsync("t1", stream, "a.bin");
+
+        Assert.True(ok);
+        Assert.Equal(2, uploadCalls); // retried without throwing on the reused stream
+    }
+
     [Fact]
     public async Task BatchUpdateTicketsAsync_sendsPutWithBatch()
     {
