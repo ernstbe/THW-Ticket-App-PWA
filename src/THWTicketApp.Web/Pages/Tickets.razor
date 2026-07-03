@@ -426,6 +426,7 @@ else
     private void OnRealtimeChange(string ticketId)
     {
         _refreshDebounceCts?.Cancel();
+        _refreshDebounceCts?.Dispose();
         _refreshDebounceCts = new CancellationTokenSource();
         var token = _refreshDebounceCts.Token;
         _ = InvokeAsync(async () =>

@@ -853,6 +853,7 @@ else
     {
         if (string.IsNullOrEmpty(ticketId) || _ticket?.Id != ticketId) return;
         _refreshDebounceCts?.Cancel();
+        _refreshDebounceCts?.Dispose();
         _refreshDebounceCts = new CancellationTokenSource();
         var token = _refreshDebounceCts.Token;
         _ = InvokeAsync(async () =>

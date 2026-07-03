@@ -74,6 +74,7 @@
 @code {
     private IJSObjectReference? _module;
     private DotNetObjectReference<Scanner>? _dotNetRef;
+    private bool _disposed;
     private bool _cameraActive;
     private bool _scanComplete;
     private string _scannedValue = string.Empty;
@@ -84,7 +85,16 @@
     {
         if (firstRender)
         {
-            _module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/scanner-interop.js");
+            var module = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/scanner-interop.js");
+            // The component may have been disposed while the dynamic import was in
+            // flight; if so, DisposeAsync already ran with _module still null, so
+            // tear the just-imported module down here instead of leaking it (#259).
+            if (_disposed)
+            {
+                await module.DisposeAsync();
+                return;
+            }
+            _module = module;
             _barcodeApiSupported = await _module.InvokeAsync<bool>("isBarcodeDetectorSupported");
             StateHasChanged();
         }
@@ -168,6 +178,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         if (_module != null)
         {
             await _module.InvokeVoidAsync("stopScanner");
