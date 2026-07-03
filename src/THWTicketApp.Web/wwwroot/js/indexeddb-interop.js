@@ -40,16 +40,22 @@ function openDb() {
 
 export async function saveTickets(ticketsJson) {
     const database = await openDb();
-    const tx = database.transaction('tickets', 'readwrite');
-    const store = tx.objectStore('tickets');
     const tickets = JSON.parse(ticketsJson);
-    for (const ticket of tickets) {
-        store.put(ticket);
-    }
-    // Save cache timestamp
-    const metaTx = database.transaction('meta', 'readwrite');
-    metaTx.objectStore('meta').put({ key: 'lastCacheTime', value: new Date().toISOString() });
-    return true;
+    // Resolve only once the transaction COMMITS, and reject on failure — the old
+    // code returned true before the writes committed (and split them across two
+    // transactions), so a failed cache write (e.g. QuotaExceededError) was
+    // silently reported as success (#207). One atomic tx over both stores.
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction(['tickets', 'meta'], 'readwrite');
+        const store = tx.objectStore('tickets');
+        for (const ticket of tickets) {
+            store.put(ticket);
+        }
+        tx.objectStore('meta').put({ key: 'lastCacheTime', value: new Date().toISOString() });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('saveTickets transaction aborted'));
+    });
 }
 
 export async function getTickets() {
@@ -209,10 +215,15 @@ export async function updateActionBaseline(id, ticketUpdatedAtIso) {
 
 export async function appendSyncLog(entryJson) {
     const database = await openDb();
-    const tx = database.transaction('syncLog', 'readwrite');
     const entry = JSON.parse(entryJson);
-    tx.objectStore('syncLog').add(entry);
-    return true;
+    // Await commit and surface failures rather than returning true early (#207).
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction('syncLog', 'readwrite');
+        tx.objectStore('syncLog').add(entry);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('appendSyncLog transaction aborted'));
+    });
 }
 
 export async function getSyncLog(limit) {
