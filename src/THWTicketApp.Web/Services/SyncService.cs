@@ -348,6 +348,15 @@ public class SyncService : ISyncService
                 await _indexedDb.RemovePendingActionAsync(actionId);
                 await UpdatePendingCount();
                 await AppendLogAsync("info", action, "Force-applied after conflict");
+
+                // Advance the baseline of any remaining queued action for the same
+                // ticket: our force-apply just bumped the server `updated`, so
+                // without this the next drain re-flags those actions as a conflict
+                // (drift now including our own change) and the user has to
+                // force-apply each one separately (#285).
+                var pendingJson = await _indexedDb.GetPendingActionsAsync();
+                var pending = JsonSerializer.Deserialize<PendingActionDto[]>(pendingJson, JsonOptions) ?? [];
+                await RefreshSameTicketBaselinesAsync(action, pending, 0);
             }
             return success;
         }

@@ -842,6 +842,47 @@ public class SyncServiceTests
         Assert.True(result);
     }
 
+    // #285: force-applying a conflicted action must advance the baseline of the
+    // remaining queued actions for the same ticket, or the next drain re-flags
+    // them as a conflict against our own force-applied change.
+    [Fact]
+    public async Task ForceApply_refreshesSameTicketBaselines()
+    {
+        const string t0 = "2026-04-01T10:00:00.0000000Z";
+        const string t1 = "2026-04-01T10:00:05.0000000Z"; // server bump after our force-apply
+        var conflicted = new PendingActionDto
+        {
+            Id = 1,
+            ActionType = "UpdateStatus",
+            TicketId = "t1",
+            TicketUid = 1001,
+            StatusId = "s2",
+            TicketUpdatedAt = t0,
+            IsConflicted = true
+        };
+        _db.GetConflictedActionsAsync().Returns(JsonSerializer.Serialize(new[] { conflicted }, SyncService.JsonOptions));
+        _api.UpdateTicketStatusAsync("t1", 1001, "s2").Returns(true);
+
+        // A second, still-queued action for the same ticket with the stale baseline.
+        var successor = new PendingActionDto
+        {
+            Id = 2,
+            ActionType = "UpdateStatus",
+            TicketId = "t1",
+            TicketUid = 1001,
+            StatusId = "s3",
+            TicketUpdatedAt = t0
+        };
+        _db.GetPendingActionsAsync().Returns(JsonSerializer.Serialize(new[] { successor }, SyncService.JsonOptions));
+        _api.GetTicketRawAsync("1001").Returns((200, $"{{\"_id\":\"t1\",\"updated\":\"{t1}\",\"status\":{{\"_id\":\"s1\"}}}}"));
+
+        var ok = await _sut.ForceApplyAsync(1);
+
+        Assert.True(ok);
+        await _db.Received(1).RemovePendingActionAsync(1);
+        await _db.Received(1).UpdateActionBaselineAsync(2, t1); // successor rebaselined to our own change
+    }
+
     // The refresh must NOT hide a genuine concurrent edit: if another user
     // changes the ticket between our two applies, the second still conflicts.
     [Fact]
