@@ -1,7 +1,37 @@
+using System.Text.RegularExpressions;
+
 namespace THWTicketApp.Shared.Services;
 
 public static class TrudeskTranslationHelper
 {
+    // Trudesk stores notification titles as fixed English strings for some
+    // events (Created/Comment/Mention) and German for others (assignment), so
+    // the list reads as mixed language with an inconsistent "Ticket#" spacing
+    // (frontend review ISSUE-5). Normalize the English ones to German and to a
+    // consistent "Ticket #<n>" form; already-German titles pass through.
+    private static readonly (Regex Pattern, string Replacement)[] NotificationTitleRules =
+    {
+        (new Regex(@"^Ticket\s*#\s*(\d+)\s+Created$", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Ticket #$1 erstellt"),
+        (new Regex(@"^Comment Added to Ticket\s*#\s*(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Neuer Kommentar zu Ticket #$1"),
+        (new Regex(@"^You were mentioned in Ticket\s*#\s*(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Du wurdest in Ticket #$1 erwähnt"),
+    };
+
+    /// <summary>
+    /// Translate a trudesk notification title to German and normalize spacing.
+    /// Unknown or already-German titles are returned unchanged.
+    /// </summary>
+    public static string? TranslateNotificationTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return title;
+        var trimmed = title.Trim();
+        foreach (var (pattern, replacement) in NotificationTitleRules)
+        {
+            if (pattern.IsMatch(trimmed))
+                return pattern.Replace(trimmed, replacement);
+        }
+        return title;
+    }
+
     private static readonly Dictionary<string, string> PriorityTranslations = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Normal"] = "Normal",
