@@ -568,6 +568,10 @@
         Navigation.LocationChanged -= OnLocationChanged;
         if (_shortcutModule != null)
             _ = _shortcutModule.InvokeVoidAsync("unregister");
+        // Remove the window online/offline listeners bound to _dotNetRef before we
+        // dispose it, so a connectivity event on the login screen doesn't fire into
+        // a disposed reference (#211).
+        _ = JsRuntime.InvokeVoidAsync("window.unregisterConnectivityHandler");
         _syncTimer?.Dispose();
         _dotNetRef?.Dispose();
     }

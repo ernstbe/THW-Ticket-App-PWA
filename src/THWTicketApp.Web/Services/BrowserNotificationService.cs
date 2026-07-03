@@ -31,16 +31,30 @@ public class BrowserNotificationService : IAsyncDisposable
         _initialized = true;
         _realtimeService.TicketEvent += OnTicketEvent;
 
-        var module = await GetModuleAsync();
-        var isSupported = await module.InvokeAsync<bool>("isSupported");
-        if (!isSupported) return;
-
-        var permission = await module.InvokeAsync<string>("getPermission");
-        if (permission == "default")
+        // Best-effort. requestPermission rejects when called outside a user
+        // gesture on iOS Safari / installed PWAs (NotAllowedError), and
+        // GetModuleAsync throws if the module fails to load (stale cache/404
+        // after a deploy). This runs during MainLayout's first render BEFORE
+        // offline detection, the sync timer, install handler, shortcuts and dark
+        // mode are set up, so an uncaught JSException here would skip all of that
+        // (#213). Swallow it — notifications are optional.
+        try
         {
-            var enabled = await _localStorage.GetItemAsync("settings_notifications");
-            if (enabled == "true")
-                await module.InvokeAsync<string>("requestPermission");
+            var module = await GetModuleAsync();
+            var isSupported = await module.InvokeAsync<bool>("isSupported");
+            if (!isSupported) return;
+
+            var permission = await module.InvokeAsync<string>("getPermission");
+            if (permission == "default")
+            {
+                var enabled = await _localStorage.GetItemAsync("settings_notifications");
+                if (enabled == "true")
+                    await module.InvokeAsync<string>("requestPermission");
+            }
+        }
+        catch (JSException)
+        {
+            // Notification permission is optional; never block layout init on it.
         }
     }
 

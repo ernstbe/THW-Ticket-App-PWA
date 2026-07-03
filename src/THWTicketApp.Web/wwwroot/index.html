@@ -246,12 +246,19 @@
     </script>
     <script>
         window.registerConnectivityHandler = function (dotNetRef) {
-            window.addEventListener('online', function () {
-                dotNetRef.invokeMethodAsync('OnConnectivityChanged', true);
-            });
-            window.addEventListener('offline', function () {
-                dotNetRef.invokeMethodAsync('OnConnectivityChanged', false);
-            });
+            // Remove any previously-registered listeners first. MainLayout is
+            // recreated on every logout->login, so without this each cycle would
+            // leave a stale online/offline listener bound to a now-disposed
+            // DotNetObjectReference, leaking it and throwing on the next event (#211).
+            window.unregisterConnectivityHandler();
+            window.__thwOnline = function () { dotNetRef.invokeMethodAsync('OnConnectivityChanged', true); };
+            window.__thwOffline = function () { dotNetRef.invokeMethodAsync('OnConnectivityChanged', false); };
+            window.addEventListener('online', window.__thwOnline);
+            window.addEventListener('offline', window.__thwOffline);
+        };
+        window.unregisterConnectivityHandler = function () {
+            if (window.__thwOnline) { window.removeEventListener('online', window.__thwOnline); window.__thwOnline = null; }
+            if (window.__thwOffline) { window.removeEventListener('offline', window.__thwOffline); window.__thwOffline = null; }
         };
     </script>
 </body>
