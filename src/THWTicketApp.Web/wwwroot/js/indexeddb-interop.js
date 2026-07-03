@@ -1,6 +1,10 @@
 // IndexedDB interop for offline caching
 const DB_NAME = 'thw-ticket-cache';
 const DB_VERSION = 2;
+// Cap for the diagnostic syncLog store — it's persistent and appended on every
+// drain step, so without eviction it grows forever and eventually eats the
+// origin's storage quota, starving the offline queue it's meant to diagnose (#224).
+const SYNC_LOG_MAX = 500;
 
 let db = null;
 
@@ -219,7 +223,23 @@ export async function appendSyncLog(entryJson) {
     // Await commit and surface failures rather than returning true early (#207).
     return new Promise((resolve, reject) => {
         const tx = database.transaction('syncLog', 'readwrite');
-        tx.objectStore('syncLog').add(entry);
+        const store = tx.objectStore('syncLog');
+        store.add(entry);
+        // Evict the oldest rows beyond the cap in the same transaction. openCursor
+        // iterates ascending by the autoIncrement key, i.e. oldest first (#224).
+        const countReq = store.count();
+        countReq.onsuccess = () => {
+            let toDelete = countReq.result - SYNC_LOG_MAX;
+            if (toDelete <= 0) return;
+            store.openCursor().onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor && toDelete > 0) {
+                    cursor.delete();
+                    toDelete--;
+                    cursor.continue();
+                }
+            };
+        };
         tx.oncomplete = () => resolve(true);
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error || new Error('appendSyncLog transaction aborted'));
