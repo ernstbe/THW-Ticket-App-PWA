@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="HtmlSanitizer" Version="9.0.892" />
     <PackageReference Include="Markdig" Version="1.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.8" />
@@ -19,6 +20,16 @@
 
   <ItemGroup>
     <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
+
+  <!-- Blazor WASM trims on Release publish. HtmlSanitizer/AngleSharp resolve
+       tokenizers and CSS handlers via reflection, which the trimmer can strip —
+       breaking SafeHtml.Sanitize only in the published build. Root these
+       assemblies so comment/report sanitization keeps working in production. -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="HtmlSanitizer" />
+    <TrimmerRootAssembly Include="AngleSharp" />
+    <TrimmerRootAssembly Include="AngleSharp.Css" />
   </ItemGroup>
 
   <ItemGroup>
