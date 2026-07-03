@@ -330,6 +330,8 @@ public class LocalizationService
 
         // Reports
         ["reports.handover"] = "Übergabebericht",
+        ["reports.since"] = "Seit",
+        ["reports.select_group"] = "Bitte zuerst eine Gruppe wählen.",
         ["reports.sitzung"] = "OV-Sitzungsbericht",
         ["reports.generate"] = "Bericht erstellen",
         ["reports.copy"] = "In Zwischenablage kopieren",
@@ -1122,6 +1124,8 @@ public class LocalizationService
 
         // Reports
         ["reports.handover"] = "Handover Report",
+        ["reports.since"] = "Since",
+        ["reports.select_group"] = "Please select a group first.",
         ["reports.sitzung"] = "Meeting Report",
         ["reports.generate"] = "Generate report",
         ["reports.copy"] = "Copy to clipboard",

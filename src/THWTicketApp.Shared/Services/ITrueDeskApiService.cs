@@ -112,9 +112,10 @@ public interface ITrueDeskApiService
     Task<bool> DeleteAssetAsync(string assetId);
     Task<bool> LinkAssetToTicketAsync(string assetId, string ticketUid);
 
-    // Reports (v2)
-    Task<string> GetHandoverReportAsync(string format = "json");
-    Task<string> GetSitzungReportAsync(string format = "json");
+    // Reports (v2). Both endpoints require a query param: handover needs a
+    // groupId, sitzung needs an ISO `since` date — omitting them 400s.
+    Task<string> GetHandoverReportAsync(string groupId, string format = "json");
+    Task<string> GetSitzungReportAsync(string since, string format = "json");
 
     // Teams (v2)
     Task<string> GetTeamsAsync();
