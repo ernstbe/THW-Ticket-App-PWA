@@ -51,6 +51,31 @@
             document.body.removeChild(a);
         },
 
+        // Download a URL under a caller-chosen filename. Attachments are stored on
+        // disk under a random hash (attachment_<hash>.pdf), so a plain navigation
+        // saves the file under that hash — the user's original name is only in the
+        // ticket data (attachment.name). Fetch as a blob and click an
+        // <a download="..."> so the saved file keeps the original name (#254/ISSUE-6).
+        // Returns false so the C# caller can fall back to a plain navigation.
+        downloadUrl: async function (url, filename) {
+            try {
+                var resp = await fetch(url, { credentials: 'same-origin' });
+                if (!resp.ok) return false;
+                var blob = await resp.blob();
+                var objectUrl = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = objectUrl;
+                a.download = filename || '';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 10000);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        },
+
         // Wrap the current selection in a textarea (or insert at caret) with
         // the given prefix/suffix. Used by the Markdown toolbar to apply
         // **bold**, *italic*, etc. without eval'ing strings from C#.
