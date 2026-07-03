@@ -19,8 +19,22 @@ function openDb() {
             if (!database.objectStoreNames.contains('syncLog'))
                 database.createObjectStore('syncLog', { keyPath: 'id', autoIncrement: true });
         };
-        request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+        request.onsuccess = (e) => {
+            db = e.target.result;
+            // If another tab later opens a higher DB_VERSION, its upgrade would be
+            // blocked as long as we hold this connection open. Close and drop it so
+            // the other tab can upgrade; the next openDb() call here re-opens.
+            db.onversionchange = () => { db.close(); db = null; };
+            resolve(db);
+        };
         request.onerror = (e) => reject(e.target.error);
+        // Another connection (a second tab, or the previous SPA instance during a
+        // soft reload) still holding an older DB_VERSION blocks the upgrade: the
+        // browser fires 'blocked' and NEITHER 'success' NOR 'error'. Without this
+        // handler the Promise never settles and every awaiting C# call hangs
+        // forever. Reject so the deadlock surfaces as an error instead.
+        request.onblocked = () => reject(new Error(
+            'IndexedDB upgrade blocked by another open connection (close other tabs of this app and retry).'));
     });
 }
 
@@ -69,10 +83,20 @@ export async function clearTicketCache() {
 
 export async function enqueuePendingAction(actionJson) {
     const database = await openDb();
-    const tx = database.transaction('pendingActions', 'readwrite');
     const action = JSON.parse(actionJson);
-    tx.objectStore('pendingActions').add(action);
-    return true;
+    // Resolve only once the transaction COMMITS. Returning true right after add()
+    // reported success even when the write later failed (quota exceeded,
+    // ConstraintError, aborted tx) — the offline mutation was silently lost and
+    // the UI showed it as accepted. Wait for oncomplete and reject on error/abort
+    // so EnqueueAsync can surface the failure to the user.
+    return new Promise((resolve, reject) => {
+        const tx = database.transaction('pendingActions', 'readwrite');
+        const request = tx.objectStore('pendingActions').add(action);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error || request.error);
+        tx.onabort = () => reject(tx.error || request.error
+            || new Error('enqueuePendingAction transaction aborted'));
+    });
 }
 
 export async function getPendingActions() {
