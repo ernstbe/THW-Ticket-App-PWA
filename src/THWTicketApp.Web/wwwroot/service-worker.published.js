@@ -45,8 +45,12 @@ self.addEventListener("notificationclick", (event) => {
   if (!url) return;
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Compare the resolved PATHNAME exactly. A substring match (client.url
+      // .includes("/app/tickets/5")) would wrongly focus a window already on
+      // /app/tickets/55 and never open ticket 5 (#261).
+      const targetPath = new URL(url, self.location.origin).pathname;
       for (const client of windowClients) {
-        if (client.url.includes(url) && "focus" in client) return client.focus();
+        if (new URL(client.url).pathname === targetPath && "focus" in client) return client.focus();
       }
       return clients.openWindow(url);
     })
