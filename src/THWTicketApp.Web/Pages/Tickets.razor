@@ -551,12 +551,11 @@ else
             // "Aktiv" = everything that is NOT closed/resolved. Picks up
             // "Offen", "In Bearbeitung", and any custom non-resolved
             // status the trudesk admin may have added.
-            "active" => source.Where(t => !(t.Status?.IsResolved == true
-                || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved")),
-            "open" => source.Where(t => t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new"),
+            "active" => source.Where(t => TicketStatusHelper.IsActive(t.Status)),
+            "open" => source.Where(t => TicketStatusHelper.IsOpen(t.Status)),
             "pending" => source.Where(t => t.Status?.IsInProgress == true),
-            "closed" => source.Where(t => t.Status?.IsResolved == true || t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved"),
-            "overdue" => source.Where(t => TicketDueDateHelper.IsOverdue(t.DueDate) && t.Status?.IsResolved != true),
+            "closed" => source.Where(t => TicketStatusHelper.IsClosed(t.Status)),
+            "overdue" => source.Where(t => TicketDueDateHelper.IsOverdue(t.DueDate) && TicketStatusHelper.IsActive(t.Status)),
             _ => source
         };
         if (_showOnlyMyTickets && !string.IsNullOrEmpty(ApiService.CurrentUserId))

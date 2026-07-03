@@ -346,12 +346,9 @@ else
     private void ComputeStatistics()
     {
         _totalTickets = _allTickets.Count;
-        _openTickets = _allTickets.Count(t =>
-            t.Status?.Name?.ToLowerInvariant() is "offen" or "open" or "neu" or "new");
+        _openTickets = _allTickets.Count(t => TicketStatusHelper.IsOpen(t.Status));
         _pendingTickets = _allTickets.Count(t => t.Status?.IsInProgress == true);
-        _closedTickets = _allTickets.Count(t =>
-            t.Status?.IsResolved == true ||
-            t.Status?.Name?.ToLowerInvariant() is "geschlossen" or "closed" or "gelöst" or "resolved");
+        _closedTickets = _allTickets.Count(t => TicketStatusHelper.IsClosed(t.Status));
         var username = ApiService.CurrentUsername;
         var userId = ApiService.CurrentUserId;
         if (!string.IsNullOrEmpty(username))
@@ -359,13 +356,13 @@ else
                 t.Assignee?.Username?.Equals(username, StringComparison.OrdinalIgnoreCase) == true
                 || (!string.IsNullOrEmpty(userId) && t.AdditionalAssignees.Any(a => a.Id == userId)));
         _overdueTickets = _allTickets.Count(t =>
-            TicketDueDateHelper.IsOverdue(t.DueDate) && t.Status?.IsResolved != true);
+            TicketDueDateHelper.IsOverdue(t.DueDate) && TicketStatusHelper.IsActive(t.Status));
 
         _ticketsPerGroup = _allTickets
             .Where(t => t.Group != null && !string.IsNullOrEmpty(t.Group.Name))
             .GroupBy(t => t.Group!.Name!)
             .OrderByDescending(g => g.Count())
-            .Select(g => new GroupTicketCount(g.Key, g.Count(), g.Count(t => t.Status?.IsResolved != true)))
+            .Select(g => new GroupTicketCount(g.Key, g.Count(), g.Count(t => TicketStatusHelper.IsActive(t.Status))))
             .ToList();
     }
 
