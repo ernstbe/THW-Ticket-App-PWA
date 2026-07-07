@@ -13,6 +13,7 @@
 @inject THWTicketApp.Web.Services.RecentTicketsService RecentTickets
 @inject ISyncService SyncService
 @inject THWTicketApp.Web.Services.AppStateService AppState
+@inject LocalStorageService LocalStorage
 
 <PageTitle>@L.T("nav.dashboard") - THW Ticket App</PageTitle>
 
@@ -281,18 +282,20 @@ else
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(json, "tickets", options);
 
-            _allTickets = tickets.ToList();
-            foreach (var t in _allTickets)
-                TrudeskTranslationHelper.TranslateTicket(t);
-
-            ComputeStatistics();
-            _recentTickets = _allTickets.OrderByDescending(t => t.LastActivityAt).Take(5).ToList();
+            PopulateDashboard(tickets);
+            // Snapshot for the offline read-cache (best-effort, gated by the setting).
+            await CacheTicketsIfEnabledAsync(json);
         }
         catch (Exception ex)
         {
-            var (message, _) = ErrorHelper.Categorize(ex);
-            _hasError = true;
-            _errorMessage = message;
+            // Network failure — fall back to the last cached snapshot when offline
+            // caching is enabled, otherwise surface the error.
+            if (!await TryRenderCachedDashboardAsync())
+            {
+                var (message, _) = ErrorHelper.Categorize(ex);
+                _hasError = true;
+                _errorMessage = message;
+            }
         }
         finally
         {
@@ -302,6 +305,60 @@ else
 
         // Load widgets separately (non-blocking)
         _ = LoadWidgetsAsync();
+    }
+
+    private void PopulateDashboard(IReadOnlyList<Ticket> tickets)
+    {
+        _allTickets = tickets.ToList();
+        foreach (var t in _allTickets)
+            TrudeskTranslationHelper.TranslateTicket(t);
+
+        ComputeStatistics();
+        _recentTickets = _allTickets.OrderByDescending(t => t.LastActivityAt).Take(5).ToList();
+    }
+
+    // Offline read-cache: persist the raw server ticket array after a successful
+    // load (only when the user enabled the setting); restore from it when the
+    // network is down so the dashboard still shows the last known figures (#300).
+    private async Task CacheTicketsIfEnabledAsync(string wrappedJson)
+    {
+        try
+        {
+            if (await LocalStorage.GetItemAsync("settings_offline_cache") != "true") return;
+            var raw = JsonHelper.ExtractWrappedArrayRaw(wrappedJson, "tickets");
+            if (!string.IsNullOrEmpty(raw))
+                await SyncService.CacheTicketsAsync(raw);
+        }
+        catch { /* caching is best-effort, never break the load */ }
+    }
+
+    private async Task<bool> TryRenderCachedDashboardAsync()
+    {
+        try
+        {
+            if (await LocalStorage.GetItemAsync("settings_offline_cache") != "true") return false;
+            var cached = await SyncService.GetCachedTicketsAsync();
+            if (string.IsNullOrWhiteSpace(cached)) return false;
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var tickets = JsonSerializer.Deserialize<List<Ticket>>(cached, options) ?? [];
+            if (tickets.Count == 0) return false;
+
+            PopulateDashboard(tickets);
+            _hasError = true; // reuse the warning banner to carry the offline hint
+            _errorMessage = await BuildCacheHintAsync();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<string> BuildCacheHintAsync()
+    {
+        var iso = await SyncService.GetLastCacheTimeAsync();
+        var when = DateTime.TryParse(iso, out var dt) ? dt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "?";
+        return string.Format(L.T("offline.showing_cached"), when);
     }
 
     private async Task LoadWidgetsAsync()

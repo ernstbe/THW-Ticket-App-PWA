@@ -290,7 +290,7 @@ else
                         OnClick="NavigateToDetail"
                         OnAssignToMe="AssignToMeAsync"
                         OnClose="CloseTicketAsync"
-                        AvailableStatuses="_allStatuses"
+                        AvailableStatuses="@AllowedStatusesFor(t)"
                         OnChangeStatus="QuickChangeStatusAsync" />
         }
     </MudStack>
@@ -469,40 +469,94 @@ else
             var json = await ApiService.GetTicketsAsync();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var tickets = JsonHelper.DeserializeWrappedArray<Ticket>(json, "tickets", options);
-
-            _allTickets.Clear();
-            foreach (var t in tickets)
-            {
-                TrudeskTranslationHelper.TranslateTicket(t);
-                _allTickets.Add(t);
-            }
-
-            // Populate advanced filter options from data
-            _allPriorities = _allTickets
-                .Where(t => t.Priority?.Name != null)
-                .Select(t => t.Priority!.Name!)
-                .Distinct().OrderBy(n => n).ToList();
-            _allGroups = _allTickets
-                .Where(t => t.Group?.Name != null)
-                .Select(t => t.Group!.Name!)
-                .Distinct().OrderBy(n => n).ToList();
-            _allTypes = _allTickets
-                .Where(t => t.Type?.Name != null)
-                .Select(t => t.Type!.TranslatedName)
-                .Distinct().OrderBy(n => n).ToList();
-
-            ApplyFilters();
+            PopulateTickets(tickets);
+            // Snapshot for the offline read-cache (best-effort, gated by the setting).
+            await CacheTicketsIfEnabledAsync(json);
         }
         catch (Exception ex)
         {
-            var (message, _) = ErrorHelper.Categorize(ex);
-            _statusMessage = message;
+            // Network failure — fall back to the last cached snapshot when offline
+            // caching is enabled, otherwise surface the error.
+            if (!await TryRenderCachedTicketsAsync())
+            {
+                var (message, _) = ErrorHelper.Categorize(ex);
+                _statusMessage = message;
+            }
         }
         finally
         {
             _isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private void PopulateTickets(IReadOnlyList<Ticket> tickets)
+    {
+        _allTickets.Clear();
+        foreach (var t in tickets)
+        {
+            TrudeskTranslationHelper.TranslateTicket(t);
+            _allTickets.Add(t);
+        }
+
+        // Populate advanced filter options from data
+        _allPriorities = _allTickets
+            .Where(t => t.Priority?.Name != null)
+            .Select(t => t.Priority!.Name!)
+            .Distinct().OrderBy(n => n).ToList();
+        _allGroups = _allTickets
+            .Where(t => t.Group?.Name != null)
+            .Select(t => t.Group!.Name!)
+            .Distinct().OrderBy(n => n).ToList();
+        _allTypes = _allTickets
+            .Where(t => t.Type?.Name != null)
+            .Select(t => t.Type!.TranslatedName)
+            .Distinct().OrderBy(n => n).ToList();
+
+        ApplyFilters();
+    }
+
+    // Offline read-cache: after a successful load, persist the raw server ticket
+    // array to IndexedDB (only when the user enabled the setting); on a failed load
+    // restore from it so the list still shows the last known tickets (#300).
+    private async Task CacheTicketsIfEnabledAsync(string wrappedJson)
+    {
+        try
+        {
+            if (await LocalStorage.GetItemAsync("settings_offline_cache") != "true") return;
+            var raw = JsonHelper.ExtractWrappedArrayRaw(wrappedJson, "tickets");
+            if (!string.IsNullOrEmpty(raw))
+                await SyncService.CacheTicketsAsync(raw);
+        }
+        catch { /* caching is best-effort, never break the load */ }
+    }
+
+    private async Task<bool> TryRenderCachedTicketsAsync()
+    {
+        try
+        {
+            if (await LocalStorage.GetItemAsync("settings_offline_cache") != "true") return false;
+            var cached = await SyncService.GetCachedTicketsAsync();
+            if (string.IsNullOrWhiteSpace(cached)) return false;
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var tickets = JsonSerializer.Deserialize<List<Ticket>>(cached, options) ?? [];
+            if (tickets.Count == 0) return false;
+
+            PopulateTickets(tickets);
+            _statusMessage = await BuildCacheHintAsync();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<string> BuildCacheHintAsync()
+    {
+        var iso = await SyncService.GetLastCacheTimeAsync();
+        var when = DateTime.TryParse(iso, out var dt) ? dt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "?";
+        return string.Format(L.T("offline.showing_cached"), when);
     }
 
     private async Task OnSearchChanged(string value)
@@ -644,6 +698,17 @@ else
             { Snackbar.Add(L.T("tickets.assigned"), Severity.Success); await LoadTicketsAsync(); }
         }
         catch { Snackbar.Add(L.T("tickets.assign_failed"), Severity.Error); }
+    }
+
+    // Restrict the quick status menu to the ticket type's configured statuses,
+    // mirroring Kanban's CanDrop and TicketDetail's AllowedStatusesForCurrentType.
+    // A type with no configured statuses ⇒ all statuses allowed (#306).
+    private List<Status> AllowedStatusesFor(Ticket ticket)
+    {
+        var allowed = ticket.Type?.Statuses;
+        if (allowed == null || allowed.Count == 0) return _allStatuses;
+        var allowedIds = new HashSet<string>(allowed.Select(s => s.Id ?? "").Where(id => id.Length > 0));
+        return _allStatuses.Where(s => s.Id != null && allowedIds.Contains(s.Id)).ToList();
     }
 
     private async Task QuickChangeStatusAsync((Ticket Ticket, Status Status) args)

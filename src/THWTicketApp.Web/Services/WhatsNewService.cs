@@ -95,6 +95,13 @@ public sealed class WhatsNewService
         new WhatsNewEntry(16, "20.06.2026", "Profilbilder in der Aktivität",
         [
             "Im Aktivitätsverlauf eines Tickets erscheint jetzt das Profilbild der jeweiligen Person neben Kommentaren, Notizen und Verlaufseinträgen. Wer kein Bild hochgeladen hat, bekommt weiterhin die farbigen Initialen."
+        ]),
+        new WhatsNewEntry(18, "07.07.2026", "Offline-Verbesserungen und Korrekturen",
+        [
+            "Offline-Cache: In den Einstellungen lässt sich das Zwischenspeichern von Tickets aktivieren — fällt die Verbindung aus, zeigen Ticketliste und Dashboard weiter den zuletzt geladenen Stand. Der Knopf „Cache leeren“ funktioniert jetzt ebenfalls.",
+            "Schnelle Statusänderung: Das Status-Menü in der Ticketliste bietet nur noch Status an, die zum jeweiligen Tickettyp passen — wie im Kanban-Board.",
+            "Der wöchentliche Verlauf in der Statistik beginnt jetzt montags statt sonntags.",
+            "Benachrichtigungen zu nicht mehr vorhandenen Tickets führen nicht mehr auf eine leere Seite, und offline erfasste Änderungen an gelöschten Tickets werden jetzt zuverlässig erkannt."
         ])
     ];
 

@@ -226,6 +226,7 @@ public class LocalizationService
         ["notes.added"] = "Notiz hinzugefügt.",
         ["offline.queued"] = "Offline gespeichert — wird gesendet, sobald die Verbindung wieder steht.",
         ["offline.action_unavailable"] = "Diese Aktion benötigt eine Online-Verbindung.",
+        ["offline.showing_cached"] = "Offline — gespeicherte Tickets werden angezeigt (Stand: {0}).",
 
         // Attachments
         ["attachments.title"] = "Anhänge",
@@ -1021,6 +1022,7 @@ public class LocalizationService
         ["notes.added"] = "Note added.",
         ["offline.queued"] = "Saved offline — will sync when the connection is back.",
         ["offline.action_unavailable"] = "This action requires an online connection.",
+        ["offline.showing_cached"] = "Offline — showing saved tickets (as of {0}).",
 
         // Attachments
         ["attachments.title"] = "Attachments",

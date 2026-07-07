@@ -531,6 +531,11 @@ else
             }
 
             RecomputeFiltered();
+
+            // Snapshot the raw ticket array into the shared offline read-cache
+            // (best-effort, gated by the setting) so the list/dashboard can fall
+            // back to it when the network is down (#300).
+            await CacheTicketsIfEnabledAsync(ticketJson);
         }
         catch (Exception ex)
         {
@@ -728,6 +733,12 @@ else
             var success = await ApiService.UpdateTicketStatusAsync(ticketId, ticketUid, newStatusId);
             if (success)
             {
+                // Refresh the conflict baseline from the server: our own status write
+                // just bumped the ticket's `updated`, so a later offline move of the
+                // same card would otherwise diff against a stale timestamp and be
+                // wrongly flagged as a StatusChanged conflict (#303).
+                var serverUpdated = await SyncService.GetServerUpdatedAsync(ticketUid);
+                if (serverUpdated.HasValue) item.Updated = serverUpdated.Value;
                 Snackbar.Add($"#{item.Uid} → {targetName}", Severity.Success);
             }
             else
@@ -749,6 +760,22 @@ else
             RecomputeFiltered();
             Snackbar.Add(L.T("kanban.move_failed"), Severity.Error);
         }
+    }
+
+    // Offline read-cache: persist the raw server ticket array (only when the user
+    // enabled the setting) so the ticket list and dashboard can fall back to it
+    // offline. The board itself needs the live status catalogue to render its
+    // columns, so it does not restore from this cache (#300).
+    private async Task CacheTicketsIfEnabledAsync(string wrappedJson)
+    {
+        try
+        {
+            if (await LocalStorage.GetItemAsync("settings_offline_cache") != "true") return;
+            var raw = JsonHelper.ExtractWrappedArrayRaw(wrappedJson, "tickets");
+            if (!string.IsNullOrEmpty(raw))
+                await SyncService.CacheTicketsAsync(raw);
+        }
+        catch { /* caching is best-effort, never break the load */ }
     }
 
     // ─── DTOs ───────────────────────────────────────────────────────────

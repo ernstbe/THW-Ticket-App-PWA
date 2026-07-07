@@ -241,10 +241,10 @@ else
             Realtime.RaiseLocalNotificationUpdate();
         }
 
+        // Navigate only via the numeric uid: the {TicketUid:int} route can't match
+        // a Mongo _id, so the old TicketId branch always dead-ended at NotFound (#307).
         if (!string.IsNullOrEmpty(notification.TicketUid))
             Navigation.NavigateTo($"tickets/{notification.TicketUid}");
-        else if (!string.IsNullOrEmpty(notification.TicketId))
-            Navigation.NavigateTo($"tickets/{notification.TicketId}");
     }
 
     private async Task MarkReadAsync(NotificationItem notification)

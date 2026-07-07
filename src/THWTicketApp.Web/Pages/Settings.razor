@@ -917,7 +917,11 @@
 
     private async Task ClearCacheAsync()
     {
-        await LocalStorage.RemoveItemAsync("ticket_cache");
+        // Clear the real IndexedDB ticket cache. The old code deleted a
+        // "ticket_cache" localStorage key that was never written, so the button
+        // did nothing (#300).
+        try { await IndexedDb.ClearTicketCacheAsync(); }
+        catch { /* best-effort */ }
         Snackbar.Add(L.T("settings.cache_cleared"), Severity.Success);
     }
 
