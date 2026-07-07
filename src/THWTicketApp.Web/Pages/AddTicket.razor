@@ -430,11 +430,20 @@ else
 
     private async Task CreateTicketAsync()
     {
-        await _form.ValidateAsync();
-        if (!_form.IsValid) return;
-
+        // Guard against a double-tap creating two tickets: the ValidateAsync await
+        // below yields, and _isLoading was previously raised only afterwards, so a
+        // second tap slipped through before the flag was set (#311).
+        if (_isLoading) return;
         _isLoading = true;
         StateHasChanged();
+
+        await _form.ValidateAsync();
+        if (!_form.IsValid)
+        {
+            _isLoading = false;
+            StateHasChanged();
+            return;
+        }
 
         try
         {

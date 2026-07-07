@@ -99,6 +99,7 @@ else
 
 @code {
     private bool _isLoading;
+    private bool _isSaving;
     private bool _showDialog;
     private List<NoticeItem> _notices = [];
     private NoticeItem _editNotice = new();
@@ -124,16 +125,27 @@ else
 
     private async Task CreateAsync()
     {
-        var color = _pickerColor.ToString(MudColorOutputFormats.Hex);
-        var fontColor = IsLightColor(color) ? "#000000" : "#FFFFFF";
-        if (await ApiService.CreateNoticeAsync(_editNotice.Name, _editNotice.Message, color, fontColor))
+        // Guard against a double-tap creating two notices (#311).
+        if (_isSaving) return;
+        _isSaving = true;
+        try
         {
-            _showDialog = false;
-            _editNotice = new();
-            Snackbar.Add(L.T("notices.created"), Severity.Success);
-            await LoadNoticesAsync();
+            var color = _pickerColor.ToString(MudColorOutputFormats.Hex);
+            var fontColor = IsLightColor(color) ? "#000000" : "#FFFFFF";
+            if (await ApiService.CreateNoticeAsync(_editNotice.Name, _editNotice.Message, color, fontColor))
+            {
+                _showDialog = false;
+                _editNotice = new();
+                Snackbar.Add(L.T("notices.created"), Severity.Success);
+                await LoadNoticesAsync();
+            }
+            else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
         }
-        else Snackbar.Add(L.T("detail.add_failed"), Severity.Error);
+        finally
+        {
+            _isSaving = false;
+            StateHasChanged();
+        }
     }
 
     private async Task ActivateAsync(string id)
