@@ -95,6 +95,11 @@ public sealed class WhatsNewService
         new WhatsNewEntry(16, "20.06.2026", "Profilbilder in der Aktivität",
         [
             "Im Aktivitätsverlauf eines Tickets erscheint jetzt das Profilbild der jeweiligen Person neben Kommentaren, Notizen und Verlaufseinträgen. Wer kein Bild hochgeladen hat, bekommt weiterhin die farbigen Initialen."
+        ]),
+        new WhatsNewEntry(17, "07.07.2026", "Live-Aktualisierungen",
+        [
+            "Änderungen an Tickets durch andere Personen erscheinen jetzt sofort in Ticketliste, Kanban-Board und Dashboard — ohne die Seite neu zu laden. Auch gelöschte Tickets verschwinden automatisch.",
+            "Ticket-Benachrichtigungen zeigen jetzt die richtige Ticketnummer statt einer internen Kennung."
         ])
     ];
 

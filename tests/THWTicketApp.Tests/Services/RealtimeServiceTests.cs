@@ -60,6 +60,26 @@ public class RealtimeServiceTests
         Assert.False(ticketEventRaised);
     }
 
+    // #299: the REST-write-path delete event (payload = bare _id) must refresh any
+    // open list/board via AnyTicketChanged and raise TicketDeleted, but must NOT
+    // fall through to TicketEvent (which would pop a misleading OS notification).
+    [Fact]
+    public void OnTicketEvent_ticketDeleted_raisesDeletedAndAnyChangedButNotTicketEvent()
+    {
+        var sut = Build();
+        string? deletedId = null, anyChangedId = null;
+        var ticketEventRaised = false;
+        sut.TicketDeleted += id => deletedId = id;
+        sut.AnyTicketChanged += id => anyChangedId = id;
+        sut.TicketEvent += (_, _, _) => ticketEventRaised = true;
+
+        sut.OnTicketEvent("ticketDeleted", "665fabcdef0123456789abcd", "");
+
+        Assert.Equal("665fabcdef0123456789abcd", deletedId);
+        Assert.Equal("665fabcdef0123456789abcd", anyChangedId);
+        Assert.False(ticketEventRaised);
+    }
+
     [Fact]
     public void OnTicketEvent_nullUid_defaultsToEmpty()
     {

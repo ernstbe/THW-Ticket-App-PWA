@@ -46,7 +46,7 @@ export function connect(serverUrl, token, objRef) {
             '$trudesk:tickets:created':            'ticketCreated',
             '$trudesk:tickets:update':             'ticketUpdated',
             '$trudesk:tickets:ui:status:update':   'statusUpdated',
-            '$trudesk:tickets:assignee: update':   'assigneeUpdated',
+            '$trudesk:tickets:assignee:update':    'assigneeUpdated',
             '$trudesk:tickets:ui:priority:update': 'priorityUpdated',
             '$trudesk:tickets:ui:type:update':     'typeUpdated',
             '$trudesk:tickets:ui:group:update':    'groupUpdated',
@@ -55,6 +55,12 @@ export function connect(serverUrl, token, objRef) {
             '$trudesk:tickets:comment_note:set':   'commentNoteAdded',
             '$trudesk:tickets:comment_note:remove':'commentNoteRemoved',
             '$trudesk:tickets:ui:attachments:update': 'attachmentsUpdated',
+            // The REST write path (used by the PWA and any other API client) emits
+            // these on every ticket save/delete. Without them, changes made by other
+            // users never reach the list/kanban/dashboard until a manual reload (#299).
+            // `$trudesk:client:ticket:updated` carries { ticket }, `:deleted` a bare _id string.
+            '$trudesk:client:ticket:updated':      'ticketUpdated',
+            '$trudesk:client:ticket:deleted':      'ticketDeleted',
             '$trudesk:notifications:update':       'notificationUpdate'
         };
 
@@ -89,8 +95,11 @@ function extractTicketId(data) {
     try {
         if (!data) return '';
         if (typeof data === 'string') {
-            const parsed = JSON.parse(data);
-            data = parsed;
+            // The delete event's payload is a bare Mongo _id string, not JSON.
+            // Try to parse (some events do send a JSON string); if that fails,
+            // treat the string itself as the id instead of dropping it.
+            try { data = JSON.parse(data); }
+            catch { return data; }
         }
         if (Array.isArray(data) && data.length > 0) data = data[0];
         if (data.ticket) {

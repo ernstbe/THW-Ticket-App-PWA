@@ -74,14 +74,22 @@ public class BrowserNotificationService : IAsyncDisposable
             // Check specific notification settings
             if (!await ShouldNotify(eventName)) return;
 
+            // The body references the human-facing numeric uid, never the Mongo
+            // _id (which is what ticketId holds). When the socket payload carried
+            // no uid, fall back to the generic title text instead of leaking the
+            // raw _id into the notification (#304).
+            string Body(string key) => string.IsNullOrEmpty(ticketUid)
+                ? _localization.T("notify.ticket_event")
+                : string.Format(_localization.T(key), ticketUid);
+
             var (title, body) = eventName switch
             {
-                "ticketCreated" => (_localization.T("notify.ticket_created"), string.Format(_localization.T("notify.ticket_created_body"), ticketId)),
-                "ticketUpdated" => (_localization.T("notify.ticket_updated"), string.Format(_localization.T("notify.ticket_updated_body"), ticketId)),
-                "statusUpdated" => (_localization.T("notify.status_changed"), string.Format(_localization.T("notify.status_changed_body"), ticketId)),
-                "assigneeUpdated" => (_localization.T("notify.assignee_changed"), string.Format(_localization.T("notify.assignee_changed_body"), ticketId)),
-                "commentNoteAdded" => (_localization.T("notify.comment_added"), string.Format(_localization.T("notify.comment_added_body"), ticketId)),
-                _ => (_localization.T("notify.ticket_event"), string.Format(_localization.T("notify.ticket_event_body"), ticketId))
+                "ticketCreated" => (_localization.T("notify.ticket_created"), Body("notify.ticket_created_body")),
+                "ticketUpdated" => (_localization.T("notify.ticket_updated"), Body("notify.ticket_updated_body")),
+                "statusUpdated" => (_localization.T("notify.status_changed"), Body("notify.status_changed_body")),
+                "assigneeUpdated" => (_localization.T("notify.assignee_changed"), Body("notify.assignee_changed_body")),
+                "commentNoteAdded" => (_localization.T("notify.comment_added"), Body("notify.comment_added_body")),
+                _ => (_localization.T("notify.ticket_event"), Body("notify.ticket_event_body"))
             };
 
             // Deep-link with the NUMERIC uid: /app/tickets/{TicketUid:int} can't
