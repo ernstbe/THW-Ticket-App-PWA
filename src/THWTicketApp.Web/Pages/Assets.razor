@@ -132,6 +132,7 @@ else if (_isLoading)
 
 @code {
     private bool _isLoading;
+    private bool _isSaving;
     private Asset[] _assets = [];
     private string _searchText = string.Empty;
     private bool _dialogVisible;
@@ -200,36 +201,48 @@ else if (_isLoading)
 
     private async Task SaveAssetAsync()
     {
+        // Guard against a double-tap creating two assets (#311).
+        if (_isSaving) return;
+
         if (string.IsNullOrWhiteSpace(_formName))
         {
             Snackbar.Add(L.T("assets.name_required"), Severity.Warning);
             return;
         }
 
-        var data = new Dictionary<string, object?>
+        _isSaving = true;
+        try
         {
-            ["name"] = _formName,
-            ["assetTag"] = _formTag,
-            ["category"] = _formCategory,
-            ["location"] = _formLocation,
-            ["description"] = _formDescription
-        };
+            var data = new Dictionary<string, object?>
+            {
+                ["name"] = _formName,
+                ["assetTag"] = _formTag,
+                ["category"] = _formCategory,
+                ["location"] = _formLocation,
+                ["description"] = _formDescription
+            };
 
-        bool success;
-        if (_editingAsset != null)
-            success = await ApiService.UpdateAssetAsync(_editingAsset.Id, data);
-        else
-            success = await ApiService.CreateAssetAsync(data);
+            bool success;
+            if (_editingAsset != null)
+                success = await ApiService.UpdateAssetAsync(_editingAsset.Id, data);
+            else
+                success = await ApiService.CreateAssetAsync(data);
 
-        if (success)
-        {
-            _dialogVisible = false;
-            Snackbar.Add(L.T("common.success"), Severity.Success);
-            await LoadAssetsAsync();
+            if (success)
+            {
+                _dialogVisible = false;
+                Snackbar.Add(L.T("common.success"), Severity.Success);
+                await LoadAssetsAsync();
+            }
+            else
+            {
+                Snackbar.Add(L.T("common.error"), Severity.Error);
+            }
         }
-        else
+        finally
         {
-            Snackbar.Add(L.T("common.error"), Severity.Error);
+            _isSaving = false;
+            StateHasChanged();
         }
     }
 
