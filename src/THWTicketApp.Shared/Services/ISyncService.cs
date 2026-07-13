@@ -31,4 +31,18 @@ public interface ISyncService
     Task<bool> ForceApplyAsync(int actionId);
     Task DiscardActionAsync(int actionId);
     Task<List<PendingAction>> GetConflictedActionsAsync();
+
+    // Offline read-cache for the ticket list / dashboard / kanban. Stores the raw
+    // server ticket array (keyed by _id) so those pages can fall back to the last
+    // snapshot when the network is unavailable.
+    Task CacheTicketsAsync(string ticketsJson);
+    Task<string> GetCachedTicketsAsync();
+    Task<string?> GetLastCacheTimeAsync();
+
+    /// <summary>
+    /// Fetches a ticket's current server <c>updated</c> timestamp, used to refresh
+    /// a page's conflict baseline right after it applies an online change. Returns
+    /// null on any network/parse failure.
+    /// </summary>
+    Task<DateTime?> GetServerUpdatedAsync(int ticketUid);
 }

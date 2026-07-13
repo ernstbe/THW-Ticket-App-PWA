@@ -44,7 +44,7 @@ public class SyncService : ISyncService
         _appState = appState;
     }
 
-    // Cache helpers (not part of ISyncService but used by pages)
+    // Offline read-cache helpers (used by the ticket list / dashboard / kanban).
     public async Task CacheTicketsAsync(string ticketsJson)
     {
         await _indexedDb.SaveTicketsAsync(ticketsJson);
@@ -53,6 +53,15 @@ public class SyncService : ISyncService
     public async Task<string> GetCachedTicketsAsync()
     {
         return await _indexedDb.GetTicketsAsync();
+    }
+
+    public Task<string?> GetLastCacheTimeAsync() => _indexedDb.GetLastCacheTimeAsync();
+
+    public async Task<DateTime?> GetServerUpdatedAsync(int ticketUid)
+    {
+        if (ticketUid <= 0) return null;
+        var iso = await FetchServerUpdatedAsync(ticketUid);
+        return TryParseUtc(iso ?? string.Empty, out var dt) ? dt : null;
     }
 
     public async Task<int> GetPendingCountAsync()
@@ -496,6 +505,21 @@ public class SyncService : ISyncService
         if (response.statusCode < 200 || response.statusCode >= 300)
             return null;
 
+        // trudesk v1 answers a deleted/unknown ticket with HTTP 200 +
+        // {success:false,error:'Invalid Ticket'} instead of a 404, so the status
+        // check above never catches it and the action would silently retry until
+        // it is dropped. Inspect the body: an explicit success:false — or a 2xx
+        // payload carrying no ticket at all — means the ticket is gone. (v2 returns
+        // the ticket on success and a real 404 otherwise, so this stays inert for v2.)
+        if (IsTicketMissing(response.body))
+        {
+            if (action.ActionType == "DeleteTicket")
+                return null; // someone else already deleted it — our goal is met
+            return new ConflictResult(
+                ConflictType.TicketDeleted,
+                "Das Ticket wurde serverseitig gelöscht, seit die Aktion erstellt wurde.");
+        }
+
         // Additive actions (comment/note) can only conflict with the ticket being
         // gone or access lost — both handled by the 404/401/403 checks above. They
         // can never conflict with a mere field edit, so skip the updated-timestamp
@@ -623,6 +647,34 @@ public class SyncService : ISyncService
             // Best-effort: if we can't read the new baseline, leave successors as-is.
         }
         return null;
+    }
+
+    // A 2xx GET /tickets/:uid whose body doesn't actually contain a ticket.
+    // trudesk v1 uses {success:false} for a deleted/unknown ticket (HTTP 200)
+    // instead of a 404; a payload with no ticket identity (_id/uid) counts too.
+    private static bool IsTicketMissing(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return false;
+
+            if (root.TryGetProperty("success", out var successEl)
+                && successEl.ValueKind == JsonValueKind.False)
+                return true;
+
+            var ticketEl = NavigateToTicketElement(root);
+            if (ticketEl.ValueKind != JsonValueKind.Object)
+                return true;
+            return !ticketEl.TryGetProperty("_id", out _) && !ticketEl.TryGetProperty("uid", out _);
+        }
+        catch
+        {
+            // Unparseable — can't prove the ticket is gone; let the apply step try.
+            return false;
+        }
     }
 
     // trudesk wraps the ticket differently across endpoints/versions

@@ -340,7 +340,10 @@
 
         for (int i = 7; i >= 0; i--)
         {
-            var weekStart = now.Date.AddDays(-((int)now.DayOfWeek + 7 * i));
+            // Weeks start on Monday (DE convention), not Sunday. DayOfWeek has
+            // Sunday=0..Saturday=6; shift so Monday maps to 0 (#305).
+            var dow = ((int)now.DayOfWeek + 6) % 7;
+            var weekStart = now.Date.AddDays(-(dow + 7 * i));
             var weekEnd = weekStart.AddDays(7);
             // Ticket dates are UTC (parsed from trailing-Z timestamps); the week
             // boundaries are local. Convert to local before bucketing so tickets

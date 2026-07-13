@@ -747,6 +747,53 @@ public class SyncServiceTests
         Assert.Null(result);
     }
 
+    // #301: trudesk v1 answers a deleted/unknown ticket with HTTP 200 +
+    // {success:false} instead of a 404, so it must still be detected as deleted.
+    [Fact]
+    public async Task CheckConflict_v1SuccessFalseBody_returnsTicketDeleted()
+    {
+        _api.GetTicketRawAsync("1001").Returns((200, "{\"success\":false,\"error\":\"Invalid Ticket\"}"));
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket());
+
+        Assert.NotNull(result);
+        Assert.Equal(ConflictType.TicketDeleted, result!.Type);
+    }
+
+    // #301: the same v1 shape must flag additive comment/note actions as
+    // TicketDeleted too (you can't comment on a ticket that no longer exists),
+    // instead of silently retrying and dropping them.
+    [Fact]
+    public async Task CheckConflict_v1SuccessFalseBody_addComment_returnsTicketDeleted()
+    {
+        _api.GetTicketRawAsync("1001").Returns((200, "{\"success\":false,\"error\":\"Invalid Ticket\"}"));
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket("AddComment"));
+
+        Assert.NotNull(result);
+        Assert.Equal(ConflictType.TicketDeleted, result!.Type);
+    }
+
+    // #301: a 2xx body carrying no ticket object at all is treated as gone too.
+    [Fact]
+    public async Task CheckConflict_2xxWithoutTicketBody_returnsTicketDeleted()
+    {
+        _api.GetTicketRawAsync("1001").Returns((200, "{\"foo\":\"bar\"}"));
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket());
+
+        Assert.NotNull(result);
+        Assert.Equal(ConflictType.TicketDeleted, result!.Type);
+    }
+
+    // #301: for a DeleteTicket action, "already gone" (v1 success:false) is success,
+    // not a conflict — our goal was achieved by someone else.
+    [Fact]
+    public async Task CheckConflict_v1SuccessFalseBody_deleteAction_returnsNull()
+    {
+        _api.GetTicketRawAsync("1001").Returns((200, "{\"success\":false,\"error\":\"Invalid Ticket\"}"));
+        var result = await _sut.CheckConflictAsync(ActionTargetingTicket("DeleteTicket"));
+
+        Assert.Null(result);
+    }
+
     [Theory]
     [InlineData(401)]
     [InlineData(403)]
