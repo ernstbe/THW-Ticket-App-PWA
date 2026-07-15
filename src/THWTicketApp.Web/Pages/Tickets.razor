@@ -538,8 +538,10 @@ else
             if (await LocalStorage.GetItemAsync("settings_offline_cache") != "true") return false;
             var cached = await SyncService.GetCachedTicketsAsync();
             if (string.IsNullOrWhiteSpace(cached)) return false;
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var tickets = JsonSerializer.Deserialize<List<Ticket>>(cached, options) ?? [];
+            // The cache holds the raw server array — parse it with the same
+            // tolerant options as the live path so a poisoned field can't
+            // break the offline fallback either.
+            var tickets = JsonSerializer.Deserialize<List<Ticket>>(cached, JsonHelper.TolerantOptions) ?? [];
             if (tickets.Count == 0) return false;
 
             PopulateTickets(tickets);

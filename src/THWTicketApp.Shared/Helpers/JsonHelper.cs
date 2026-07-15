@@ -4,22 +4,43 @@ namespace THWTicketApp.Shared.Helpers;
 
 public static class JsonHelper
 {
-    private static readonly JsonSerializerOptions DefaultOptions = new() { PropertyNameCaseInsensitive = true };
+    /// <summary>
+    /// Parse options used for all server payloads: case-insensitive property
+    /// matching plus the tolerant value-type converters, so a single off-type
+    /// field (e.g. <c>"dueDate": null</c> after a cleared due date) maps to the
+    /// established "unset" defaults instead of throwing and taking the whole
+    /// response down with it.
+    /// </summary>
+    public static readonly JsonSerializerOptions TolerantOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters =
+        {
+            new TolerantDateTimeConverter(),
+            new TolerantNullableDateTimeConverter(),
+            new TolerantIntConverter(),
+            new TolerantBoolConverter()
+        }
+    };
 
     /// <summary>
     /// Deserializes a JSON array that may be wrapped in a named property.
     /// Handles v2 format: { success, data: { propertyName: [...] } } or { success, data: [...] }
-    /// and v1 format: { propertyName: [...] }
+    /// and v1 format: { propertyName: [...] }.
+    /// Array elements are deserialized individually: an element the client
+    /// cannot parse even with the tolerant converters is skipped (with a
+    /// console warning) instead of aborting the entire list — one broken
+    /// ticket must never blank every page of the app.
     /// </summary>
     public static T[] DeserializeWrappedArray<T>(string json, string propertyName, JsonSerializerOptions? options = null)
     {
-        options ??= DefaultOptions;
+        options = EnsureTolerant(options);
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
         // Fallback: try root as array first (before property access)
         if (root.ValueKind == JsonValueKind.Array)
-            return JsonSerializer.Deserialize<T[]>(json, options) ?? [];
+            return DeserializeArrayResilient<T>(root, options);
 
         // Anything that isn't an object (e.g. a bare `null` payload) has no
         // properties to inspect — TryGetProperty would throw. Bail out empty.
@@ -31,11 +52,11 @@ public static class JsonHelper
         {
             // data might be the array directly
             if (dataEl.ValueKind == JsonValueKind.Array)
-                return JsonSerializer.Deserialize<T[]>(dataEl.GetRawText(), options) ?? [];
+                return DeserializeArrayResilient<T>(dataEl, options);
             // data might contain the named property: { data: { tickets: [...] } }
             if (dataEl.ValueKind == JsonValueKind.Object &&
                 dataEl.TryGetProperty(propertyName, out var innerEl) && innerEl.ValueKind == JsonValueKind.Array)
-                return JsonSerializer.Deserialize<T[]>(innerEl.GetRawText(), options) ?? [];
+                return DeserializeArrayResilient<T>(innerEl, options);
             // data might be a single object - wrap in array
             if (dataEl.ValueKind == JsonValueKind.Object)
                 return [JsonSerializer.Deserialize<T>(dataEl.GetRawText(), options)!];
@@ -43,7 +64,7 @@ public static class JsonHelper
 
         // v1 response: { propertyName: [...] }
         if (root.TryGetProperty(propertyName, out var el) && el.ValueKind == JsonValueKind.Array)
-            return JsonSerializer.Deserialize<T[]>(el.GetRawText(), options) ?? [];
+            return DeserializeArrayResilient<T>(el, options);
 
         return [];
     }
@@ -100,5 +121,51 @@ public static class JsonHelper
         {
             return null;
         }
+    }
+
+    // Callers construct their own options all over the pages; make sure every
+    // parse path gets the tolerant converters regardless, without mutating the
+    // caller's instance (JsonSerializerOptions are frozen after first use).
+    private static JsonSerializerOptions EnsureTolerant(JsonSerializerOptions? options)
+    {
+        if (options is null || ReferenceEquals(options, TolerantOptions))
+            return TolerantOptions;
+        foreach (var converter in options.Converters)
+        {
+            if (converter is TolerantDateTimeConverter)
+                return options;
+        }
+        var merged = new JsonSerializerOptions(options);
+        merged.Converters.Add(new TolerantDateTimeConverter());
+        merged.Converters.Add(new TolerantNullableDateTimeConverter());
+        merged.Converters.Add(new TolerantIntConverter());
+        merged.Converters.Add(new TolerantBoolConverter());
+        return merged;
+    }
+
+    // Element-wise deserialization: a single element that still fails (e.g. a
+    // structurally alien entry) is dropped instead of poisoning the whole
+    // array. JSON nulls inside the array are dropped too — downstream code
+    // never expects null tickets/statuses in a list.
+    private static T[] DeserializeArrayResilient<T>(JsonElement arrayEl, JsonSerializerOptions options)
+    {
+        var items = new List<T>(arrayEl.GetArrayLength());
+        var skipped = 0;
+        foreach (var el in arrayEl.EnumerateArray())
+        {
+            try
+            {
+                var item = el.Deserialize<T>(options);
+                if (item is not null)
+                    items.Add(item);
+            }
+            catch (JsonException)
+            {
+                skipped++;
+            }
+        }
+        if (skipped > 0)
+            Console.Error.WriteLine($"[JsonHelper] Skipped {skipped} of {items.Count + skipped} {typeof(T).Name} entries the client could not parse.");
+        return [.. items];
     }
 }

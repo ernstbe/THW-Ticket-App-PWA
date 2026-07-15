@@ -103,10 +103,15 @@ public sealed class WhatsNewService
             "Der wöchentliche Verlauf in der Statistik beginnt jetzt montags statt sonntags.",
             "Benachrichtigungen zu nicht mehr vorhandenen Tickets führen nicht mehr auf eine leere Seite, und offline erfasste Änderungen an gelöschten Tickets werden jetzt zuverlässig erkannt."
         ]),
-        // Ursprünglich als Id 17 angelegt; Eintrag 18 war zum Merge-Zeitpunkt
-        // aber bereits deployed (Geräte speichern lastSeen=18) — mit Id < 18
-        // würde dieser Block dort nie angezeigt. Daher auf 19 umnummeriert.
-        new WhatsNewEntry(19, "15.07.2026", "Live-Aktualisierungen",
+        new WhatsNewEntry(19, "15.07.2026", "Stabilere Ticketliste",
+        [
+            "Ein einzelnes fehlerhaftes Ticket (z. B. mit entferntem Fälligkeitsdatum) konnte bisher dazu führen, dass App-weit „Ungültiges Datenformat vom Server“ erschien und keine Tickets mehr angezeigt wurden. Solche Daten werden jetzt toleriert — die Liste, das Dashboard und das Kanban-Board bleiben vollständig nutzbar."
+        ]),
+        // Ursprünglich als Id 17 angelegt; die Einträge 18 (#316) und 19 (#318)
+        // waren zum Merge-Zeitpunkt aber bereits deployed (Geräte speichern
+        // lastSeen) — mit einer kleineren Id würde dieser Block dort nie
+        // angezeigt. Daher auf 20 umnummeriert.
+        new WhatsNewEntry(20, "15.07.2026", "Live-Aktualisierungen",
         [
             "Änderungen an Tickets durch andere Personen erscheinen jetzt sofort in Ticketliste, Kanban-Board und Dashboard — ohne die Seite neu zu laden. Auch gelöschte Tickets verschwinden automatisch.",
             "Ticket-Benachrichtigungen zeigen jetzt die richtige Ticketnummer statt einer internen Kennung."
