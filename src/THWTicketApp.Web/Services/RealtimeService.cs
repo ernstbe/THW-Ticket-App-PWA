@@ -20,6 +20,7 @@ public class RealtimeService : IAsyncDisposable
     // Strongly-typed per-channel events. Payload: Mongo ticket _id (empty for NotificationUpdate).
     public event Action<string>? TicketCreated;
     public event Action<string>? TicketUpdated;
+    public event Action<string>? TicketDeleted;
     public event Action<string>? StatusUpdated;
     public event Action<string>? AssigneeUpdated;
     public event Action<string>? PriorityUpdated;
@@ -130,6 +131,14 @@ public class RealtimeService : IAsyncDisposable
                 TicketUpdated?.Invoke(ticketId);
                 AnyTicketChanged?.Invoke(ticketId);
                 break;
+            case "ticketDeleted":
+                TicketDeleted?.Invoke(ticketId);
+                AnyTicketChanged?.Invoke(ticketId);
+                // Don't fall through to TicketEvent: a deletion carries no uid and
+                // an OS notification worded "updated" would be misleading. The
+                // AnyTicketChanged fan-in already refreshes the open list/board so
+                // the removed ticket disappears (#299).
+                return;
             case "statusUpdated":
                 StatusUpdated?.Invoke(ticketId);
                 AnyTicketChanged?.Invoke(ticketId);

@@ -106,6 +106,15 @@ public sealed class WhatsNewService
         new WhatsNewEntry(19, "15.07.2026", "Stabilere Ticketliste",
         [
             "Ein einzelnes fehlerhaftes Ticket (z. B. mit entferntem Fälligkeitsdatum) konnte bisher dazu führen, dass App-weit „Ungültiges Datenformat vom Server“ erschien und keine Tickets mehr angezeigt wurden. Solche Daten werden jetzt toleriert — die Liste, das Dashboard und das Kanban-Board bleiben vollständig nutzbar."
+        ]),
+        // Ursprünglich als Id 17 angelegt; die Einträge 18 (#316) und 19 (#318)
+        // waren zum Merge-Zeitpunkt aber bereits deployed (Geräte speichern
+        // lastSeen) — mit einer kleineren Id würde dieser Block dort nie
+        // angezeigt. Daher auf 20 umnummeriert.
+        new WhatsNewEntry(20, "15.07.2026", "Live-Aktualisierungen",
+        [
+            "Änderungen an Tickets durch andere Personen erscheinen jetzt sofort in Ticketliste, Kanban-Board und Dashboard — ohne die Seite neu zu laden. Auch gelöschte Tickets verschwinden automatisch.",
+            "Ticket-Benachrichtigungen zeigen jetzt die richtige Ticketnummer statt einer internen Kennung."
         ])
     ];
 
