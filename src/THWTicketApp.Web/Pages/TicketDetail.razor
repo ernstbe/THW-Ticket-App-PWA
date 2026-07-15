@@ -892,15 +892,41 @@ else
         }
         try
         {
-            var json = await ApiService.GetTicketAsync(TicketUid.ToString());
+            var (status, json) = await ApiService.GetTicketRawAsync(TicketUid.ToString());
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            using var doc = JsonDocument.Parse(json);
-            _ticket = doc.RootElement.TryGetProperty("ticket", out var ticketEl)
-                ? JsonSerializer.Deserialize<Ticket>(ticketEl.GetRawText(), options)
-                : JsonSerializer.Deserialize<Ticket>(json, options);
 
-            if (_ticket != null)
+            // Parse the ticket only from a genuine success body. trudesk v1 answers
+            // an unknown/deleted ticket with HTTP 200 + {success:false}, v2 with a
+            // 404; both must surface as "not found" instead of deserializing the
+            // error body into an empty "#0" ticket (#302). A transient error
+            // (5xx/network) is deliberately NOT treated as not-found, so a background
+            // realtime refresh that hits one doesn't blank an already-loaded ticket.
+            Ticket? loaded = null;
+            var notFound = status == 404;
+            if (status is >= 200 and < 300)
             {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                var isError = root.ValueKind == JsonValueKind.Object
+                              && root.TryGetProperty("success", out var okEl)
+                              && okEl.ValueKind == JsonValueKind.False;
+                if (isError)
+                {
+                    notFound = true;
+                }
+                else
+                {
+                    loaded = root.TryGetProperty("ticket", out var ticketEl)
+                        ? JsonSerializer.Deserialize<Ticket>(ticketEl.GetRawText(), options)
+                        : JsonSerializer.Deserialize<Ticket>(json, options);
+                    if (loaded is not { Uid: > 0 })
+                        notFound = true; // empty/garbage body → nothing to show
+                }
+            }
+
+            if (loaded is { Uid: > 0 })
+            {
+                _ticket = loaded;
                 TrudeskTranslationHelper.TranslateTicket(_ticket);
                 // Don't clobber the inline-edit-bound fields while their editor is open: a background
                 // realtime refresh (AnyTicketChanged) would otherwise wipe the user's unsaved text mid-typing.
@@ -913,11 +939,19 @@ else
                     _editIssue = _ticket.Issue ?? string.Empty;
                 }
                 _dueDateLocal = _ticket.DueDate == DateTime.MinValue ? null : _ticket.DueDate;
+                // Reached only for a real ticket (uid > 0), so "recently viewed" never
+                // records a bogus #0 entry (#302).
                 _ = RecentTickets.RecordAsync(
                     _ticket.Uid.ToString(),
                     _ticket.Subject ?? string.Empty,
                     _ticket.Status?.Uid);
             }
+            else if (notFound)
+            {
+                // Definitely gone/unknown — show the not-found alert.
+                _ticket = null;
+            }
+            // else: transient error — keep the currently displayed ticket, if any.
         }
         catch (Exception ex)
         {

@@ -62,4 +62,43 @@ public static class JsonHelper
         if (result.Length > 0) return result;
         return DeserializeWrappedArray<T>(json, fallbackProperty, options);
     }
+
+    /// <summary>
+    /// Returns the raw JSON text of a wrapped array (same v1/v2 shapes as
+    /// <see cref="DeserializeWrappedArray{T}(string, string, JsonSerializerOptions?)"/>)
+    /// without deserializing the elements — used to hand the untouched server ticket
+    /// array to the offline cache. Returns <c>null</c> when no array is found or the
+    /// input isn't valid JSON.
+    /// </summary>
+    public static string? ExtractWrappedArrayRaw(string json, string propertyName)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Array)
+                return root.GetRawText();
+            if (root.ValueKind != JsonValueKind.Object)
+                return null;
+
+            if (root.TryGetProperty("data", out var dataEl))
+            {
+                if (dataEl.ValueKind == JsonValueKind.Array)
+                    return dataEl.GetRawText();
+                if (dataEl.ValueKind == JsonValueKind.Object &&
+                    dataEl.TryGetProperty(propertyName, out var innerEl) && innerEl.ValueKind == JsonValueKind.Array)
+                    return innerEl.GetRawText();
+            }
+
+            if (root.TryGetProperty(propertyName, out var el) && el.ValueKind == JsonValueKind.Array)
+                return el.GetRawText();
+
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 }
