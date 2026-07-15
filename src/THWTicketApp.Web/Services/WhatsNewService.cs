@@ -102,6 +102,10 @@ public sealed class WhatsNewService
             "Schnelle Statusänderung: Das Status-Menü in der Ticketliste bietet nur noch Status an, die zum jeweiligen Tickettyp passen — wie im Kanban-Board.",
             "Der wöchentliche Verlauf in der Statistik beginnt jetzt montags statt sonntags.",
             "Benachrichtigungen zu nicht mehr vorhandenen Tickets führen nicht mehr auf eine leere Seite, und offline erfasste Änderungen an gelöschten Tickets werden jetzt zuverlässig erkannt."
+        ]),
+        new WhatsNewEntry(19, "15.07.2026", "Stabilere Ticketliste",
+        [
+            "Ein einzelnes fehlerhaftes Ticket (z. B. mit entferntem Fälligkeitsdatum) konnte bisher dazu führen, dass App-weit „Ungültiges Datenformat vom Server“ erschien und keine Tickets mehr angezeigt wurden. Solche Daten werden jetzt toleriert — die Liste, das Dashboard und das Kanban-Board bleiben vollständig nutzbar."
         ])
     ];
 

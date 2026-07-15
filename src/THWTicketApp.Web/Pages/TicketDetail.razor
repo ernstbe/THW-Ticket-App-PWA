@@ -893,7 +893,9 @@ else
         try
         {
             var (status, json) = await ApiService.GetTicketRawAsync(TicketUid.ToString());
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            // Tolerant options: a stored "dueDate": null (or similar off-type field)
+            // must map to the unset-defaults instead of throwing the detail page away.
+            var options = JsonHelper.TolerantOptions;
 
             // Parse the ticket only from a genuine success body. trudesk v1 answers
             // an unknown/deleted ticket with HTTP 200 + {success:false}, v2 with a
