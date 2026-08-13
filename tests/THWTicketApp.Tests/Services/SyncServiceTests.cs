@@ -387,12 +387,12 @@ public class SyncServiceTests
             TicketUid = 1001,
             TargetUserIds = ["u1", "u2"]
         });
-        _api.SetAdditionalAssigneesAsync("t1", Arg.Any<IEnumerable<string>>()).Returns(true);
+        _api.SetAdditionalAssigneesAsync("t1", 1001, Arg.Any<IEnumerable<string>>()).Returns(true);
 
         var result = await _sut.SyncPendingActionsAsync();
 
         Assert.True(result);
-        await _api.Received(1).SetAdditionalAssigneesAsync("t1",
+        await _api.Received(1).SetAdditionalAssigneesAsync("t1", 1001,
             Arg.Is<IEnumerable<string>>(ids => ids.SequenceEqual(new[] { "u1", "u2" })));
         await _db.Received(1).RemovePendingActionAsync(4);
     }
