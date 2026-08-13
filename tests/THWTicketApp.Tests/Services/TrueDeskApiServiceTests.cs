@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Linq;
 using Microsoft.JSInterop;
 using NSubstitute;
 using THWTicketApp.Shared.Services;
@@ -1030,6 +1031,44 @@ public class TrueDeskApiServiceTests
         Assert.Equal(2, deleteCalls);        // retried once
         Assert.Equal(2, deleted);
         Assert.Equal(0, failed);
+    }
+
+    // Regression for #314: N concurrent 401s (e.g. LoadReferenceDataAsync's
+    // Task.WhenAll over several requests) used to each fire their own
+    // POST /token. Harmless in practice (trudesk doesn't rotate the refresh
+    // token), but wasteful — verify concurrent callers now share a single
+    // in-flight refresh instead of one per caller.
+    [Fact]
+    public async Task ConcurrentRequests_401ing_shareASingleTokenRefresh()
+    {
+        var v2 = new TrueDeskApiService(
+            new HttpClient(_handler),
+            new AppSettings { ApiBaseUrl = "https://host.test/api/v2", ConnectionTimeoutSeconds = 30 },
+            new InMemoryLocalStorageService(),
+            Substitute.For<IJSRuntime>());
+        SetPrivate(v2, "_authToken", "jwt-expired");
+        SetPrivate(v2, "_refreshToken", "refresh-1");
+
+        var tokenCalls = 0;
+        var refreshed = false;
+        _handler.RespondTo(
+            req => req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/token", StringComparison.Ordinal),
+            _ =>
+            {
+                tokenCalls++;
+                refreshed = true;
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"token\":\"jwt-new\"}") };
+            });
+        _handler.RespondTo(
+            req => req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/assets", StringComparison.Ordinal),
+            _ => refreshed
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"assets\":[]}") }
+                : new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("{}") });
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => v2.GetAssetsAsync()));
+
+        Assert.Equal(1, tokenCalls); // single-flight: not one refresh per caller
+        Assert.All(results, r => Assert.Equal("{\"assets\":[]}", r));
     }
 
     private static void SetPrivate(object target, string field, object? value) =>
