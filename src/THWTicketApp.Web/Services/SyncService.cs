@@ -436,7 +436,7 @@ public class SyncService : ISyncService
         "AddNote" => await _apiService.AddNoteAsync(action.TicketUid.ToString(), action.OwnerId!, action.Content!),
         "AssignTicket" => await _apiService.AssignTicketAsync(action.TicketId!, action.TicketUid, action.TargetUserId!),
         "ClearAssignee" => await _apiService.ClearTicketAssigneeAsync(action.TicketId!, action.TicketUid),
-        "SetAdditionalAssignees" => await _apiService.SetAdditionalAssigneesAsync(action.TicketId!, action.TargetUserIds ?? []),
+        "SetAdditionalAssignees" => await _apiService.SetAdditionalAssigneesAsync(action.TicketId!, action.TicketUid, action.TargetUserIds ?? []),
         "UpdateStatus" => await _apiService.UpdateTicketStatusAsync(action.TicketId!, action.TicketUid, action.StatusId!),
         "CreateTicket" => await _apiService.CreateTicketAsync(
             action.Subject ?? action.Content ?? "", action.Issue, action.TypeId, action.PriorityId, action.GroupId, action.TargetUserId,
