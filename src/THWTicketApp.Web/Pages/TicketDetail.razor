@@ -1790,8 +1790,22 @@ else
     private async Task LoadSubscriptionStateAsync()
     {
         var subJson = await LocalStorage.GetItemAsync("subscribed_tickets") ?? "[]";
-        var subs = JsonSerializer.Deserialize<List<int>>(subJson) ?? [];
-        _isSubscribed = subs.Contains(TicketUid);
+        var localSubs = JsonSerializer.Deserialize<List<int>>(subJson) ?? [];
+        _isSubscribed = DeriveIsSubscribed(_ticket, ApiService.CurrentUserId, localSubs, TicketUid);
+    }
+
+    // Server subscriber list is the source of truth (owner/assignee/
+    // commenters are auto-subscribed there, independent of this device).
+    // localStorage is only a fallback for when the ticket has no Subscribers
+    // loaded (e.g. offline cache) — otherwise a fresh install / storage
+    // clear / second device showed "not subscribed" even though the server
+    // already had the user subscribed (#315).
+    internal static bool DeriveIsSubscribed(Ticket? ticket, string? currentUserId, List<int> localSubs, int ticketUid)
+    {
+        if (ticket != null && ticket.Subscribers.Count > 0)
+            return !string.IsNullOrEmpty(currentUserId) && ticket.Subscribers.Any(s => s.Id == currentUserId);
+
+        return localSubs.Contains(ticketUid);
     }
 
     private async Task ToggleSubscriptionAsync()
