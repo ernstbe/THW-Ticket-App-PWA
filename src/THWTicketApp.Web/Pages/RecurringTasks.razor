@@ -5,6 +5,7 @@
 @using THWTicketApp.Shared.Models.Responses
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
+@using THWTicketApp.Web.Helpers
 @inject ITrueDeskApiService ApiService
 @inject ILookupService Lookup
 @inject ISnackbar Snackbar
@@ -275,7 +276,10 @@ else if (_isLoading)
             var groupResponse = JsonSerializer.Deserialize<GetGroupResponse>(groupsTask.Result, JsonOptions);
             var rawGroups = groupResponse?.Groups ?? new List<Group>();
             var visibleGroupIds = profileTask.Result?.Groups;
-            _groups = AddTicket.FilterGroupsByVisibility(rawGroups, visibleGroupIds);
+            // #privatetickets — a recurring task fires unattended on a
+            // schedule; targeting a private space nobody else can act on
+            // makes no sense, so it's excluded here (same as Reports).
+            _groups = GroupDisplayHelper.ExcludePrivate(AddTicket.FilterGroupsByVisibility(rawGroups, visibleGroupIds));
             _noVisibleGroups = visibleGroupIds != null && _groups.Count == 0;
         }
         catch

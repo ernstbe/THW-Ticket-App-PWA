@@ -6,6 +6,7 @@
 @using THWTicketApp.Shared.Services
 @using Markdig
 @using Microsoft.JSInterop
+@using THWTicketApp.Web.Helpers
 @inject ITrueDeskApiService ApiService
 @inject ISnackbar Snackbar
 @inject IJSRuntime JsRuntime
@@ -316,7 +317,10 @@
             try
             {
                 var groupsJson = await ApiService.GetGroupsAsync();
-                _reportGroups = JsonHelper.DeserializeWrappedArray<Group>(groupsJson, "groups", options).ToList();
+                var rawGroups = JsonHelper.DeserializeWrappedArray<Group>(groupsJson, "groups", options).ToList();
+                // #privatetickets — a handover report has no sensible reading
+                // of "target my private space", so it's not offered here.
+                _reportGroups = GroupDisplayHelper.ExcludePrivate(rawGroups);
                 _reportGroupId ??= _reportGroups.FirstOrDefault()?.Id;
             }
             catch { /* group selector just stays empty; report button will prompt */ }

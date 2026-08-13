@@ -1463,4 +1463,28 @@ public class TrueDeskApiServiceTests
         var body = await _sut.ExportMyDataAsync();
         Assert.Null(body);
     }
+
+    // -----------------------------------------------------------------
+    // #privatetickets — Settings toggle backing call
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task EnablePrivateTicketsAsync_postsV2PrivateGroupEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, """{"success":true,"group":{"_id":"g1","private":true}}""");
+
+        var result = await _sut.EnablePrivateTicketsAsync();
+
+        Assert.True(result);
+        Assert.Equal(HttpMethod.Post, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts/me/private-group", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task EnablePrivateTicketsAsync_returnsFalseOnError()
+    {
+        _handler.SetDefault(HttpStatusCode.InternalServerError);
+        var result = await _sut.EnablePrivateTicketsAsync();
+        Assert.False(result);
+    }
 }

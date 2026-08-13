@@ -10,6 +10,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using QRCoder
 @using System.Net.Http
+@using THWTicketApp.Web.Helpers
 @inject ITrueDeskApiService ApiService
 @inject ILookupService Lookup
 @inject NavigationManager Navigation
@@ -112,11 +113,11 @@ else
                       ItemTitle="@(t => t.TranslatedName ?? "")"
                       OnSelected="QuickChangeTypeAsync" />
         <ChipWithMenu T="Group"
-                      Label="@_ticket.Group?.Name"
+                      Label="@GroupDisplayHelper.GetDisplayName(_ticket.Group, L)"
                       EmptyLabel="@L.T("detail.no_group")"
                       Icon="@Icons.Material.Filled.Group"
                       Items="_groups"
-                      ItemTitle="@(g => g.Name ?? "")"
+                      ItemTitle="@(g => GroupDisplayHelper.GetDisplayName(g, L))"
                       OnSelected="QuickChangeGroupAsync" />
         <ChipWithMenu T="User"
                       Label="@_ticket.Assignee?.Fullname"
@@ -188,7 +189,7 @@ else
             {
                 <tr><th>Weitere Zuständige</th><td>@string.Join(", ", _ticket.AdditionalAssignees.Select(a => a.Fullname))</td></tr>
             }
-            <tr><th>Gruppe</th><td>@(_ticket.Group?.Name ?? "-")</td></tr>
+            <tr><th>Gruppe</th><td>@(_ticket.Group != null ? GroupDisplayHelper.GetDisplayName(_ticket.Group, L) : "-")</td></tr>
             <tr><th>Typ</th><td>@(_ticket.Type?.TranslatedName ?? "-")</td></tr>
             <tr><th>Erstellt</th><td>@_ticket.Date.ToLocalDisplayString("dd.MM.yyyy HH:mm")</td></tr>
             <tr><th>Aktualisiert</th><td>@_ticket.LastActivityAt.ToLocalDisplayString("dd.MM.yyyy HH:mm")</td></tr>

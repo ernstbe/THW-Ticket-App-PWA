@@ -1646,6 +1646,15 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
+    public async Task<bool> EnablePrivateTicketsAsync()
+    {
+        // v2-only endpoint (trudesk feat/private-tickets). Idempotent —
+        // safe to call every time the Settings toggle is flipped on.
+        var response = await SendWithAutoRefreshAsync(() =>
+            _httpClient.PostAsync($"{V2BaseUrl}/accounts/me/private-group", new StringContent(string.Empty, Encoding.UTF8, "application/json")));
+        return response.IsSuccessStatusCode;
+    }
+
     public async Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber)
     {
         if (string.IsNullOrWhiteSpace(fullname)) return false;

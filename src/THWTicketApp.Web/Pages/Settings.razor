@@ -1,6 +1,8 @@
 @page "/settings"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using THWTicketApp.Shared.Services
+@using THWTicketApp.Shared.Models
+@using THWTicketApp.Shared.Models.Responses
 @using Microsoft.JSInterop
 @inject ITrueDeskApiService ApiService
 @inject AppSettings AppSettings
@@ -290,6 +292,35 @@
         </MudCard>
     </div>
 
+    @* Private Tickets (#privatetickets) *@
+    <div class="settings-cell">
+        <MudCard>
+            <MudCardHeader>
+                <MudText Typo="Typo.h6">@L.T("settings.private_tickets")</MudText>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+                    @L.T("settings.private_tickets_desc")
+                </MudText>
+
+                @if (_privateTicketsEnabled)
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true" Icon="@Icons.Material.Filled.Lock">
+                        @L.T("settings.private_tickets_enabled")
+                    </MudAlert>
+                }
+                else
+                {
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText>@L.T("settings.private_tickets_enable")</MudText>
+                        <MudSwitch Value="false" ValueChanged="EnablePrivateTicketsAsync"
+                                   Color="Color.Primary" T="bool" Disabled="@_enablingPrivateTickets" />
+                    </div>
+                }
+            </MudCardContent>
+        </MudCard>
+    </div>
+
     @* Cache *@
     <div class="settings-cell">
         <MudCard>
@@ -503,6 +534,12 @@
     private string _connectionStatus = string.Empty;
     private Severity _connectionSeverity = Severity.Info;
 
+    // #privatetickets — server-truth flag: whether GetGroupsAsync() already
+    // returns a Private group for this user. No local storage key and no
+    // disable path (matches the "keep it simple" call in the plan).
+    private bool _privateTicketsEnabled;
+    private bool _enablingPrivateTickets;
+
     // Passkey — server-truth list (#205), not a local flag.
     private IJSObjectReference? _webauthnModule;
     private bool _webauthnSupported;
@@ -566,6 +603,7 @@
 
         await LoadSyncLogAsync();
         await LoadConflictCountAsync();
+        await LoadPrivateTicketsStatusAsync();
 
         // Keep the sync-conflicts card honest: refresh the count when
         // the SyncService detects a fresh conflict, and when the pending
@@ -625,6 +663,49 @@
         finally
         {
             _updateChecking = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPrivateTicketsStatusAsync()
+    {
+        try
+        {
+            var json = await ApiService.GetGroupsAsync();
+            var groupResponse = System.Text.Json.JsonSerializer.Deserialize<GetGroupResponse>(json,
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            _privateTicketsEnabled = groupResponse?.Groups.Any(g => g.Private) ?? false;
+        }
+        catch
+        {
+            _privateTicketsEnabled = false;
+        }
+    }
+
+    private async Task EnablePrivateTicketsAsync(bool _)
+    {
+        if (_privateTicketsEnabled || _enablingPrivateTickets) return;
+        _enablingPrivateTickets = true;
+        StateHasChanged();
+        try
+        {
+            if (await ApiService.EnablePrivateTicketsAsync())
+            {
+                _privateTicketsEnabled = true;
+                Snackbar.Add(L.T("settings.private_tickets_enabled"), Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(L.T("settings.private_tickets_enable_failed"), Severity.Error);
+            }
+        }
+        catch
+        {
+            Snackbar.Add(L.T("settings.private_tickets_enable_failed"), Severity.Error);
+        }
+        finally
+        {
+            _enablingPrivateTickets = false;
             StateHasChanged();
         }
     }

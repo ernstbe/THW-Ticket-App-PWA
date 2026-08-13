@@ -7,6 +7,7 @@
 @using THWTicketApp.Shared.Models
 @using THWTicketApp.Shared.Models.Responses
 @using THWTicketApp.Shared.Services
+@using THWTicketApp.Web.Helpers
 @inject ITrueDeskApiService ApiService
 @inject ILookupService Lookup
 @inject NavigationManager Navigation
@@ -106,10 +107,10 @@ else
             <MudItem xs="12" sm="6">
                 <MudSelect T="Group" @bind-Value="_selectedGroup" Label="@L.T("detail.group")" Variant="Variant.Outlined"
                            Required="true" RequiredError="@L.T("tickets.group_required")"
-                           ToStringFunc="@(g => g?.Name ?? "")" Class="mb-4">
+                           ToStringFunc="@(g => GroupDisplayHelper.GetDisplayName(g, L))" Class="mb-4">
                     @foreach (var group in _groups)
                     {
-                        <MudSelectItem Value="group">@group.Name</MudSelectItem>
+                        <MudSelectItem Value="group">@GroupDisplayHelper.GetDisplayName(group, L)</MudSelectItem>
                     }
                 </MudSelect>
                 @if (_noVisibleGroups)

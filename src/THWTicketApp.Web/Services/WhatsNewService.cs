@@ -120,6 +120,11 @@ public sealed class WhatsNewService
         [
             "Passkey-Anmeldung und automatische Sperre nach Inaktivität prüfen jetzt serverseitig, statt nur lokal auf dem Gerät. Bitte bestehende Passkeys unter Einstellungen einmal neu registrieren — alte, nur lokal gespeicherte Passkeys funktionieren nicht mehr.",
             "Der Passkey-Button auf der Anmeldeseite funktioniert jetzt auch nach vollständigem Abmelden oder auf einem neuen Gerät mit synchronisiertem Passkey, nicht mehr nur zum Entsperren."
+        ]),
+        new WhatsNewEntry(22, "13.08.2026", "Privater Ticket-Bereich",
+        [
+            "Neu unter Einstellungen: ein privater Ticket-Bereich für Entwürfe und Tickets, die nur du sehen sollst. Nach dem Aktivieren erscheint er als eigene Gruppe „🔒 Privater Bereich\" bei der Ticket-Erstellung.",
+            "Ein privates Ticket kannst du später jederzeit veröffentlichen, indem du es über den Gruppen-Chip in eine reguläre Gruppe verschiebst — genau wie bei jedem anderen Gruppenwechsel."
         ])
     ];
 
