@@ -46,7 +46,16 @@ public class TrueDeskApiService : ITrueDeskApiService
     // recurring tasks, assets) exist only under v2 regardless of the configured base URL.
     private string V2BaseUrl => ServerUrl + "/api/v2";
 
-    private void SetAuthHeader(string? token)
+    // forceBearer: WebAuthn always mints a v2 JWT (there is no v1
+    // equivalent), regardless of whether ApiBaseUrl is currently configured
+    // for v1 or v2 — so a WebAuthn-issued token must always ride the
+    // Authorization: Bearer header, never the v1 accesstoken header (that
+    // header is looked up against stored DB accessTokens, not JWTs, and
+    // would just 401). Auto-refresh (SendWithAutoRefreshAsync) is still
+    // gated on IsV2, so in a v1-configured install a WebAuthn session simply
+    // isn't refreshed and expires after the JWT's TTL — an accepted
+    // limitation of a v2-only feature running before the v1→v2 flip.
+    private void SetAuthHeader(string? token, bool forceBearer = false)
     {
         // Remove old headers
         _httpClient.DefaultRequestHeaders.Authorization = null;
@@ -55,7 +64,7 @@ public class TrueDeskApiService : ITrueDeskApiService
 
         if (!string.IsNullOrEmpty(token))
         {
-            if (IsV2)
+            if (IsV2 || forceBearer)
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             else
                 _httpClient.DefaultRequestHeaders.Add("accesstoken", token);
@@ -146,14 +155,10 @@ public class TrueDeskApiService : ITrueDeskApiService
 
                 CurrentUsername = username;
 
-                // Foreign login on a shared device (including a passkey-locked
-                // device where a different person logs in fresh instead of
-                // unlocking): if the account differs from whatever identity was
-                // cached here, purge the previous user's offline data before we
-                // start caching this user's (#217).
+                // Foreign login on a shared device: if the account differs from
+                // whatever identity was cached here, purge the previous user's
+                // offline data before we start caching this user's (#217).
                 var previousUserId = await _localStorage.GetItemAsync("auth_userid");
-                if (string.IsNullOrEmpty(previousUserId))
-                    previousUserId = await _localStorage.GetItemAsync("locked_auth_userid");
                 if (!string.IsNullOrEmpty(previousUserId)
                     && !string.Equals(previousUserId, CurrentUserId, StringComparison.Ordinal))
                 {
@@ -174,8 +179,12 @@ public class TrueDeskApiService : ITrueDeskApiService
                 await _localStorage.SetItemAsync("auth_refresh_token", _refreshToken ?? string.Empty);
                 await _localStorage.SetItemAsync("auth_username", username);
                 await _localStorage.SetItemAsync("auth_userid", CurrentUserId ?? string.Empty);
-                // Drop any stale locked-session keys from a previous logout-with-passkey.
-                await ClearLockedAuthAsync();
+                // Drop any stale locked-session keys from a pre-#205 install's
+                // client-only lock scheme — dead weight, nothing reads them.
+                await _localStorage.RemoveItemAsync("locked_auth_token");
+                await _localStorage.RemoveItemAsync("locked_auth_refresh_token");
+                await _localStorage.RemoveItemAsync("locked_auth_username");
+                await _localStorage.RemoveItemAsync("locked_auth_userid");
                 return true;
             }
             return false;
@@ -269,9 +278,6 @@ public class TrueDeskApiService : ITrueDeskApiService
         // Fire pre-logout hooks while we still have a valid token. Most
         // important consumer: WebPushService.DisableAsync, which has to
         // DELETE the subscription server-side BEFORE we drop our auth.
-        // We deliberately run hooks for both the passkey-lock branch and
-        // the plain logout branch — a user that "locks" their session
-        // probably still doesn't want pushes flowing in.
         if (LoggingOut != null)
         {
             foreach (Func<Task> handler in LoggingOut.GetInvocationList().Cast<Func<Task>>())
@@ -280,17 +286,16 @@ public class TrueDeskApiService : ITrueDeskApiService
             }
         }
 
-        // If a passkey is registered on this device, treat logout as "lock":
-        // keep the session token in a separate localStorage key that only the
-        // explicit biometric-unlock flow reads. AuthStateProvider's auto-restore
-        // looks at "auth_token" and finds nothing, so the user gets the login
-        // screen — but the Passkey button can unlock without re-entering creds.
-        var passkeyId = await _localStorage.GetItemAsync("passkey_credential_id");
-        if (!string.IsNullOrEmpty(passkeyId) && IsAuthenticated)
-        {
-            await LockSessionAsync();
-            return;
-        }
+        // Logout is always real now (#205) — the old "lock" scheme stashed
+        // the still-valid token under a different localStorage key and
+        // skipped the server call entirely, so a passkey unlock never
+        // actually re-authenticated anything; the stashed token alone was
+        // enough to impersonate the session. If a passkey is registered,
+        // remember only the USERNAME (never a token) so the login screen
+        // can offer "unlock with passkey" — that flow now does a real
+        // server-verified WebAuthn assertion and gets a fresh token.
+        var passkeyUsername = CurrentUsername;
+        var hasPasskey = (await ListWebauthnCredentialsAsync())?.Count > 0;
 
         try
         {
@@ -300,6 +305,9 @@ public class TrueDeskApiService : ITrueDeskApiService
         catch { }
 
         await ClearAuthState();
+
+        if (hasPasskey && !string.IsNullOrEmpty(passkeyUsername))
+            await _localStorage.SetItemAsync("last_passkey_username", passkeyUsername);
     }
 
     private async Task ClearAuthState()
@@ -314,7 +322,15 @@ public class TrueDeskApiService : ITrueDeskApiService
         await _localStorage.RemoveItemAsync("auth_refresh_token");
         await _localStorage.RemoveItemAsync("auth_username");
         await _localStorage.RemoveItemAsync("auth_userid");
-        await ClearLockedAuthAsync();
+        // Sweep stale keys from the pre-#205 client-only lock scheme — dead
+        // weight from an old install, nothing reads them anymore.
+        await _localStorage.RemoveItemAsync("locked_auth_token");
+        await _localStorage.RemoveItemAsync("locked_auth_refresh_token");
+        await _localStorage.RemoveItemAsync("locked_auth_username");
+        await _localStorage.RemoveItemAsync("locked_auth_userid");
+        await _localStorage.RemoveItemAsync("passkey_credential_id");
+        await _localStorage.RemoveItemAsync("passkey_user_id");
+        await _localStorage.RemoveItemAsync("passkey_user_name");
         // Full logout ends the session: purge the offline cache so the next user
         // on a shared device can't read the previous user's tickets, queued
         // offline actions or sync log (#217).
@@ -329,14 +345,6 @@ public class TrueDeskApiService : ITrueDeskApiService
         try { await _indexedDb.ClearTicketCacheAsync(); } catch { }
         try { await _indexedDb.ClearPendingActionsAsync(); } catch { }
         try { await _indexedDb.ClearSyncLogAsync(); } catch { }
-    }
-
-    private async Task ClearLockedAuthAsync()
-    {
-        await _localStorage.RemoveItemAsync("locked_auth_token");
-        await _localStorage.RemoveItemAsync("locked_auth_refresh_token");
-        await _localStorage.RemoveItemAsync("locked_auth_username");
-        await _localStorage.RemoveItemAsync("locked_auth_userid");
     }
 
     /// <summary>
@@ -358,67 +366,157 @@ public class TrueDeskApiService : ITrueDeskApiService
         return fresh;
     }
 
-    private async Task LockSessionAsync()
+    // --- WebAuthn / passkey (#205) ---------------------------------------
+    // All server-verified: registration stores a real public key server-
+    // side, authentication requires a fresh signed assertion the server
+    // checks against it before minting a token. Always routed through
+    // V2BaseUrl — WebAuthn is a v2-only feature with no v1 equivalent,
+    // same convention as Teams/Assets/Templates etc.
+
+    public async Task<string?> GetWebauthnRegistrationOptionsAsync()
     {
-        // Move auth_* keys to locked_* so normal auto-restore won't pick them up.
-        // Only TryUnlockSessionAsync (called after a successful biometric prompt)
-        // moves them back. We intentionally do NOT call /logout on the server —
-        // the v1 accessToken stays valid so unlock is instant.
-        var token = _authToken ?? await _localStorage.GetItemAsync("auth_token");
-        var refresh = _refreshToken ?? await _localStorage.GetItemAsync("auth_refresh_token");
-        var username = CurrentUsername ?? await _localStorage.GetItemAsync("auth_username");
-        var userid = CurrentUserId ?? await _localStorage.GetItemAsync("auth_userid");
-
-        if (!string.IsNullOrEmpty(token))
-            await _localStorage.SetItemAsync("locked_auth_token", token);
-        if (!string.IsNullOrEmpty(refresh))
-            await _localStorage.SetItemAsync("locked_auth_refresh_token", refresh);
-        if (!string.IsNullOrEmpty(username))
-            await _localStorage.SetItemAsync("locked_auth_username", username);
-        if (!string.IsNullOrEmpty(userid))
-            await _localStorage.SetItemAsync("locked_auth_userid", userid);
-
-        _authToken = null;
-        _refreshToken = null;
-        CurrentUsername = null;
-        CurrentUserId = null;
-        // Drop the cached admin flag too — otherwise a different user who logs
-        // in on this same (Scoped, whole-session) instance after the lock
-        // inherits the locker's admin UI until a page reload (#208).
-        _isAdminCached = null;
-        SetAuthHeader(null);
-        await _localStorage.RemoveItemAsync("auth_token");
-        await _localStorage.RemoveItemAsync("auth_refresh_token");
-        await _localStorage.RemoveItemAsync("auth_username");
-        await _localStorage.RemoveItemAsync("auth_userid");
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/webauthn/register/options", null));
+            if (!response.IsSuccessStatusCode) return null;
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("options", out var opts) ? opts.GetRawText() : null;
+        }
+        catch { return null; }
     }
 
-    public async Task<bool> TryUnlockSessionAsync()
+    public async Task<bool> VerifyWebauthnRegistrationAsync(string credentialResponseJson, string? deviceLabel)
     {
-        // Called by Login.razor after navigator.credentials.get() succeeded.
-        // Moves locked_* keys back to auth_* and then performs the normal restore.
-        var token = await _localStorage.GetItemAsync("locked_auth_token");
-        if (string.IsNullOrEmpty(token))
+        try
         {
-            // No locked session — fall through to a normal restore in case
-            // auth_* still exists (e.g. first-ever unlock after registering passkey).
-            return await TryRestoreSessionAsync();
+            using var responseDoc = JsonDocument.Parse(credentialResponseJson);
+            var payload = new Dictionary<string, object?>
+            {
+                ["response"] = responseDoc.RootElement,
+                ["deviceLabel"] = deviceLabel
+            };
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.PostAsync($"{V2BaseUrl}/webauthn/register/verify", content));
+            return response.IsSuccessStatusCode;
         }
+        catch { return false; }
+    }
 
-        var refresh = await _localStorage.GetItemAsync("locked_auth_refresh_token");
-        var username = await _localStorage.GetItemAsync("locked_auth_username");
-        var userid = await _localStorage.GetItemAsync("locked_auth_userid");
+    public async Task<List<WebauthnCredentialInfo>> ListWebauthnCredentialsAsync()
+    {
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/webauthn/credentials"));
+            if (!response.IsSuccessStatusCode) return [];
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("credentials", out var arr)) return [];
+            return JsonSerializer.Deserialize<List<WebauthnCredentialInfo>>(arr.GetRawText(),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+        }
+        catch { return []; }
+    }
 
-        await _localStorage.SetItemAsync("auth_token", token);
-        if (!string.IsNullOrEmpty(refresh))
-            await _localStorage.SetItemAsync("auth_refresh_token", refresh);
-        if (!string.IsNullOrEmpty(username))
+    public async Task<bool> RemoveWebauthnCredentialAsync(string credentialId)
+    {
+        try
+        {
+            var response = await SendWithAutoRefreshAsync(() =>
+                _httpClient.DeleteAsync($"{V2BaseUrl}/webauthn/credentials/{Uri.EscapeDataString(credentialId)}"));
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    // Public endpoint — no auth header needed (that's the point of a
+    // passwordless login), so this calls _httpClient directly rather than
+    // SendWithAutoRefreshAsync.
+    public async Task<string?> GetWebauthnAuthenticationOptionsAsync(string username)
+    {
+        try
+        {
+            var payload = new { username };
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync($"{V2BaseUrl}/webauthn/auth/options", content);
+            if (!response.IsSuccessStatusCode) return null;
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("options", out var opts) ? opts.GetRawText() : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Verifies a WebAuthn assertion server-side and, on success, mints a
+    /// fresh token and sets up the authenticated session exactly like
+    /// AuthenticateAsync's v2 branch — a passkey login is a genuine new
+    /// authentication, not a replay of anything stashed client-side.
+    /// </summary>
+    public async Task<bool> VerifyWebauthnAuthenticationAsync(string username, string assertionResponseJson)
+    {
+        try
+        {
+            using var responseDoc = JsonDocument.Parse(assertionResponseJson);
+            var payload = new Dictionary<string, object?>
+            {
+                ["username"] = username,
+                ["response"] = responseDoc.RootElement
+            };
+            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync($"{V2BaseUrl}/webauthn/auth/verify", content);
+            if (!response.IsSuccessStatusCode) return false;
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            _authToken = doc.RootElement.TryGetProperty("token", out var tokenEl) ? tokenEl.GetString() : null;
+            _refreshToken = doc.RootElement.TryGetProperty("refreshToken", out var rtEl) ? rtEl.GetString() : null;
+            if (string.IsNullOrEmpty(_authToken)) return false;
+
+            SetAuthHeader(_authToken, forceBearer: true);
+            CurrentUsername = username;
+            CurrentUserId = ExtractUserIdFromJwt(_authToken);
+
+            var previousUserId = await _localStorage.GetItemAsync("auth_userid");
+            if (!string.IsNullOrEmpty(previousUserId)
+                && !string.Equals(previousUserId, CurrentUserId, StringComparison.Ordinal))
+            {
+                await ClearOfflineCacheAsync();
+            }
+
+            await _localStorage.SetItemAsync("auth_token", _authToken);
+            await _localStorage.SetItemAsync("auth_refresh_token", _refreshToken ?? string.Empty);
             await _localStorage.SetItemAsync("auth_username", username);
-        if (!string.IsNullOrEmpty(userid))
-            await _localStorage.SetItemAsync("auth_userid", userid);
+            await _localStorage.SetItemAsync("auth_userid", CurrentUserId ?? string.Empty);
+            await _localStorage.SetItemAsync("last_passkey_username", username);
+            return true;
+        }
+        catch { return false; }
+    }
 
-        await ClearLockedAuthAsync();
-        return await TryRestoreSessionAsync();
+    // Shared with AuthenticateAsync's v2 JWT-payload fallback (#203): JWT
+    // payloads are base64url, and the "user._id" claim is where trudesk
+    // puts it.
+    private static string? ExtractUserIdFromJwt(string jwt)
+    {
+        try
+        {
+            var parts = jwt.Split('.');
+            if (parts.Length != 3) return null;
+
+            var payload64 = parts[1].Replace('-', '+').Replace('_', '/');
+            switch (payload64.Length % 4)
+            {
+                case 2: payload64 += "=="; break;
+                case 3: payload64 += "="; break;
+            }
+            var payloadBytes = Convert.FromBase64String(payload64);
+            using var jwtDoc = JsonDocument.Parse(Encoding.UTF8.GetString(payloadBytes));
+            if (jwtDoc.RootElement.TryGetProperty("user", out var jwtUser) && jwtUser.TryGetProperty("_id", out var jwtId))
+                return jwtId.GetString();
+        }
+        catch { /* JWT parsing optional */ }
+        return null;
     }
 
     // Tickets

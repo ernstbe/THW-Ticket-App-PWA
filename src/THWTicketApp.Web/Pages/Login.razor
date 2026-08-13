@@ -9,6 +9,7 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
 @inject THWTicketApp.Web.Services.LocalizationService L
+@inject THWTicketApp.Web.Services.LocalStorageService LocalStorage
 @implements IAsyncDisposable
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="height: 100vh;">
@@ -111,6 +112,7 @@
     private bool _passkeyAvailable;
     private bool _serverConfigured;
     private IJSObjectReference? _webauthnModule;
+    private string? _lastPasskeyUsername;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -121,15 +123,19 @@
             _serverConfigured = AppSettings.IsConfigured;
             StateHasChanged();
 
+            _lastPasskeyUsername = await LocalStorage.GetItemAsync("last_passkey_username");
+
             try
             {
                 _webauthnModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/webauthn-interop.js");
-                var supported = await _webauthnModule.InvokeAsync<bool>("isWebAuthnSupported");
-                if (supported)
-                {
-                    _passkeyAvailable = await _webauthnModule.InvokeAsync<bool>("isPasskeyRegistered");
-                    StateHasChanged();
-                }
+                // Server-verified now (#205): the button offers passwordless
+                // login to any WebAuthn-capable browser, not just a device
+                // that previously registered a passkey here — a synced
+                // passkey (iCloud/Google) on a second device works too.
+                _passkeyAvailable = await _webauthnModule.InvokeAsync<bool>("isWebAuthnSupported");
+                if (!string.IsNullOrEmpty(_lastPasskeyUsername))
+                    _username = _lastPasskeyUsername;
+                StateHasChanged();
             }
             catch { }
         }
@@ -197,37 +203,47 @@
     private async Task LoginWithPasskeyAsync()
     {
         if (_webauthnModule == null || _isLoading) return;
+
+        // No remembered device username (fresh device / cleared storage) —
+        // need one to ask the server which credentials to challenge.
+        var username = string.IsNullOrEmpty(_lastPasskeyUsername) ? _username.Trim() : _lastPasskeyUsername;
+        if (string.IsNullOrEmpty(username))
+        {
+            _errorMessage = L.T("login.passkey_username_required");
+            return;
+        }
+
         _isLoading = true;
         _errorMessage = null;
         StateHasChanged();
 
         try
         {
-            var result = await _webauthnModule.InvokeAsync<PasskeyAuthResult?>("authenticatePasskey");
-            if (result == null || string.IsNullOrEmpty(result.UserId))
+            var optionsJson = await ApiService.GetWebauthnAuthenticationOptionsAsync(username);
+            if (optionsJson == null)
             {
-                // Biometric prompt was cancelled, OS keychain doesn't have the
-                // credential anymore, or the credential was registered against
-                // a different rpId. Different from "no session to unlock".
+                _errorMessage = L.T("login.connection_error");
+                return;
+            }
+
+            var assertionJson = await _webauthnModule.InvokeAsync<string?>("getAssertion", optionsJson);
+            if (string.IsNullOrEmpty(assertionJson))
+            {
+                // Biometric prompt was cancelled, or the browser has no
+                // matching credential for this username's allowCredentials.
                 _errorMessage = L.T("login.passkey_failed");
                 return;
             }
 
-            // Passkey authentication succeeded — unlock the stored session.
-            // Reads locked_auth_* keys that LogoutAsync stashed away.
-            var restored = await ApiService.TryUnlockSessionAsync();
-            if (restored)
+            var success = await ApiService.VerifyWebauthnAuthenticationAsync(username, assertionJson);
+            if (success)
             {
                 AuthStateProvider.NotifyAuthStateChanged();
                 Navigation.NavigateTo("./");
                 return;
             }
 
-            // Biometric worked, but nothing to restore. Almost always means
-            // the user registered the passkey before the biometric-lock flow
-            // existed, so logout cleared the token instead of stashing it.
-            // Tell them clearly so they don't keep clicking the button.
-            _errorMessage = L.T("login.passkey_no_session");
+            _errorMessage = L.T("login.passkey_failed");
         }
         catch
         {
@@ -243,12 +259,5 @@
     {
         if (_webauthnModule != null)
             await _webauthnModule.DisposeAsync();
-    }
-
-    private class PasskeyAuthResult
-    {
-        public string? UserId { get; set; }
-        public string? UserName { get; set; }
-        public string? CredentialId { get; set; }
     }
 }

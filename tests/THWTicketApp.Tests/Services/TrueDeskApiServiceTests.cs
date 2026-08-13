@@ -1071,6 +1071,115 @@ public class TrueDeskApiServiceTests
         Assert.All(results, r => Assert.Equal("{\"assets\":[]}", r));
     }
 
+    // -----------------------------------------------------------------
+    // WebAuthn / passkey (#205) — always routed through V2BaseUrl
+    // regardless of the configured ApiBaseUrl, same convention as Teams/
+    // Assets/Templates.
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task GetWebauthnRegistrationOptionsAsync_returnsOptionsFromServer()
+    {
+        SetPrivate(_sut, "_authToken", "tok");
+        _handler.RespondTo(HttpMethod.Post, "/api/v2/webauthn/register/options", HttpStatusCode.OK,
+            "{\"success\":true,\"options\":{\"challenge\":\"c1\",\"rp\":{\"id\":\"host.test\"}}}");
+
+        var options = await _sut.GetWebauthnRegistrationOptionsAsync();
+
+        Assert.NotNull(options);
+        Assert.Contains("\"challenge\":\"c1\"", options);
+        Assert.Equal("/api/v2/webauthn/register/options", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetWebauthnRegistrationOptionsAsync_returnsNullOnServerError()
+    {
+        SetPrivate(_sut, "_authToken", "tok");
+        _handler.SetDefault(HttpStatusCode.InternalServerError);
+
+        var options = await _sut.GetWebauthnRegistrationOptionsAsync();
+
+        Assert.Null(options);
+    }
+
+    [Fact]
+    public async Task VerifyWebauthnRegistrationAsync_postsResponseAndDeviceLabel()
+    {
+        SetPrivate(_sut, "_authToken", "tok");
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true}");
+
+        var ok = await _sut.VerifyWebauthnRegistrationAsync("{\"id\":\"cred-1\"}", "My Laptop");
+
+        Assert.True(ok);
+        Assert.Equal("/api/v2/webauthn/register/verify", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"id\":\"cred-1\"", LastBody);
+        Assert.Contains("My Laptop", LastBody);
+    }
+
+    [Fact]
+    public async Task VerifyWebauthnRegistrationAsync_returnsFalseOnServerRejection()
+    {
+        SetPrivate(_sut, "_authToken", "tok");
+        _handler.SetDefault(HttpStatusCode.BadRequest, "{\"success\":false}");
+
+        var ok = await _sut.VerifyWebauthnRegistrationAsync("{\"id\":\"cred-1\"}", null);
+
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task ListWebauthnCredentialsAsync_parsesCredentialsWithoutKeyMaterial()
+    {
+        SetPrivate(_sut, "_authToken", "tok");
+        _handler.SetDefault(HttpStatusCode.OK,
+            "{\"success\":true,\"credentials\":[{\"credentialId\":\"c1\",\"deviceLabel\":\"Phone\"," +
+            "\"createdAt\":\"2026-01-01T00:00:00Z\",\"lastUsedAt\":\"2026-02-01T00:00:00Z\"}]}");
+
+        var creds = await _sut.ListWebauthnCredentialsAsync();
+
+        Assert.Single(creds);
+        Assert.Equal("c1", creds[0].CredentialId);
+        Assert.Equal("Phone", creds[0].DeviceLabel);
+    }
+
+    [Fact]
+    public async Task ListWebauthnCredentialsAsync_returnsEmptyOnServerError()
+    {
+        SetPrivate(_sut, "_authToken", "tok");
+        _handler.SetDefault(HttpStatusCode.InternalServerError);
+
+        var creds = await _sut.ListWebauthnCredentialsAsync();
+
+        Assert.Empty(creds);
+    }
+
+    [Fact]
+    public async Task RemoveWebauthnCredentialAsync_deletesByEscapedId()
+    {
+        SetPrivate(_sut, "_authToken", "tok");
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true}");
+
+        var ok = await _sut.RemoveWebauthnCredentialAsync("cred with spaces");
+
+        Assert.True(ok);
+        Assert.Equal(HttpMethod.Delete, LastRequest.Method);
+        Assert.Equal("/api/v2/webauthn/credentials/cred%20with%20spaces", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetWebauthnAuthenticationOptionsAsync_isCalledWithoutAuthHeader()
+    {
+        // No _authToken set — this is the whole point of a passwordless login.
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"options\":{\"challenge\":\"c2\"}}");
+
+        var options = await _sut.GetWebauthnAuthenticationOptionsAsync("alice");
+
+        Assert.NotNull(options);
+        Assert.Null(LastRequest.Headers.Authorization);
+        Assert.False(LastRequest.Headers.Contains("accesstoken"));
+        Assert.Contains("\"username\":\"alice\"", LastBody);
+    }
+
     private static void SetPrivate(object target, string field, object? value) =>
         target.GetType()
             .GetField(field, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!

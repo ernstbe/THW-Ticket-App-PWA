@@ -8,9 +8,10 @@ namespace THWTicketApp.Web.Services;
 
 /// <summary>
 /// Watches for user inactivity and triggers <see cref="ITrueDeskApiService.LogoutAsync"/>
-/// after a configurable timeout. Logout in turn locks the session (keeps the
-/// token in <c>locked_auth_*</c> keys) when a passkey is registered, so the
-/// user can unlock biometrically without re-entering credentials.
+/// after a configurable timeout. This is a real logout (#205) — no token
+/// survives it — but LogoutAsync stashes the username so the login screen
+/// can offer a server-verified passkey unlock in place of re-entering
+/// credentials.
 ///
 /// If no passkey is registered the watcher does nothing — kicking the user
 /// out without a way back in would be hostile.
@@ -132,9 +133,11 @@ public sealed class IdleLockService : IAsyncDisposable
         if (!Enabled || !_apiService.IsAuthenticated) return;
 
         // Skip if no passkey — auto-lock without unlock path = user gets stuck on
-        // the login screen and has to type their password again. Defeats the point.
-        var passkeyId = await _localStorage.GetItemAsync("passkey_credential_id");
-        if (string.IsNullOrEmpty(passkeyId)) return;
+        // the login screen and has to type their password again. Defeats the
+        // point. Server-truth check (#205) — a locally-cached flag can't tell
+        // us whether a credential is actually still registered.
+        var credentials = await _apiService.ListWebauthnCredentialsAsync();
+        if (credentials.Count == 0) return;
 
         try
         {
@@ -171,11 +174,13 @@ public sealed class IdleLockService : IAsyncDisposable
         // pulling the rug out.
         if (!_apiService.IsAuthenticated) return;
 
-        var passkeyId = await _localStorage.GetItemAsync("passkey_credential_id");
-        if (string.IsNullOrEmpty(passkeyId)) return;
+        var credentials = await _apiService.ListWebauthnCredentialsAsync();
+        if (credentials.Count == 0) return;
 
         await StopAsync();
-        await _apiService.LogoutAsync(); // locks because passkey is registered
+        // Real logout now (#205) — LogoutAsync stashes only the username so
+        // the login screen can offer a server-verified passkey unlock.
+        await _apiService.LogoutAsync();
         _authState.NotifyAuthStateChanged();
         _snackbar.Add(_localization.T("idlelock.locked"), Severity.Info);
         _navigation.NavigateTo("login");

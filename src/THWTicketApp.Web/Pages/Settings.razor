@@ -218,23 +218,32 @@
                         @L.T("settings.passkey_not_supported")
                     </MudAlert>
                 }
-                else if (_passkeyRegistered)
-                {
-                    <div class="d-flex align-center gap-3">
-                        <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" />
-                        <MudText Color="Color.Success">@L.T("settings.passkey_registered")</MudText>
-                        <MudSpacer />
-                        <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
-                                   OnClick="RemovePasskeyAsync">
-                            @L.T("settings.passkey_remove")
-                        </MudButton>
-                    </div>
-                }
                 else
                 {
+                    @if (_passkeyCredentials.Count > 0)
+                    {
+                        <MudList T="string" Dense="true" Class="mb-3">
+                            @foreach (var cred in _passkeyCredentials)
+                            {
+                                <MudListItem T="string" Icon="@Icons.Material.Filled.VerifiedUser" IconColor="Color.Success">
+                                    <div class="d-flex align-center gap-3">
+                                        <div class="flex-grow-1">
+                                            <MudText>@(string.IsNullOrEmpty(cred.DeviceLabel) ? L.T("settings.passkey_unnamed_device") : cred.DeviceLabel)</MudText>
+                                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                                @string.Format(L.T("settings.passkey_added_on"), cred.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy"))
+                                            </MudText>
+                                        </div>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                                       OnClick="@(() => RemovePasskeyAsync(cred.CredentialId))"
+                                                       aria-label="@L.T("settings.passkey_remove")" />
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
                     <MudButton Variant="Variant.Filled" Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Fingerprint"
-                               OnClick="RegisterPasskeyAsync">
+                               OnClick="RegisterPasskeyAsync" Disabled="@_registeringPasskey">
                         @L.T("settings.passkey_register")
                     </MudButton>
                 }
@@ -494,10 +503,12 @@
     private string _connectionStatus = string.Empty;
     private Severity _connectionSeverity = Severity.Info;
 
-    // Passkey
+    // Passkey — server-truth list (#205), not a local flag.
     private IJSObjectReference? _webauthnModule;
     private bool _webauthnSupported;
-    private bool _passkeyRegistered;
+    private List<WebauthnCredentialInfo> _passkeyCredentials = new();
+    private bool _registeringPasskey;
+    private bool _passkeyRegistered => _passkeyCredentials.Count > 0;
 
     // Auto-Lock
     private bool _idleLockEnabled;
@@ -640,7 +651,7 @@
                 _webauthnModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/webauthn-interop.js");
                 _webauthnSupported = await _webauthnModule.InvokeAsync<bool>("isWebAuthnSupported");
                 if (_webauthnSupported)
-                    _passkeyRegistered = await _webauthnModule.InvokeAsync<bool>("isPasskeyRegistered");
+                    _passkeyCredentials = await ApiService.ListWebauthnCredentialsAsync();
 
                 _webPushSupported = await WebPush.IsSupportedAsync();
                 if (_webPushSupported)
@@ -817,15 +828,34 @@
 
     private async Task RegisterPasskeyAsync()
     {
-        if (_webauthnModule == null) return;
+        if (_webauthnModule == null || _registeringPasskey) return;
+        _registeringPasskey = true;
         try
         {
-            var userId = ApiService.CurrentUserId ?? "unknown";
-            var userName = ApiService.CurrentUsername ?? "user";
-            var credentialId = await _webauthnModule.InvokeAsync<string?>("registerPasskey", userId, userName);
-            if (!string.IsNullOrEmpty(credentialId))
+            // Server issues the challenge and stores the public key it comes
+            // back with (#205) — createCredential just runs the browser
+            // ceremony against those server-issued options.
+            var optionsJson = await ApiService.GetWebauthnRegistrationOptionsAsync();
+            if (optionsJson == null)
             {
-                _passkeyRegistered = true;
+                Snackbar.Add(L.T("settings.passkey_register_failed"), Severity.Error);
+                return;
+            }
+
+            var credentialJson = await _webauthnModule.InvokeAsync<string?>("createCredential", optionsJson);
+            if (string.IsNullOrEmpty(credentialJson))
+            {
+                Snackbar.Add(L.T("settings.passkey_register_failed"), Severity.Error);
+                return;
+            }
+
+            string? deviceLabel = null;
+            try { deviceLabel = await JsRuntime.InvokeAsync<string>("pwaHelpers.getUserAgent"); } catch { }
+
+            var verified = await ApiService.VerifyWebauthnRegistrationAsync(credentialJson, deviceLabel);
+            if (verified)
+            {
+                _passkeyCredentials = await ApiService.ListWebauthnCredentialsAsync();
                 Snackbar.Add(L.T("settings.passkey_registered"), Severity.Success);
             }
             else
@@ -837,16 +867,26 @@
         {
             Snackbar.Add($"{L.T("common.error")}: {ex.Message}", Severity.Error);
         }
+        finally
+        {
+            _registeringPasskey = false;
+        }
     }
 
-    private async Task RemovePasskeyAsync()
+    private async Task RemovePasskeyAsync(string credentialId)
     {
-        if (_webauthnModule == null) return;
-        await _webauthnModule.InvokeAsync<bool>("removePasskey");
-        _passkeyRegistered = false;
-        // Auto-lock without a passkey is a one-way trip to the login screen —
-        // disable it implicitly when the passkey is gone.
-        if (_idleLockEnabled)
+        var removed = await ApiService.RemoveWebauthnCredentialAsync(credentialId);
+        if (!removed)
+        {
+            Snackbar.Add(L.T("common.error"), Severity.Error);
+            return;
+        }
+
+        _passkeyCredentials = await ApiService.ListWebauthnCredentialsAsync();
+
+        // Auto-lock without any passkey left is a one-way trip to the login
+        // screen — disable it implicitly once the last credential is gone.
+        if (!_passkeyRegistered && _idleLockEnabled)
         {
             _idleLockEnabled = false;
             await IdleLock.SaveSettingsAsync(false, _idleLockMinutes);

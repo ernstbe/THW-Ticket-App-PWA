@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using MudBlazor;
 using NSubstitute;
+using THWTicketApp.Shared.Models;
 using THWTicketApp.Shared.Services;
 using THWTicketApp.Tests.Helpers;
 using THWTicketApp.Web.Services;
@@ -29,7 +30,13 @@ public class IdleLockServiceTests
         _l10n = new LocalizationService(_storage);
         var jsRuntime = Substitute.For<IJSRuntime>();
         _auth = new AuthStateProvider(_api, new AppSettings(), jsRuntime, _nav);
+        // Default: no passkey. Server-truth check (#205) replaced the old
+        // passkey_credential_id localStorage flag.
+        _api.ListWebauthnCredentialsAsync().Returns(new List<WebauthnCredentialInfo>());
     }
+
+    private static void SetHasPasskey(ITrueDeskApiService api) =>
+        api.ListWebauthnCredentialsAsync().Returns(new List<WebauthnCredentialInfo> { new() { CredentialId = "cred" } });
 
     private IdleLockService Build() => new(
         Substitute.For<IJSRuntime>(),
@@ -101,7 +108,7 @@ public class IdleLockServiceTests
     public async Task StartAsync_doesNothingWhenDisabled()
     {
         _api.IsAuthenticated.Returns(true);
-        _storage.Store["passkey_credential_id"] = "cred";
+        SetHasPasskey(_api);
 
         var sut = Build();
         // Enabled is false by default
@@ -131,7 +138,7 @@ public class IdleLockServiceTests
     public async Task OnIdle_lockedSessionAndNavigatesToLogin()
     {
         _api.IsAuthenticated.Returns(true);
-        _storage.Store["passkey_credential_id"] = "cred";
+        SetHasPasskey(_api);
 
         var sut = Build();
         await sut.OnIdle();
@@ -147,7 +154,7 @@ public class IdleLockServiceTests
     {
         // Race: timer fires after user logged out via another flow.
         _api.IsAuthenticated.Returns(false);
-        _storage.Store["passkey_credential_id"] = "cred";
+        SetHasPasskey(_api);
 
         var sut = Build();
         await sut.OnIdle();
