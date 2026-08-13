@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using THWTicketApp.Shared.Helpers;
 
 namespace THWTicketApp.Shared.Models;
 
@@ -34,6 +35,16 @@ public class Ticket
     /// </summary>
     [JsonPropertyName("additionalAssignees")]
     public List<Assignee> AdditionalAssignees { get; set; } = new();
+
+    /// <summary>
+    /// Users subscribed to notifications on this ticket (owner, assignee and
+    /// commenters are auto-subscribed server-side). trudesk only partially
+    /// populates this ref array — an unresolved entry arrives as a bare
+    /// ObjectId string instead of an object (PR #167), hence the tolerant
+    /// converter. Empty if unset.
+    /// </summary>
+    [JsonConverter(typeof(TolerantAssigneeListConverter))]
+    public List<Assignee> Subscribers { get; set; } = new();
 
     /// <summary>
     /// Bidirectional links to other tickets (trudesk v2 feature). The server

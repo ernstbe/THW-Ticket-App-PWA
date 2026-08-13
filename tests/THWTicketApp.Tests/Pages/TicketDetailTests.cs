@@ -1,9 +1,52 @@
+using THWTicketApp.Shared.Models;
 using THWTicketApp.Web.Pages;
 
 namespace THWTicketApp.Tests.Pages;
 
 public class TicketDetailTests
 {
+    // -----------------------------------------------------------------
+    // DeriveIsSubscribed (#315 — subscription bell must reflect the
+    // server's subscriber list, not just per-device localStorage)
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public void DeriveIsSubscribed_userInServerSubscribers_returnsTrue()
+    {
+        var ticket = new Ticket { Subscribers = [new Assignee { Id = "u1" }, new Assignee { Id = "u2" }] };
+        Assert.True(TicketDetail.DeriveIsSubscribed(ticket, "u2", [], 1001));
+    }
+
+    [Fact]
+    public void DeriveIsSubscribed_userNotInServerSubscribers_returnsFalse()
+    {
+        var ticket = new Ticket { Subscribers = [new Assignee { Id = "u1" }] };
+        // Local cache says subscribed, but the server list — which is
+        // authoritative once present — disagrees.
+        Assert.False(TicketDetail.DeriveIsSubscribed(ticket, "u2", [1001], 1001));
+    }
+
+    [Fact]
+    public void DeriveIsSubscribed_emptyServerSubscribers_fallsBackToLocalStorage()
+    {
+        var ticket = new Ticket { Subscribers = [] };
+        Assert.True(TicketDetail.DeriveIsSubscribed(ticket, "u1", [1001], 1001));
+        Assert.False(TicketDetail.DeriveIsSubscribed(ticket, "u1", [], 1001));
+    }
+
+    [Fact]
+    public void DeriveIsSubscribed_nullTicket_fallsBackToLocalStorage()
+    {
+        Assert.True(TicketDetail.DeriveIsSubscribed(null, "u1", [1001], 1001));
+    }
+
+    [Fact]
+    public void DeriveIsSubscribed_noCurrentUserId_returnsFalseEvenIfSubscribersPresent()
+    {
+        var ticket = new Ticket { Subscribers = [new Assignee { Id = "u1" }] };
+        Assert.False(TicketDetail.DeriveIsSubscribed(ticket, null, [1001], 1001));
+    }
+
     // -----------------------------------------------------------------
     // TruncateTemplate
     // -----------------------------------------------------------------

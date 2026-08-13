@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using THWTicketApp.Shared.Models;
 
 namespace THWTicketApp.Shared.Helpers;
 
@@ -126,4 +127,52 @@ public sealed class TolerantBoolConverter : JsonConverter<bool>
 
     public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options)
         => writer.WriteBooleanValue(value);
+}
+
+// trudesk .populate()s some ref arrays only partially — a deleted or
+// otherwise unresolved member is left as the bare ObjectId string instead of
+// the populated object (seen on `subscribers`, PR #167's absorber-removal
+// investigation). Each element is either a populated object (deserialize
+// normally) or a bare string (wrap as an Assignee with just Id set) so the
+// whole array doesn't throw and abort the ticket.
+public sealed class TolerantAssigneeListConverter : JsonConverter<List<Assignee>>
+{
+    // Reference-type converters aren't invoked for a JSON null by default —
+    // System.Text.Json assigns null directly instead, which would stomp the
+    // property's `= new()` initializer. Opt in so Read() below runs and
+    // returns an empty list instead.
+    public override bool HandleNull => true;
+
+    public override List<Assignee> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var list = new List<Assignee>();
+        if (reader.TokenType == JsonTokenType.Null) return list;
+        if (reader.TokenType != JsonTokenType.StartArray) { reader.Skip(); return list; }
+
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+        {
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                list.Add(new Assignee { Id = reader.GetString() ?? string.Empty });
+            }
+            else if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                var assignee = JsonSerializer.Deserialize<Assignee>(ref reader, options);
+                if (assignee != null) list.Add(assignee);
+            }
+            else
+            {
+                reader.Skip();
+            }
+        }
+
+        return list;
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<Assignee> value, JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        foreach (var a in value) JsonSerializer.Serialize(writer, a, options);
+        writer.WriteEndArray();
+    }
 }
