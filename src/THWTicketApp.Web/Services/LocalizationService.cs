@@ -128,6 +128,7 @@ public class LocalizationService
         ["login.passkey_failed"] = "Passkey-Anmeldung fehlgeschlagen.",
         ["login.passkey_cancelled"] = "Passkey-Anmeldung abgebrochen.",
         ["login.passkey_no_session"] = "Passkey OK, aber keine gesperrte Sitzung gefunden. Bitte einmal mit Benutzername und Passwort anmelden — danach funktioniert der Passkey-Button.",
+        ["login.passkey_username_required"] = "Bitte zuerst den Benutzernamen eingeben, um sich mit Passkey anzumelden.",
         ["login.username_required"] = "Benutzername ist erforderlich",
         ["login.password_required"] = "Passwort ist erforderlich",
 
@@ -373,6 +374,8 @@ public class LocalizationService
         ["settings.passkey_not_supported"] = "Ihr Browser unterstützt keine Passkeys.",
         ["settings.passkey_register_failed"] = "Passkey-Registrierung fehlgeschlagen.",
         ["settings.passkey_removed"] = "Passkey entfernt.",
+        ["settings.passkey_unnamed_device"] = "Unbenanntes Gerät",
+        ["settings.passkey_added_on"] = "Hinzugefügt am {0}",
         ["settings.idlelock"] = "Automatisch sperren",
         ["settings.idlelock_desc"] = "App nach Inaktivität sperren. Entsperren per Passkey/Biometrie. Erfordert registrierten Passkey.",
         ["settings.idlelock_enable"] = "Auto-Lock aktivieren",
@@ -924,6 +927,7 @@ public class LocalizationService
         ["login.passkey_failed"] = "Passkey authentication failed.",
         ["login.passkey_cancelled"] = "Passkey authentication cancelled.",
         ["login.passkey_no_session"] = "Passkey OK, but no locked session found. Please sign in with username and password once — the Passkey button will work afterwards.",
+        ["login.passkey_username_required"] = "Please enter your username first to sign in with a passkey.",
         ["login.username_required"] = "Username is required",
         ["login.password_required"] = "Password is required",
 
@@ -1169,6 +1173,8 @@ public class LocalizationService
         ["settings.passkey_not_supported"] = "Your browser does not support passkeys.",
         ["settings.passkey_register_failed"] = "Passkey registration failed.",
         ["settings.passkey_removed"] = "Passkey removed.",
+        ["settings.passkey_unnamed_device"] = "Unnamed device",
+        ["settings.passkey_added_on"] = "Added on {0}",
         ["settings.idlelock"] = "Auto-lock",
         ["settings.idlelock_desc"] = "Lock the app after a period of inactivity. Unlock with passkey/biometrics. Requires a registered passkey.",
         ["settings.idlelock_enable"] = "Enable auto-lock",

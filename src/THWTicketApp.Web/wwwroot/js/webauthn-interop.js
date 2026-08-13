@@ -1,118 +1,95 @@
-// WebAuthn / Passkey interop for Blazor
-// Used as local biometric gate to unlock stored credentials
+// WebAuthn / Passkey interop for Blazor.
+//
+// Thin wrappers around navigator.credentials.create()/get() — all
+// challenge generation and verification happens server-side now (#205).
+// This module only converts between the server's base64url-encoded JSON
+// options and the ArrayBuffers the WebAuthn API needs, then converts the
+// browser's response back to base64url JSON for the C# side to POST on
+// to the server's verify endpoint unchanged.
 
 export function isWebAuthnSupported() {
     return !!(window.PublicKeyCredential);
 }
 
-export async function isPasskeyRegistered() {
-    const credId = localStorage.getItem('passkey_credential_id');
-    return !!credId;
+export async function createCredential(optionsJson) {
+    const options = typeof optionsJson === 'string' ? JSON.parse(optionsJson) : optionsJson;
+
+    const publicKey = {
+        ...options,
+        challenge: base64urlToBuffer(options.challenge),
+        user: {
+            ...options.user,
+            id: base64urlToBuffer(options.user.id)
+        },
+        excludeCredentials: (options.excludeCredentials || []).map(c => ({
+            ...c,
+            id: base64urlToBuffer(c.id)
+        }))
+    };
+
+    const credential = await navigator.credentials.create({ publicKey });
+    if (!credential) return null;
+
+    return JSON.stringify({
+        id: credential.id,
+        rawId: bufferToBase64url(credential.rawId),
+        type: credential.type,
+        response: {
+            clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+            attestationObject: bufferToBase64url(credential.response.attestationObject),
+            transports: credential.response.getTransports ? credential.response.getTransports() : []
+        },
+        clientExtensionResults: credential.getClientExtensionResults ? credential.getClientExtensionResults() : {},
+        authenticatorAttachment: credential.authenticatorAttachment || null
+    });
 }
 
-export async function registerPasskey(userId, userName) {
-    try {
-        const challenge = new Uint8Array(32);
-        crypto.getRandomValues(challenge);
+export async function getAssertion(optionsJson) {
+    const options = typeof optionsJson === 'string' ? JSON.parse(optionsJson) : optionsJson;
 
-        const userIdBytes = new TextEncoder().encode(userId);
+    const publicKey = {
+        ...options,
+        challenge: base64urlToBuffer(options.challenge),
+        allowCredentials: (options.allowCredentials || []).map(c => ({
+            ...c,
+            id: base64urlToBuffer(c.id)
+        }))
+    };
 
-        const createOptions = {
-            publicKey: {
-                rp: {
-                    name: "THW Ticket App",
-                    id: window.location.hostname
-                },
-                user: {
-                    id: userIdBytes,
-                    name: userName,
-                    displayName: userName
-                },
-                challenge: challenge,
-                pubKeyCredParams: [
-                    { alg: -7, type: "public-key" },   // ES256
-                    { alg: -257, type: "public-key" }   // RS256
-                ],
-                authenticatorSelection: {
-                    authenticatorAttachment: "platform",
-                    userVerification: "required",
-                    residentKey: "preferred"
-                },
-                timeout: 60000,
-                attestation: "none"
-            }
-        };
+    const assertion = await navigator.credentials.get({ publicKey });
+    if (!assertion) return null;
 
-        const credential = await navigator.credentials.create(createOptions);
-        const credentialId = bufferToBase64(credential.rawId);
-
-        localStorage.setItem('passkey_credential_id', credentialId);
-        localStorage.setItem('passkey_user_id', userId);
-        localStorage.setItem('passkey_user_name', userName);
-
-        return credentialId;
-    } catch (e) {
-        console.error('Passkey registration failed:', e);
-        return null;
-    }
+    return JSON.stringify({
+        id: assertion.id,
+        rawId: bufferToBase64url(assertion.rawId),
+        type: assertion.type,
+        response: {
+            clientDataJSON: bufferToBase64url(assertion.response.clientDataJSON),
+            authenticatorData: bufferToBase64url(assertion.response.authenticatorData),
+            signature: bufferToBase64url(assertion.response.signature),
+            userHandle: assertion.response.userHandle ? bufferToBase64url(assertion.response.userHandle) : null
+        },
+        clientExtensionResults: assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {},
+        authenticatorAttachment: assertion.authenticatorAttachment || null
+    });
 }
 
-export async function authenticatePasskey() {
-    try {
-        const credentialId = localStorage.getItem('passkey_credential_id');
-        if (!credentialId) return null;
-
-        const challenge = new Uint8Array(32);
-        crypto.getRandomValues(challenge);
-
-        const getOptions = {
-            publicKey: {
-                challenge: challenge,
-                rpId: window.location.hostname,
-                allowCredentials: [{
-                    id: base64ToBuffer(credentialId),
-                    type: "public-key",
-                    transports: ["internal"]
-                }],
-                userVerification: "required",
-                timeout: 60000
-            }
-        };
-
-        const assertion = await navigator.credentials.get(getOptions);
-        // Authentication succeeded - return stored user info
-        return {
-            userId: localStorage.getItem('passkey_user_id'),
-            userName: localStorage.getItem('passkey_user_name'),
-            credentialId: credentialId
-        };
-    } catch (e) {
-        console.error('Passkey authentication failed:', e);
-        return null;
-    }
-}
-
-export function removePasskey() {
-    localStorage.removeItem('passkey_credential_id');
-    localStorage.removeItem('passkey_user_id');
-    localStorage.removeItem('passkey_user_name');
-    return true;
-}
-
-function bufferToBase64(buffer) {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-}
-
-function base64ToBuffer(base64) {
-    const binary = atob(base64);
+function base64urlToBuffer(base64url) {
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const binary = atob(padded);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
     }
     return bytes.buffer;
+}
+
+function bufferToBase64url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }

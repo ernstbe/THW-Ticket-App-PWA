@@ -115,6 +115,11 @@ public sealed class WhatsNewService
         [
             "Änderungen an Tickets durch andere Personen erscheinen jetzt sofort in Ticketliste, Kanban-Board und Dashboard — ohne die Seite neu zu laden. Auch gelöschte Tickets verschwinden automatisch.",
             "Ticket-Benachrichtigungen zeigen jetzt die richtige Ticketnummer statt einer internen Kennung."
+        ]),
+        new WhatsNewEntry(21, "13.08.2026", "Passkey jetzt echt geprüft",
+        [
+            "Passkey-Anmeldung und automatische Sperre nach Inaktivität prüfen jetzt serverseitig, statt nur lokal auf dem Gerät. Bitte bestehende Passkeys unter Einstellungen einmal neu registrieren — alte, nur lokal gespeicherte Passkeys funktionieren nicht mehr.",
+            "Der Passkey-Button auf der Anmeldeseite funktioniert jetzt auch nach vollständigem Abmelden oder auf einem neuen Gerät mit synchronisiertem Passkey, nicht mehr nur zum Entsperren."
         ])
     ];
 

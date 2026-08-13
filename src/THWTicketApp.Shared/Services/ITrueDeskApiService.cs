@@ -11,8 +11,16 @@ public interface ITrueDeskApiService
 
     Task<bool> AuthenticateAsync(string username, string password);
     Task<bool> TryRestoreSessionAsync();
-    Task<bool> TryUnlockSessionAsync();
     Task LogoutAsync();
+
+    // WebAuthn / passkey (#205) — server-verified registration and
+    // authentication. See TrueDeskApiService for the full contract notes.
+    Task<string?> GetWebauthnRegistrationOptionsAsync();
+    Task<bool> VerifyWebauthnRegistrationAsync(string credentialResponseJson, string? deviceLabel);
+    Task<List<WebauthnCredentialInfo>> ListWebauthnCredentialsAsync();
+    Task<bool> RemoveWebauthnCredentialAsync(string credentialId);
+    Task<string?> GetWebauthnAuthenticationOptionsAsync(string username);
+    Task<bool> VerifyWebauthnAuthenticationAsync(string username, string assertionResponseJson);
 
     /// <summary>
     /// Fires BEFORE LogoutAsync clears tokens or calls /logout. Listeners can
