@@ -1,5 +1,7 @@
 using System.Text.Json;
+using Microsoft.JSInterop;
 using NSubstitute;
+using NSubstitute.Core;
 using THWTicketApp.Shared.Data;
 using THWTicketApp.Shared.Models;
 using THWTicketApp.Shared.Services;
@@ -1085,5 +1087,38 @@ public class SyncServiceTests
 
         await _db.Received(1).UpdateRetryStateAsync(302, Arg.Any<string>(), 1, Arg.Any<string?>());
         await _db.DidNotReceive().RemovePendingActionAsync(302);
+    }
+
+    // ---------------------------------------------------------------------
+    // Cross-tab lock (#309) — the actual navigator.locks mutual exclusion
+    // can only be verified with two real browser tabs, so this covers the
+    // C# side: interop failure (unsupported browser, import error, ...)
+    // must fall back to running the drain directly rather than losing the
+    // sync entirely.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task Sync_withJsRuntime_fallsBackToDirectDrainWhenLockInteropFails()
+    {
+        var jsRuntime = Substitute.For<IJSRuntime>();
+        IJSObjectReference ThrowImportError(CallInfo _) => throw new JSException("import failed");
+        jsRuntime.InvokeAsync<IJSObjectReference>("import", Arg.Any<object[]>())
+            .Returns((Func<CallInfo, IJSObjectReference>)ThrowImportError);
+        var sut = new SyncService(_db, _api, _state, jsRuntime);
+
+        SetupQueuedActions(new PendingActionDto
+        {
+            Id = 1,
+            ActionType = "DeleteTicket",
+            TicketId = "t1",
+            TicketUid = 1001
+        });
+        _api.DeleteTicketAsync("t1", 1001).Returns(true);
+
+        var result = await sut.SyncPendingActionsAsync();
+
+        Assert.True(result);
+        await _api.Received(1).DeleteTicketAsync("t1", 1001);
+        await _db.Received(1).RemovePendingActionAsync(1);
     }
 }

@@ -576,6 +576,15 @@ else
         try
         {
             var json = await ApiService.SearchTicketsAsync(value);
+
+            // A newer keystroke (or the clearable-X resetting the field) may
+            // have already changed _searchText while this request was in
+            // flight. Discard the now-stale response instead of overwriting
+            // whatever the newer call already produced (#308) — otherwise an
+            // out-of-order response can leave an empty search box showing
+            // results for a query that's no longer active.
+            if (_searchText != value) return;
+
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var response = JsonSerializer.Deserialize<GetTicketsResponse>(json, options);
             if (response?.Tickets != null && response.Tickets.Count > 0)
@@ -588,6 +597,7 @@ else
             }
         }
         catch { }
+        if (_searchText != value) return;
         _isServerSearchActive = false;
         ApplyFilters();
     }
