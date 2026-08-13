@@ -225,7 +225,18 @@ public class TrueDeskApiService : ITrueDeskApiService
         return false;
     }
 
-    private async Task<bool> TryRefreshTokenAsync()
+    // Single-flight guard: N concurrent 401s (e.g. LoadReferenceDataAsync's
+    // Task.WhenAll over several requests) would otherwise each fire their
+    // own POST /token. Harmless today — trudesk's refresh token isn't
+    // rotated, so the redundant requests can't race each other into a
+    // logout (#314) — but wasteful. Concurrent callers share one in-flight
+    // refresh instead. WASM is single-threaded, so the null-check-then-
+    // assign below can't race.
+    private Task<bool>? _refreshInFlight;
+
+    private Task<bool> TryRefreshTokenAsync() => _refreshInFlight ??= RefreshTokenAsync();
+
+    private async Task<bool> RefreshTokenAsync()
     {
         try
         {
@@ -244,6 +255,10 @@ public class TrueDeskApiService : ITrueDeskApiService
             }
         }
         catch { }
+        finally
+        {
+            _refreshInFlight = null;
+        }
         return false;
     }
 
