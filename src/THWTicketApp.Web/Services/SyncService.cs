@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.JSInterop;
 using THWTicketApp.Shared.Data;
 using THWTicketApp.Shared.Models;
 using THWTicketApp.Shared.Services;
@@ -26,6 +27,7 @@ public class SyncService : ISyncService
     private readonly IIndexedDbService _indexedDb;
     private readonly ITrueDeskApiService _apiService;
     private readonly AppStateService _appState;
+    private readonly IJSRuntime? _jsRuntime;
 
     internal static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -37,11 +39,15 @@ public class SyncService : ISyncService
     public event Action<int>? PendingCountChanged;
     public event Action<PendingAction>? ConflictDetected;
 
-    public SyncService(IIndexedDbService indexedDb, ITrueDeskApiService apiService, AppStateService appState)
+    // jsRuntime is optional so existing unit-test constructions (3-arg) keep
+    // compiling; DI always supplies it. Without it, the cross-tab lock is
+    // skipped and the drain just runs directly — same as before this fix.
+    public SyncService(IIndexedDbService indexedDb, ITrueDeskApiService apiService, AppStateService appState, IJSRuntime? jsRuntime = null)
     {
         _indexedDb = indexedDb;
         _apiService = apiService;
         _appState = appState;
+        _jsRuntime = jsRuntime;
     }
 
     // Offline read-cache helpers (used by the ticket list / dashboard / kanban).
@@ -219,15 +225,54 @@ public class SyncService : ISyncService
         await UpdatePendingCount();
     }
 
-    // Guards against overlapping drains (e.g. the startup pass and a
-    // connectivity-restored pass firing at once). WASM is single-threaded, so
-    // a plain flag is sufficient.
+    // Guards against overlapping drains within THIS tab (e.g. the startup
+    // pass and a connectivity-restored pass firing at once). WASM is
+    // single-threaded, so a plain flag is sufficient here — it does nothing
+    // for a second tab, which is what the Web Locks request below is for.
     private bool _syncing;
+    private IJSObjectReference? _lockModule;
 
     public async Task<bool> SyncPendingActionsAsync()
     {
         if (_syncing) return false;
         _syncing = true;
+        try
+        {
+            return await RunExclusiveAcrossTabsAsync();
+        }
+        finally
+        {
+            _syncing = false;
+        }
+    }
+
+    // The IndexedDB queue has no cross-tab claim, and getPendingActions
+    // (read) / applyAction+removePendingAction (write) are separate
+    // transactions — two tabs handling the same 'online' event can both read
+    // the same queue snapshot and apply non-idempotent actions (AddComment,
+    // CreateTicket, attachment upload, ...) twice (#309). navigator.locks
+    // serializes the drain across tabs sharing this origin; browsers without
+    // Web Locks support (or any interop failure) fall back to running
+    // unlocked — same behavior as before this fix, not a regression.
+    private async Task<bool> RunExclusiveAcrossTabsAsync()
+    {
+        if (_jsRuntime is null) return await DrainQueueAsync();
+
+        try
+        {
+            _lockModule ??= await _jsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/sync-lock-interop.js");
+            using var selfRef = DotNetObjectReference.Create(this);
+            return await _lockModule.InvokeAsync<bool>("runExclusive", selfRef);
+        }
+        catch (Exception)
+        {
+            return await DrainQueueAsync();
+        }
+    }
+
+    [JSInvokable]
+    public async Task<bool> DrainQueueAsync()
+    {
         try
         {
             var json = await _indexedDb.GetPendingActionsAsync();
@@ -334,10 +379,6 @@ public class SyncService : ISyncService
         {
             await AppendLogAsync("error", null, "Sync loop crashed: " + ex.Message, ex);
             return false;
-        }
-        finally
-        {
-            _syncing = false;
         }
     }
 
