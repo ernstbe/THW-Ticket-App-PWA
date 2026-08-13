@@ -14,6 +14,12 @@ namespace THWTicketApp.Tests.Models;
 /// must still deserialize, and a serialize → deserialize roundtrip (the
 /// shape a future offline cache would produce) must keep the data the
 /// app actually uses.
+///
+/// `subscribers` was later migrated OUT of the absorber set (#315, PR
+/// tbd) — the subscription bell needs it — via
+/// <see cref="THWTicketApp.Shared.Helpers.TolerantAssigneeListConverter"/>,
+/// which handles the same populated-or-bare-string mix. `role`, `members`
+/// and `sendMailTo` remain unmigrated absorbers.
 /// </summary>
 public class TicketSerializationTests
 {
@@ -50,6 +56,10 @@ public class TicketSerializationTests
         Assert.Equal("a1", ticket.Assignee!.Id);
         Assert.Equal("g1", ticket.Group!.Id);
         Assert.Equal("OV Emm", ticket.Group.Name);
+        Assert.Equal(2, ticket.Subscribers.Count);
+        Assert.Equal("u1", ticket.Subscribers[0].Id);
+        Assert.Equal("anna", ticket.Subscribers[0].Username);
+        Assert.Equal("u2", ticket.Subscribers[1].Id);
     }
 
     [Fact]
@@ -69,6 +79,7 @@ public class TicketSerializationTests
 
         Assert.Equal("o1", ticket.Owner!.Id);
         Assert.Equal("g1", ticket.Group!.Id);
+        Assert.Empty(ticket.Subscribers);
     }
 
     [Fact]
@@ -102,21 +113,24 @@ public class TicketSerializationTests
         Assert.Equal("OV Emm", roundtripped.Group?.Name);
         Assert.Equal("s1", roundtripped.Status?.Id);
         Assert.Equal(original.DueDate, roundtripped.DueDate);
+        Assert.Equal(2, roundtripped.Subscribers.Count);
+        Assert.Equal("u1", roundtripped.Subscribers[0].Id);
+        Assert.Equal("u2", roundtripped.Subscribers[1].Id);
     }
 
     [Fact]
-    public void Serialize_doesNotEmitRemovedAbsorberMembers()
+    public void Serialize_doesNotEmitStillRemovedAbsorberMembers()
     {
-        // The old absorbers serialized as literal nulls ("subscribers":
-        // null, "role": null, ...). Nothing in the app re-serializes these
-        // models today (the IndexedDB ticket cache stores the raw server
-        // JSON string), but if something starts to, the removed members
-        // must not reappear and accidentally clear server-side data.
+        // The old absorbers serialized as literal nulls ("role": null, ...).
+        // Nothing in the app re-serializes these models today (the IndexedDB
+        // ticket cache stores the raw server JSON string), but if something
+        // starts to, the removed members must not reappear and accidentally
+        // clear server-side data. `subscribers` is EXCLUDED from this check
+        // since #315 migrated it out of the absorber set — it's real data now.
         var ticket = new Ticket { Id = "t1", Owner = new Owner { Id = "o1" }, Group = new Group { Id = "g1" } };
 
         var json = JsonSerializer.Serialize(ticket, Options);
 
-        Assert.DoesNotContain("subscribers", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("role", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("members", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sendMailTo", json, StringComparison.OrdinalIgnoreCase);
