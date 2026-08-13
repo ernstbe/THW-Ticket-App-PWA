@@ -628,6 +628,15 @@ else
                 t.Uid.ToString().Contains(search));
         }
         _filteredTickets = ApplySorting(ApplyLocalFilters(source)).ToList();
+
+        // Some rebuild paths (manual refresh, realtime updates, saved
+        // filters) don't reset _currentPage to 1 like the filter chips do.
+        // If the result set shrank enough that the current page no longer
+        // exists, PagedTickets silently returns empty — and if it shrank to
+        // one page, MudPagination itself disappears, leaving no way back
+        // except re-clicking a filter (#310).
+        _currentPage = Math.Clamp(_currentPage, 1, _totalPages);
+
         StateHasChanged();
     }
 
