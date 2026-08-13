@@ -268,14 +268,14 @@ public class TrueDeskApiServiceTests
     }
 
     // -----------------------------------------------------------------
-    // Additional assignees (v1-only endpoint)
+    // Additional assignees
     // -----------------------------------------------------------------
 
     [Fact]
-    public async Task SetAdditionalAssigneesAsync_putsArrayToV1AdditionalAssigneesEndpoint()
+    public async Task SetAdditionalAssigneesAsync_v1_putsArrayToIdAdditionalAssigneesEndpoint()
     {
         _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true}");
-        var ok = await _sut.SetAdditionalAssigneesAsync("t1", new[] { "u1", "u2" });
+        var ok = await _sut.SetAdditionalAssigneesAsync("t1", 1001, new[] { "u1", "u2" });
 
         Assert.True(ok);
         Assert.Equal(HttpMethod.Put, LastRequest.Method);
@@ -284,10 +284,21 @@ public class TrueDeskApiServiceTests
     }
 
     [Fact]
+    public async Task SetAdditionalAssigneesAsync_v2_putsArrayToUidAdditionalAssigneesEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true}");
+        var ok = await MakeV2Sut().SetAdditionalAssigneesAsync("t1", 1001, new[] { "u1", "u2" });
+
+        Assert.True(ok);
+        Assert.Equal("/api/v2/tickets/1001/additional-assignees", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("\"additionalAssignees\":[\"u1\",\"u2\"]", LastBody);
+    }
+
+    [Fact]
     public async Task SetAdditionalAssigneesAsync_emptyListSendsEmptyArrayToClear()
     {
         _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true}");
-        var ok = await _sut.SetAdditionalAssigneesAsync("t1", []);
+        var ok = await _sut.SetAdditionalAssigneesAsync("t1", 1001, []);
 
         Assert.True(ok);
         Assert.Contains("\"additionalAssignees\":[]", LastBody);
@@ -297,7 +308,7 @@ public class TrueDeskApiServiceTests
     public async Task SetAdditionalAssigneesAsync_returnsFalseOnError()
     {
         _handler.SetDefault(HttpStatusCode.InternalServerError);
-        var ok = await _sut.SetAdditionalAssigneesAsync("t1", new[] { "u1" });
+        var ok = await _sut.SetAdditionalAssigneesAsync("t1", 1001, new[] { "u1" });
         Assert.False(ok);
     }
 
@@ -305,7 +316,7 @@ public class TrueDeskApiServiceTests
     public async Task SetAdditionalAssigneesAsync_returnsFalseForEmptyTicketIdWithoutHttpCall()
     {
         _handler.SetDefault(HttpStatusCode.OK);
-        var ok = await _sut.SetAdditionalAssigneesAsync("", new[] { "u1" });
+        var ok = await _sut.SetAdditionalAssigneesAsync("", 1001, new[] { "u1" });
         Assert.False(ok);
         Assert.Empty(_handler.Requests);
     }
