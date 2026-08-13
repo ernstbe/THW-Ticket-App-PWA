@@ -630,17 +630,18 @@ public class TrueDeskApiService : ITrueDeskApiService
         return response.IsSuccessStatusCode;
     }
 
-    public async Task<bool> SetAdditionalAssigneesAsync(string ticketId, IEnumerable<string> userIds)
+    public async Task<bool> SetAdditionalAssigneesAsync(string ticketId, int ticketUid, IEnumerable<string> userIds)
     {
         if (string.IsNullOrWhiteSpace(ticketId)) return false;
-        // PUT /tickets/:id/additional-assignees only exists in v1
-        // (trudesk-thw feat/additional-assignees). Replaces the whole array;
-        // empty array clears. The server de-duplicates and drops the primary
-        // assignee id.
+        // Replaces the whole array; empty array clears. The server
+        // de-duplicates and drops the primary assignee id. v2 route
+        // (trudesk-thw PR #161) matches on :uid like the other ticket
+        // mutations, v1 matches on the Mongo _id.
         var payload = new { additionalAssignees = userIds.ToArray() };
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var identifier = IsV2 ? ticketUid.ToString() : ticketId;
         var response = await SendWithAutoRefreshAsync(() => _httpClient.PutAsync(
-            $"{V1BaseUrl}/tickets/{ticketId}/additional-assignees", content));
+            $"{BaseUrl}/tickets/{identifier}/additional-assignees", content));
         return response.IsSuccessStatusCode;
     }
 

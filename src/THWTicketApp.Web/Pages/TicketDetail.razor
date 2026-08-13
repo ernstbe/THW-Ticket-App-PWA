@@ -1335,7 +1335,7 @@ else
                 Snackbar.Add(L.T("offline.queued"), Severity.Info);
                 return;
             }
-            if (await ApiService.SetAdditionalAssigneesAsync(ticketId, userIds))
+            if (await ApiService.SetAdditionalAssigneesAsync(ticketId, ticketUid, userIds))
             {
                 Snackbar.Add(successMessage, Severity.Success);
                 await LoadTicketAsync();
