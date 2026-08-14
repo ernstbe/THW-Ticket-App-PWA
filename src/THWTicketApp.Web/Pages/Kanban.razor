@@ -6,6 +6,7 @@
 @using THWTicketApp.Shared.Helpers
 @using THWTicketApp.Shared.Services
 @using System.Net.Http
+@using THWTicketApp.Web.Helpers
 @inject ITrueDeskApiService ApiService
 @inject ILookupService Lookup
 @inject NavigationManager Navigation
@@ -92,7 +93,7 @@
             @foreach (var g in _allGroups)
             {
                 var gid = g.Id ?? "";
-                var gname = g.Name ?? "?";
+                var gname = GroupDisplayHelper.GetDisplayName(g, L);
                 var count = _groupCounts.TryGetValue(gid, out var c) ? c : 0;
                 <MudSelectItem Value="@gid">@gname (@count)</MudSelectItem>
             }

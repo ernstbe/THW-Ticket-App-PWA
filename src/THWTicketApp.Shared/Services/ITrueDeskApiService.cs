@@ -200,6 +200,14 @@ public interface ITrueDeskApiService
     /// </summary>
     Task<string?> ExportMyDataAsync();
 
+    /// <summary>
+    /// #privatetickets — creates (or re-fetches, idempotent) the caller's
+    /// own hidden group via POST /accounts/me/private-group (v2 only).
+    /// Backs the Settings "private ticket space" toggle. Returns true once
+    /// the group exists server-side.
+    /// </summary>
+    Task<bool> EnablePrivateTicketsAsync();
+
     Task<List<SessionInfo>> GetSessionsAsync();
     Task<bool> RevokeSessionAsync(string deviceId);
     Task<bool> RevokeAllOtherSessionsAsync();

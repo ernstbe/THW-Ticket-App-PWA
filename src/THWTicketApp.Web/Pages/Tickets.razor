@@ -80,7 +80,7 @@
                            Variant="Variant.Outlined" Clearable="true" Margin="Margin.Dense">
                     @foreach (var g in _allGroups)
                     {
-                        <MudSelectItem Value="@g">@g</MudSelectItem>
+                        <MudSelectItem Value="@g">@(_privateGroupNames.Contains(g) ? L.T("groups.private_label") : g)</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -343,6 +343,7 @@ else
     private bool _hasAdvancedFilter => _filterPriority != null || _filterGroup != null || _filterType != null || _filterDateFrom != null || _filterDateTo != null;
     private List<string> _allPriorities = [];
     private List<string> _allGroups = [];
+    private HashSet<string> _privateGroupNames = [];
     private List<string> _allTypes = [];
 
     private CancellationTokenSource? _refreshDebounceCts;
@@ -508,6 +509,13 @@ else
             .Where(t => t.Group?.Name != null)
             .Select(t => t.Group!.Name!)
             .Distinct().OrderBy(n => n).ToList();
+        // #privatetickets — the filter still matches on the raw Group.Name
+        // (see below), but a private group's raw name is the internal
+        // "private:<objectid>" identifier and must never render as-is.
+        _privateGroupNames = _allTickets
+            .Where(t => t.Group is { Private: true, Name: not null })
+            .Select(t => t.Group!.Name!)
+            .ToHashSet();
         _allTypes = _allTickets
             .Where(t => t.Type?.Name != null)
             .Select(t => t.Type!.TranslatedName)
