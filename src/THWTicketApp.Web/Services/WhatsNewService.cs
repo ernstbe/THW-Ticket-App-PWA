@@ -125,6 +125,10 @@ public sealed class WhatsNewService
         [
             "Neu unter Einstellungen: ein privater Ticket-Bereich für Entwürfe und Tickets, die nur du sehen sollst. Nach dem Aktivieren erscheint er als eigene Gruppe „🔒 Privater Bereich\" bei der Ticket-Erstellung.",
             "Ein privates Ticket kannst du später jederzeit veröffentlichen, indem du es über den Gruppen-Chip in eine reguläre Gruppe verschiebst — genau wie bei jedem anderen Gruppenwechsel."
+        ]),
+        new WhatsNewEntry(23, "03.10.2026", "Sicherheitsupdate",
+        [
+            "Die Absicherung beim Anzeigen von Kommentaren und Notizen wurde aktualisiert und schließt eine bekannte Lücke, über die präparierte Inhalte Schadcode hätten ausführen können."
         ])
     ];
 
