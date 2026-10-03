@@ -49,7 +49,11 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Check formatting
-        run: dotnet format --verify-no-changes --verbosity diagnostic || echo "::warning::Code formatting issues found. Run 'dotnet format' locally."
+        run: |
+          if ! dotnet format --verify-no-changes --verbosity diagnostic; then
+            echo "::error::Code formatting issues found. Run 'dotnet format' locally and commit the result."
+            exit 1
+          fi
 
       - name: Check for vulnerable packages
         run: dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerability-report.txt || true
