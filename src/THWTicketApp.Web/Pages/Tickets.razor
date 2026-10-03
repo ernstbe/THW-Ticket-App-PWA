@@ -322,7 +322,6 @@ else
     private int _currentPage = 1;
     private int _totalPages => Math.Max(1, (int)Math.Ceiling(_filteredTickets.Count / (double)PageSize));
     private IEnumerable<Ticket> PagedTickets => _filteredTickets.Skip((_currentPage - 1) * PageSize).Take(PageSize);
-    private bool _isServerSearchActive;
     private List<SavedFilterItem> _savedFilters = [];
     private bool _showSaveFilterDialog;
     private string _saveFilterName = string.Empty;
@@ -575,7 +574,6 @@ else
         _currentPage = 1;
         if (string.IsNullOrWhiteSpace(value))
         {
-            _isServerSearchActive = false;
             ApplyFilters();
             return;
         }
@@ -597,7 +595,6 @@ else
             var response = JsonSerializer.Deserialize<GetTicketsResponse>(json, options);
             if (response?.Tickets != null && response.Tickets.Count > 0)
             {
-                _isServerSearchActive = true;
                 foreach (var t in response.Tickets) TrudeskTranslationHelper.TranslateTicket(t);
                 _filteredTickets = ApplySorting(ApplyLocalFilters(response.Tickets)).ToList();
                 StateHasChanged();
@@ -606,7 +603,6 @@ else
         }
         catch { }
         if (_searchText != value) return;
-        _isServerSearchActive = false;
         ApplyFilters();
     }
 
@@ -617,13 +613,10 @@ else
     private void ApplyFilters()
     {
         // A local rebuild (filter chip / sort change) supersedes any active
-        // server-search result set: clear the flag so the local text filter below
-        // is applied. Without this, changing a filter or sort while a server search
-        // was active rebuilt the list from _allTickets and silently DROPPED the
-        // search — showing the wrong tickets while the search box still read the
-        // query (#256).
-        _isServerSearchActive = false;
-
+        // server-search result set, so the local text filter below must always
+        // be applied. Skipping it while a server search was active rebuilt the
+        // list from _allTickets and silently DROPPED the search — showing the
+        // wrong tickets while the search box still read the query (#256).
         var source = _allTickets.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(_searchText))
         {
