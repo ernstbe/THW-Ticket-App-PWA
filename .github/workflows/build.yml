@@ -56,12 +56,22 @@ jobs:
           fi
 
       - name: Check for vulnerable packages
-        run: dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerability-report.txt || true
+        # Human-readable report for the log/artifact; the JSON variant is what
+        # gates the build (the text form exits 0 even when it lists findings).
+        run: |
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerability-report.txt
+          dotnet list package --vulnerable --include-transitive --format json > vulnerability-report.json
+          if grep -q '"vulnerabilities"' vulnerability-report.json; then
+            echo "::error::Vulnerable NuGet packages found - see the log above or the vulnerability-report artifact."
+            exit 1
+          fi
 
       - name: Upload vulnerability report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: vulnerability-report
-          path: vulnerability-report.txt
+          path: |
+            vulnerability-report.txt
+            vulnerability-report.json
           retention-days: 30
