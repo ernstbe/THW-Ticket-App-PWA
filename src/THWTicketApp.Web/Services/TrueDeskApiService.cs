@@ -1655,6 +1655,29 @@ public class TrueDeskApiService : ITrueDeskApiService
         return response.IsSuccessStatusCode;
     }
 
+    // #favorites — v2-only endpoints (trudesk feat/ticket-favorites).
+    public Task<List<int>?> GetFavoriteUidsAsync() =>
+        SendFavoritesAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/accounts/me/favorites"));
+
+    public Task<List<int>?> AddFavoriteAsync(int ticketUid) =>
+        SendFavoritesAsync(() => _httpClient.PutAsync(
+            $"{V2BaseUrl}/accounts/me/favorites/{ticketUid}",
+            new StringContent(string.Empty, Encoding.UTF8, "application/json")));
+
+    public Task<List<int>?> RemoveFavoriteAsync(int ticketUid) =>
+        SendFavoritesAsync(() => _httpClient.DeleteAsync($"{V2BaseUrl}/accounts/me/favorites/{ticketUid}"));
+
+    private async Task<List<int>?> SendFavoritesAsync(Func<Task<HttpResponseMessage>> send)
+    {
+        var response = await SendWithAutoRefreshAsync(send);
+        if (!response.IsSuccessStatusCode) return null;
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("favorites", out var favorites) || favorites.ValueKind != JsonValueKind.Array)
+            return null;
+        return favorites.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Number).Select(e => e.GetInt32()).ToList();
+    }
+
     public async Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber)
     {
         if (string.IsNullOrWhiteSpace(fullname)) return false;

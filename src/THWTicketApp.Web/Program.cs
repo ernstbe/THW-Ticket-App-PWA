@@ -37,6 +37,7 @@ builder.Services.AddScoped<BrowserNotificationService>();
 builder.Services.AddScoped<WebPushService>();
 builder.Services.AddScoped<IdleLockService>();
 builder.Services.AddScoped<RecentTicketsService>();
+builder.Services.AddScoped<FavoritesService>();
 builder.Services.AddScoped<NavigationHistoryService>();
 builder.Services.AddScoped<CommandPaletteService>();
 builder.Services.AddScoped<OnboardingService>();
