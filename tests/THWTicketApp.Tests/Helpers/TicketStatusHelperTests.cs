@@ -60,4 +60,40 @@ public class TicketStatusHelperTests
         Assert.False(TicketStatusHelper.IsOpen(S("In Bearbeitung")));
         Assert.False(TicketStatusHelper.IsOpen(S("Geschlossen")));
     }
+
+    private static Ticket T(int uid, string status, int minutesAgo, bool deleted = false) => new()
+    {
+        Uid = uid,
+        Status = S(status),
+        Updated = DateTime.UtcNow.AddMinutes(-minutesAgo),
+        Deleted = deleted
+    };
+
+    [Fact]
+    public void MostRecentActive_skipsClosedAndDeleted_newestFirst()
+    {
+        var tickets = new[]
+        {
+            T(1, "Geschlossen", 1),
+            T(2, "Offen", 5),
+            T(3, "In Bearbeitung", 2),
+            T(4, "Gelöst", 0),
+            T(5, "Offen", 3, deleted: true),
+            T(6, "Wartend", 10)
+        };
+
+        var recent = TicketStatusHelper.MostRecentActive(tickets, 5);
+
+        Assert.Equal(new[] { 3, 2, 6 }, recent.Select(t => t.Uid));
+    }
+
+    [Fact]
+    public void MostRecentActive_respectsCount()
+    {
+        var tickets = Enumerable.Range(1, 8).Select(i => T(i, "Offen", i)).ToList();
+
+        var recent = TicketStatusHelper.MostRecentActive(tickets, 5);
+
+        Assert.Equal(new[] { 1, 2, 3, 4, 5 }, recent.Select(t => t.Uid));
+    }
 }

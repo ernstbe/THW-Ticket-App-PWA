@@ -129,6 +129,11 @@ public sealed class WhatsNewService
         new WhatsNewEntry(23, "03.10.2026", "Sicherheitsupdate",
         [
             "Die Absicherung beim Anzeigen von Kommentaren und Notizen wurde aktualisiert und schließt eine bekannte Lücke, über die präparierte Inhalte Schadcode hätten ausführen können."
+        ]),
+        new WhatsNewEntry(24, "15.11.2026", "Aufgeräumtes Dashboard",
+        [
+            "„Letzte Tickets“ auf dem Dashboard zeigt nur noch Tickets, die noch in Arbeit sind. Abgeschlossene Tickets findest du weiterhin über die Ticketliste.",
+            "Agenten und Admins sehen ihre Tickets im privaten Bereich jetzt zuverlässig in Ticketliste, Suche und Detailansicht."
         ])
     ];
 
