@@ -134,6 +134,11 @@ public sealed class WhatsNewService
         [
             "„Letzte Tickets“ auf dem Dashboard zeigt nur noch Tickets, die noch in Arbeit sind. Abgeschlossene Tickets findest du weiterhin über die Ticketliste.",
             "Agenten und Admins sehen ihre Tickets im privaten Bereich jetzt zuverlässig in Ticketliste, Suche und Detailansicht."
+        ]),
+        new WhatsNewEntry(25, "15.11.2026", "Favoriten auf allen Geräten",
+        [
+            "Markiere Tickets in der Detailansicht mit dem Stern ⭐. In der Ticketliste zeigt der neue Filter „★ Favoriten“ nur noch deine markierten Tickets — kombinierbar mit „Aktiv“, „Meine Tickets“ usw.",
+            "Favoriten werden jetzt in deinem Konto gespeichert und sind auf Handy und PC dieselben. Bisher auf diesem Gerät markierte Tickets werden automatisch übernommen."
         ])
     ];
 

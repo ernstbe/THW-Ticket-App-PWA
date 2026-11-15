@@ -208,6 +208,15 @@ public interface ITrueDeskApiService
     /// </summary>
     Task<bool> EnablePrivateTicketsAsync();
 
+    /// <summary>
+    /// #favorites — the caller's starred ticket uids, stored per user on the
+    /// server (v2 only) so they follow the user across devices. Each call
+    /// returns the full list after the change, or null if the request failed.
+    /// </summary>
+    Task<List<int>?> GetFavoriteUidsAsync();
+    Task<List<int>?> AddFavoriteAsync(int ticketUid);
+    Task<List<int>?> RemoveFavoriteAsync(int ticketUid);
+
     Task<List<SessionInfo>> GetSessionsAsync();
     Task<bool> RevokeSessionAsync(string deviceId);
     Task<bool> RevokeAllOtherSessionsAsync();

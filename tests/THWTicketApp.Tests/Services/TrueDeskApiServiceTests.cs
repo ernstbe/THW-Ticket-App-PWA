@@ -1487,4 +1487,50 @@ public class TrueDeskApiServiceTests
         var result = await _sut.EnablePrivateTicketsAsync();
         Assert.False(result);
     }
+
+    [Fact]
+    public async Task GetFavoriteUidsAsync_getsV2Endpoint_andParsesList()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, """{"success":true,"favorites":[12,7]}""");
+
+        var result = await _sut.GetFavoriteUidsAsync();
+
+        Assert.Equal(new[] { 12, 7 }, result);
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts/me/favorites", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task AddFavoriteAsync_putsUid()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, """{"success":true,"favorites":[12]}""");
+
+        var result = await _sut.AddFavoriteAsync(12);
+
+        Assert.Equal(new[] { 12 }, result);
+        Assert.Equal(HttpMethod.Put, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts/me/favorites/12", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task RemoveFavoriteAsync_deletesUid()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, """{"success":true,"favorites":[]}""");
+
+        var result = await _sut.RemoveFavoriteAsync(12);
+
+        Assert.NotNull(result);
+        Assert.Empty(result!);
+        Assert.Equal(HttpMethod.Delete, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts/me/favorites/12", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden, """{"success":false,"error":"Forbidden"}""")]
+    [InlineData(HttpStatusCode.OK, """{"success":true}""")]
+    public async Task AddFavoriteAsync_errorOrMalformedBody_returnsNull(HttpStatusCode status, string body)
+    {
+        _handler.SetDefault(status, body);
+        Assert.Null(await _sut.AddFavoriteAsync(12));
+    }
 }

@@ -786,6 +786,8 @@ public class LocalizationService
         ["favorites.empty"] = "Keine Favoriten. Markiere Tickets mit dem Stern-Symbol.",
         ["favorites.remove"] = "Aus Favoriten entfernen",
         ["favorites.removed"] = "Favorit entfernt.",
+        ["favorites.save_failed"] = "Favorit konnte nicht gespeichert werden. Bist du online?",
+        ["favorites.load_failed"] = "Favoriten konnten nicht geladen werden. Bist du online?",
 
         // Advanced Search
         ["search.advanced"] = "Erweiterte Filter",
@@ -1591,6 +1593,8 @@ public class LocalizationService
         ["favorites.empty"] = "No favorites yet. Star tickets to add them here.",
         ["favorites.remove"] = "Remove from favorites",
         ["favorites.removed"] = "Favorite removed.",
+        ["favorites.save_failed"] = "Could not save the favorite. Are you online?",
+        ["favorites.load_failed"] = "Could not load favorites. Are you online?",
 
         // Advanced Search
         ["search.advanced"] = "Advanced Filters",
