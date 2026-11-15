@@ -60,7 +60,12 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # PR-merge events (pull_request: closed) get a read-only token for the
+          # Actions cache since late 2026, so writing the cache fails with
+          # "cache write denied: token has no writable scopes" and used to abort
+          # the whole build -> nothing deployed (#331). A failed cache write
+          # must never block a deploy.
+          cache-to: type=gha,mode=max,ignore-error=true
           build-args: |
             APP_VERSION=${{ github.sha }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
