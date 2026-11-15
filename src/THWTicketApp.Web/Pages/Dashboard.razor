@@ -314,7 +314,7 @@ else
             TrudeskTranslationHelper.TranslateTicket(t);
 
         ComputeStatistics();
-        _recentTickets = _allTickets.OrderByDescending(t => t.LastActivityAt).Take(5).ToList();
+        _recentTickets = TicketStatusHelper.MostRecentActive(_allTickets, 5);
     }
 
     // Offline read-cache: persist the raw server ticket array after a successful

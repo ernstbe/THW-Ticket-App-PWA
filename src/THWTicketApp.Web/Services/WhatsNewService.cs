@@ -130,7 +130,11 @@ public sealed class WhatsNewService
         [
             "Die Absicherung beim Anzeigen von Kommentaren und Notizen wurde aktualisiert und schließt eine bekannte Lücke, über die präparierte Inhalte Schadcode hätten ausführen können."
         ]),
-        // Id 25: Id 24 is taken by the dashboard change in PR #331.
+        new WhatsNewEntry(24, "15.11.2026", "Aufgeräumtes Dashboard",
+        [
+            "„Letzte Tickets“ auf dem Dashboard zeigt nur noch Tickets, die noch in Arbeit sind. Abgeschlossene Tickets findest du weiterhin über die Ticketliste.",
+            "Agenten und Admins sehen ihre Tickets im privaten Bereich jetzt zuverlässig in Ticketliste, Suche und Detailansicht."
+        ]),
         new WhatsNewEntry(25, "15.11.2026", "Favoriten auf allen Geräten",
         [
             "Markiere Tickets in der Detailansicht mit dem Stern ⭐. In der Ticketliste zeigt der neue Filter „★ Favoriten“ nur noch deine markierten Tickets — kombinierbar mit „Aktiv“, „Meine Tickets“ usw.",

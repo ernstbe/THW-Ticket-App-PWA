@@ -58,4 +58,16 @@ public static class TicketStatusHelper
     /// <summary>True for the "Offen"/"Neu" (open/new) bucket specifically.</summary>
     public static bool IsOpen(Status? status) =>
         status?.Name is { Length: > 0 } name && OpenNames.Contains(name);
+
+    /// <summary>
+    /// The dashboard's "Letzte Tickets": the most recently active tickets that
+    /// are still being worked on. Closed tickets are left out (feature request
+    /// from the in-app feedback tool) — they remain reachable via the ticket list.
+    /// </summary>
+    public static List<Ticket> MostRecentActive(IEnumerable<Ticket> tickets, int count) =>
+        tickets
+            .Where(t => !t.Deleted && IsActive(t.Status))
+            .OrderByDescending(t => t.LastActivityAt)
+            .Take(count)
+            .ToList();
 }
