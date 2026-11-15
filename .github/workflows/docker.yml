@@ -52,6 +52,12 @@ jobs:
             type=sha
             type=raw,value=latest
 
+      # repository.updated_at (used before) is when the repo's settings last
+      # changed, not when this image was built.
+      - name: Build timestamp
+        id: built
+        run: echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -68,4 +74,4 @@ jobs:
           cache-to: type=gha,mode=max,ignore-error=true
           build-args: |
             APP_VERSION=${{ github.sha }}
-            BUILD_DATE=${{ github.event.repository.updated_at }}
+            BUILD_DATE=${{ steps.built.outputs.at }}

@@ -2,11 +2,6 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Injected by the CI workflow; falls back to "dev" for local builds so the
-# version file is always present and never empty.
-ARG APP_VERSION=dev
-ARG BUILD_DATE=unknown
-
 COPY src/THWTicketApp.Shared/*.csproj src/THWTicketApp.Shared/
 COPY src/THWTicketApp.Web/*.csproj src/THWTicketApp.Web/
 RUN dotnet restore src/THWTicketApp.Web/THWTicketApp.Web.csproj
@@ -20,6 +15,12 @@ RUN dotnet publish src/THWTicketApp.Web/THWTicketApp.Web.csproj \
 RUN sed -i 's|<base href="/" />|<base href="/app/" />|g' /app/publish/wwwroot/index.html
 
 # Bake the build identifiers into a static file the PWA fetches at runtime.
+# Injected by the CI workflow; falls back to "dev" for local builds so the
+# version file is always present and never empty. Declared here, not at the
+# top: every RUN after an ARG sees it, so a per-build value up there made
+# `dotnet restore` miss the layer cache on every build.
+ARG APP_VERSION=dev
+ARG BUILD_DATE=unknown
 RUN printf '{"version":"%s","builtAt":"%s"}\n' "$APP_VERSION" "$BUILD_DATE" \
     > /app/publish/wwwroot/version.json
 
