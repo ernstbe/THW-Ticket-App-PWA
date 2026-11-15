@@ -147,8 +147,8 @@ public sealed class WhatsNewService
         ]),
         new WhatsNewEntry(27, "16.11.2026", "Benachrichtigungen per E-Mail",
         [
-            "Kommentare zu deinen oder dir zugewiesenen Tickets, Erwähnungen und Zuweisungen bekommst du jetzt auch per E-Mail. Die E-Mail enthält nur Ticketnummer, Betreff und einen Link in die App.",
-            "Unter Einstellungen → „E-Mail-Benachrichtigungen“ kannst du das abschalten oder zusätzlich jedes neue Ticket in deinen Gruppen per E-Mail bekommen."
+            "Du kannst dich jetzt auch per E-Mail benachrichtigen lassen: bei Kommentaren zu deinen oder dir zugewiesenen Tickets, Erwähnungen und Zuweisungen – und auf Wunsch bei jedem neuen Ticket in deinen Gruppen.",
+            "Das ist standardmäßig aus. Einschalten kannst du es unter Einstellungen → „E-Mail-Benachrichtigungen“. Die E-Mail enthält nur Ticketnummer, Betreff und einen Link in die App."
         ])
     ];
 

@@ -36,6 +36,17 @@ public class TrueDeskApiServiceEmailNotificationTests
     }
 
     [Fact]
+    public async Task Missing_switches_count_as_off()
+    {
+        _handler.RespondTo(HttpMethod.Get, Path, HttpStatusCode.OK,
+            "{\"success\":true,\"email\":{},\"mailEnabled\":true}");
+
+        var result = await Build().GetEmailNotificationSettingsAsync();
+
+        Assert.Equal(new EmailNotificationSettings(Personal: false, NewTickets: false, MailEnabled: true), result);
+    }
+
+    [Fact]
     public async Task Get_returns_null_when_the_server_does_not_know_the_endpoint()
     {
         _handler.RespondTo(HttpMethod.Get, Path, HttpStatusCode.NotFound, "{\"success\":false}");

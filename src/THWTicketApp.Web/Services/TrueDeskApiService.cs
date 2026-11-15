@@ -1705,7 +1705,7 @@ public class TrueDeskApiService : ITrueDeskApiService
                 ? v.GetBoolean()
                 : fallback;
         return new EmailNotificationSettings(
-            Flag(email, "personal", true),
+            Flag(email, "personal", false),
             Flag(email, "newTickets", false),
             Flag(root, "mailEnabled", false));
     }
