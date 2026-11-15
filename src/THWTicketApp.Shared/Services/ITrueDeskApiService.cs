@@ -217,6 +217,14 @@ public interface ITrueDeskApiService
     Task<List<int>?> AddFavoriteAsync(int ticketUid);
     Task<List<int>?> RemoveFavoriteAsync(int ticketUid);
 
+    /// <summary>
+    /// #mailnotify: the user's e-mail notification switches (v2 only).
+    /// Update sends only the non-null switches. Both return the settings
+    /// after the call, or null if the request failed.
+    /// </summary>
+    Task<EmailNotificationSettings?> GetEmailNotificationSettingsAsync();
+    Task<EmailNotificationSettings?> UpdateEmailNotificationSettingsAsync(bool? personal, bool? newTickets);
+
     Task<List<SessionInfo>> GetSessionsAsync();
     Task<bool> RevokeSessionAsync(string deviceId);
     Task<bool> RevokeAllOtherSessionsAsync();

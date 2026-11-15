@@ -163,6 +163,48 @@
         </MudCard>
     </div>
 
+    @* #mailnotify — server-side switches for e-mail copies of ticket
+       notifications. Hidden when the server cannot send mail. *@
+    @if (_emailSettings is { MailEnabled: true })
+    {
+        <div class="settings-cell">
+            <MudCard>
+                <MudCardHeader>
+                    <MudText Typo="Typo.h6">@L.T("settings.email_notifications")</MudText>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mb-3">
+                        @L.T("settings.email_notifications_desc")
+                    </MudText>
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <div>
+                            <MudText Typo="Typo.body2">@L.T("settings.email_personal")</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                @L.T("settings.email_personal_desc")
+                            </MudText>
+                        </div>
+                        <MudSwitch Value="@_emailSettings.Personal"
+                                   ValueChanged="@(async (bool v) => await SetEmailNotificationAsync(personal: v))"
+                                   Disabled="@_emailSettingsBusy"
+                                   Color="Color.Primary" T="bool" />
+                    </div>
+                    <div class="d-flex justify-space-between align-center">
+                        <div>
+                            <MudText Typo="Typo.body2">@L.T("settings.email_new_tickets")</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                @L.T("settings.email_new_tickets_desc")
+                            </MudText>
+                        </div>
+                        <MudSwitch Value="@_emailSettings.NewTickets"
+                                   ValueChanged="@(async (bool v) => await SetEmailNotificationAsync(newTickets: v))"
+                                   Disabled="@_emailSettingsBusy"
+                                   Color="Color.Primary" T="bool" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </div>
+    }
+
     @* API Configuration — hidden behind an "Erweitert" expander so normal
        users can't accidentally break the app by editing the URL. *@
     <div class="settings-cell">
@@ -567,6 +609,10 @@
     private bool _webPushEnabled;
     private bool _webPushBusy;
 
+    // #mailnotify — null until loaded (or when offline / server too old).
+    private EmailNotificationSettings? _emailSettings;
+    private bool _emailSettingsBusy;
+
     // App version info — fetched from version.json baked in at Docker build.
     private string _appVersion = "dev";
     private string _appBuiltAt = string.Empty;
@@ -604,6 +650,7 @@
         await LoadSyncLogAsync();
         await LoadConflictCountAsync();
         await LoadPrivateTicketsStatusAsync();
+        await LoadEmailNotificationSettingsAsync();
 
         // Keep the sync-conflicts card honest: refresh the count when
         // the SyncService detects a fresh conflict, and when the pending
@@ -663,6 +710,44 @@
         finally
         {
             _updateChecking = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadEmailNotificationSettingsAsync()
+    {
+        try
+        {
+            _emailSettings = await ApiService.GetEmailNotificationSettingsAsync();
+        }
+        catch
+        {
+            _emailSettings = null;
+        }
+    }
+
+    private async Task SetEmailNotificationAsync(bool? personal = null, bool? newTickets = null)
+    {
+        if (_emailSettingsBusy) return;
+        _emailSettingsBusy = true;
+        try
+        {
+            var updated = await ApiService.UpdateEmailNotificationSettingsAsync(personal, newTickets);
+            if (updated is null)
+            {
+                Snackbar.Add(L.T("settings.email_save_failed"), Severity.Error);
+                return;
+            }
+            _emailSettings = updated;
+            Snackbar.Add(L.T("settings.saved"), Severity.Success);
+        }
+        catch
+        {
+            Snackbar.Add(L.T("settings.email_save_failed"), Severity.Error);
+        }
+        finally
+        {
+            _emailSettingsBusy = false;
             StateHasChanged();
         }
     }
