@@ -17,6 +17,7 @@
 @inject ISyncService SyncService
 @inject THWTicketApp.Web.Services.AppStateService AppState
 @inject IDialogService DialogService
+@inject THWTicketApp.Web.Services.FavoritesService Favorites
 @implements IDisposable
 
 <PageTitle>@L.T("tickets.title") - THW Ticket App</PageTitle>
@@ -55,6 +56,10 @@
              Variant="Variant.Filled" OnClick="@(() => SetFilter("overdue"))">@L.T("dashboard.overdue")</MudChip>
     <MudChip T="string" Color="@(_showOnlyMyTickets ? Color.Secondary : Color.Default)"
              Variant="Variant.Filled" OnClick="ToggleMyTickets">@L.T("tickets.mytickets")</MudChip>
+    @* #favorites — combinable with the status chips, like "Meine Tickets". *@
+    <MudChip T="string" Color="@(_showOnlyFavorites ? Color.Warning : Color.Default)"
+             Variant="Variant.Filled" Icon="@Icons.Material.Filled.Star"
+             Disabled="_loadingFavorites" OnClick="ToggleFavoritesFilterAsync">@L.T("nav.favorites")</MudChip>
     <MudSpacer />
     <MudIconButton Icon="@(_showAdvancedFilter ? Icons.Material.Filled.FilterListOff : Icons.Material.Filled.Tune)"
                    OnClick="@(() => { _showAdvancedFilter = !_showAdvancedFilter; StateHasChanged(); })"
@@ -148,7 +153,7 @@
             {
                 <MudMenuItem>
                     <div class="d-flex align-center gap-2">
-                        <MudLink OnClick="@(() => ApplySavedFilter(f))">@f.Name</MudLink>
+                        <MudLink OnClick="@(() => ApplySavedFilterAsync(f))">@f.Name</MudLink>
                         <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small"
                                        OnClick="@(() => DeleteSavedFilterAsync(f))" />
                     </div>
@@ -316,6 +321,9 @@ else
     private string _activeFilter = "active";
     private string _activeSort = "updated";
     private bool _showOnlyMyTickets;
+    private bool _showOnlyFavorites;
+    private bool _loadingFavorites;
+    private HashSet<int> _favoriteUids = [];
     private string _statusMessage = string.Empty;
     private List<Ticket> _allTickets = [];
     private List<Ticket> _filteredTickets = [];
@@ -608,6 +616,43 @@ else
 
     private void SetFilter(string filter) { _activeFilter = filter; _currentPage = 1; ApplyFilters(); }
     private void ToggleMyTickets() { _showOnlyMyTickets = !_showOnlyMyTickets; _currentPage = 1; ApplyFilters(); }
+
+    private async Task ToggleFavoritesFilterAsync()
+    {
+        if (_showOnlyFavorites)
+        {
+            _showOnlyFavorites = false;
+        }
+        else
+        {
+            if (!await LoadFavoriteUidsAsync()) return;
+            _showOnlyFavorites = true;
+        }
+        _currentPage = 1;
+        ApplyFilters();
+    }
+
+    // Favorites are stored per user on the server (FavoritesService). Always
+    // refresh when the filter is switched on, so a star set on another device
+    // shows up without reloading the app.
+    private async Task<bool> LoadFavoriteUidsAsync()
+    {
+        _loadingFavorites = true;
+        try
+        {
+            _favoriteUids = (await Favorites.GetAsync(refresh: true)).ToHashSet();
+            return true;
+        }
+        catch (Exception)
+        {
+            Snackbar.Add(L.T("favorites.load_failed"), Severity.Error);
+            return false;
+        }
+        finally
+        {
+            _loadingFavorites = false;
+        }
+    }
     private void OnPageChanged(int page) { _currentPage = page; StateHasChanged(); }
 
     private void ApplyFilters()
@@ -658,6 +703,8 @@ else
         if (_showOnlyMyTickets && !string.IsNullOrEmpty(ApiService.CurrentUserId))
             source = source.Where(t => t.Assignee?.Id == ApiService.CurrentUserId
                 || t.AdditionalAssignees.Any(a => a.Id == ApiService.CurrentUserId));
+        if (_showOnlyFavorites)
+            source = source.Where(t => _favoriteUids.Contains(t.Uid));
 
         // Advanced filters
         if (!string.IsNullOrEmpty(_filterPriority))
@@ -922,6 +969,7 @@ else
             Filter = _activeFilter,
             Sort = _activeSort,
             MyTickets = _showOnlyMyTickets,
+            Favorites = _showOnlyFavorites,
             SearchText = _searchText
         });
         await PersistSavedFiltersAsync();
@@ -930,11 +978,12 @@ else
         Snackbar.Add(L.T("tickets.filter_saved"), Severity.Success);
     }
 
-    private void ApplySavedFilter(SavedFilterItem f)
+    private async Task ApplySavedFilterAsync(SavedFilterItem f)
     {
         _activeFilter = f.Filter;
         _activeSort = f.Sort;
         _showOnlyMyTickets = f.MyTickets;
+        _showOnlyFavorites = f.Favorites && await LoadFavoriteUidsAsync();
         _searchText = f.SearchText ?? string.Empty;
         ApplyFilters();
     }
@@ -970,6 +1019,7 @@ else
         public string Filter { get; set; } = "all";
         public string Sort { get; set; } = "date_desc";
         public bool MyTickets { get; set; }
+        public bool Favorites { get; set; }
         public string? SearchText { get; set; }
     }
 }

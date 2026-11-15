@@ -133,7 +133,7 @@ public sealed class WhatsNewService
         // Id 25: Id 24 is taken by the dashboard change in PR #331.
         new WhatsNewEntry(25, "15.11.2026", "Favoriten auf allen Geräten",
         [
-            "Markiere Tickets in der Detailansicht mit dem Stern ⭐ — unter „Favoriten“ im Menü findest du sie gesammelt wieder.",
+            "Markiere Tickets in der Detailansicht mit dem Stern ⭐. In der Ticketliste zeigt der neue Filter „★ Favoriten“ nur noch deine markierten Tickets — kombinierbar mit „Aktiv“, „Meine Tickets“ usw.",
             "Favoriten werden jetzt in deinem Konto gespeichert und sind auf Handy und PC dieselben. Bisher auf diesem Gerät markierte Tickets werden automatisch übernommen."
         ])
     ];
