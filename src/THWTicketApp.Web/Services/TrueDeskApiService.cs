@@ -1678,6 +1678,38 @@ public class TrueDeskApiService : ITrueDeskApiService
         return favorites.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Number).Select(e => e.GetInt32()).ToList();
     }
 
+    public Task<EmailNotificationSettings?> GetEmailNotificationSettingsAsync() =>
+        SendEmailNotificationSettingsAsync(() => _httpClient.GetAsync($"{V2BaseUrl}/accounts/me/notification-settings"));
+
+    public Task<EmailNotificationSettings?> UpdateEmailNotificationSettingsAsync(bool? personal, bool? newTickets)
+    {
+        var email = new Dictionary<string, bool>();
+        if (personal.HasValue) email["personal"] = personal.Value;
+        if (newTickets.HasValue) email["newTickets"] = newTickets.Value;
+        var body = JsonSerializer.Serialize(new { email });
+        return SendEmailNotificationSettingsAsync(() => _httpClient.PutAsync(
+            $"{V2BaseUrl}/accounts/me/notification-settings",
+            new StringContent(body, Encoding.UTF8, "application/json")));
+    }
+
+    private async Task<EmailNotificationSettings?> SendEmailNotificationSettingsAsync(Func<Task<HttpResponseMessage>> send)
+    {
+        var response = await SendWithAutoRefreshAsync(send);
+        if (!response.IsSuccessStatusCode) return null;
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (!root.TryGetProperty("email", out var email) || email.ValueKind != JsonValueKind.Object) return null;
+        static bool Flag(JsonElement e, string name, bool fallback) =>
+            e.TryGetProperty(name, out var v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)
+                ? v.GetBoolean()
+                : fallback;
+        return new EmailNotificationSettings(
+            Flag(email, "personal", true),
+            Flag(email, "newTickets", false),
+            Flag(root, "mailEnabled", false));
+    }
+
     public async Task<bool> UpdateProfileAsync(string fullname, string? title, string? workNumber, string? mobileNumber)
     {
         if (string.IsNullOrWhiteSpace(fullname)) return false;

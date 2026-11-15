@@ -144,6 +144,11 @@ public sealed class WhatsNewService
         [
             "„Passwort vergessen?“ auf der Anmeldeseite schickt dir jetzt einen Link (1 Stunde gültig), über den du selbst ein neues Passwort festlegst. Es wird kein Passwort mehr per E-Mail verschickt.",
             "Neue Kolleginnen und Kollegen bekommen eine Einladung per Link und vergeben ihr Passwort beim ersten Öffnen selbst."
+        ]),
+        new WhatsNewEntry(27, "16.11.2026", "Benachrichtigungen per E-Mail",
+        [
+            "Kommentare zu deinen oder dir zugewiesenen Tickets, Erwähnungen und Zuweisungen bekommst du jetzt auch per E-Mail. Die E-Mail enthält nur Ticketnummer, Betreff und einen Link in die App.",
+            "Unter Einstellungen → „E-Mail-Benachrichtigungen“ kannst du das abschalten oder zusätzlich jedes neue Ticket in deinen Gruppen per E-Mail bekommen."
         ])
     ];
 
