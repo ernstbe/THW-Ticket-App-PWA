@@ -1987,4 +1987,61 @@ public class TrueDeskApiService : ITrueDeskApiService
             return (false, ex.Message);
         }
     }
+
+    private string AccountLinkUrl(bool isInvite, string token) =>
+        $"{V2BaseUrl}/public/{(isInvite ? "invite" : "password-reset")}/{Uri.EscapeDataString(token)}";
+
+    public async Task<(string Fullname, string Username)?> CheckAccountLinkAsync(bool isInvite, string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
+        try
+        {
+            var response = await _httpClient.GetAsync(AccountLinkUrl(isInvite, token));
+            if (!response.IsSuccessStatusCode) return null;
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            if (!doc.RootElement.TryGetProperty("account", out var acc)) return null;
+            var fullname = acc.TryGetProperty("fullname", out var f) ? f.GetString() : null;
+            var username = acc.TryGetProperty("username", out var u) ? u.GetString() : null;
+            if (string.IsNullOrEmpty(username)) return null;
+            return (fullname ?? username, username);
+        }
+        catch (HttpRequestException) { return null; }
+        catch (TaskCanceledException) { return null; }
+        catch (JsonException) { return null; }
+    }
+
+    public async Task<(bool Success, string? Username, string? Error, bool LinkInvalid)> AcceptAccountLinkAsync(
+        bool isInvite, string token, string password, string passwordConfirm)
+    {
+        try
+        {
+            var content = new StringContent(JsonSerializer.Serialize(new { password, passwordConfirm }), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync(AccountLinkUrl(isInvite, token), content);
+            var json = await response.Content.ReadAsStringAsync();
+            string? username = null, error = null;
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("username", out var u)) username = u.GetString();
+                if (doc.RootElement.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.String) error = e.GetString();
+            }
+            catch (JsonException) { }
+            var linkInvalid = response.StatusCode == System.Net.HttpStatusCode.NotFound;
+            return (response.IsSuccessStatusCode && !string.IsNullOrEmpty(username), username, error, linkInvalid);
+        }
+        catch (HttpRequestException ex) { return (false, null, ex.Message, false); }
+        catch (TaskCanceledException ex) { return (false, null, ex.Message, false); }
+    }
+
+    public async Task<bool> RequestPasswordResetAsync(string email)
+    {
+        try
+        {
+            var content = new StringContent(JsonSerializer.Serialize(new { email }), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync($"{V2BaseUrl}/public/password-reset", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException) { return false; }
+        catch (TaskCanceledException) { return false; }
+    }
 }
