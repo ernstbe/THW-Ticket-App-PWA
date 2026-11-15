@@ -8,7 +8,7 @@
 @inject ITrueDeskApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
-@inject LocalStorageService LocalStorage
+@inject THWTicketApp.Web.Services.FavoritesService FavoritesStore
 @inject THWTicketApp.Web.Services.LocalizationService L
 
 <PageTitle>@L.T("nav.favorites") - THW Ticket App</PageTitle>
@@ -90,8 +90,8 @@ else
 
         try
         {
-            var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
-            var favUids = JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
+            // #favorites — the list lives on the server (per user, all devices).
+            var favUids = await FavoritesStore.GetAsync(refresh: true);
 
             if (favUids.Count == 0)
             {
@@ -99,6 +99,8 @@ else
                 return;
             }
 
+            // The ticket list is already filtered to what this user may see,
+            // so a favorite that moved out of reach simply doesn't show up.
             var json = await ApiService.GetTicketsAsync();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var allTickets = JsonHelper.DeserializeWrappedArray<Ticket>(json, "tickets", options);
@@ -110,6 +112,10 @@ else
 
             foreach (var t in _favorites)
                 TrudeskTranslationHelper.TranslateTicket(t);
+        }
+        catch (THWTicketApp.Web.Services.FavoritesUnavailableException)
+        {
+            Snackbar.Add(L.T("favorites.load_failed"), Severity.Error);
         }
         catch (Exception ex)
         {
@@ -124,10 +130,11 @@ else
 
     private async Task RemoveFavoriteAsync(int uid)
     {
-        var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
-        var favs = JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
-        favs.Remove(uid);
-        await LocalStorage.SetItemAsync("favorite_tickets", JsonSerializer.Serialize(favs));
+        if (!await FavoritesStore.SetAsync(uid, false))
+        {
+            Snackbar.Add(L.T("favorites.save_failed"), Severity.Error);
+            return;
+        }
         _favorites.RemoveAll(t => t.Uid == uid);
         Snackbar.Add(L.T("favorites.removed"), Severity.Info);
         StateHasChanged();

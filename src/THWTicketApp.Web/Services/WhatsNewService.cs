@@ -129,6 +129,12 @@ public sealed class WhatsNewService
         new WhatsNewEntry(23, "03.10.2026", "Sicherheitsupdate",
         [
             "Die Absicherung beim Anzeigen von Kommentaren und Notizen wurde aktualisiert und schließt eine bekannte Lücke, über die präparierte Inhalte Schadcode hätten ausführen können."
+        ]),
+        // Id 25: Id 24 is taken by the dashboard change in PR #331.
+        new WhatsNewEntry(25, "15.11.2026", "Favoriten auf allen Geräten",
+        [
+            "Markiere Tickets in der Detailansicht mit dem Stern ⭐ — unter „Favoriten“ im Menü findest du sie gesammelt wieder.",
+            "Favoriten werden jetzt in deinem Konto gespeichert und sind auf Handy und PC dieselben. Bisher auf diesem Gerät markierte Tickets werden automatisch übernommen."
         ])
     ];
 

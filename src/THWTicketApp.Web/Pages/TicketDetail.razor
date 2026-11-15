@@ -20,6 +20,7 @@
 @inject THWTicketApp.Web.Services.RealtimeService Realtime
 @inject IJSRuntime JsRuntime
 @inject THWTicketApp.Web.Services.RecentTicketsService RecentTickets
+@inject THWTicketApp.Web.Services.FavoritesService Favorites
 @inject IDialogService DialogService
 @inject ISyncService SyncService
 @inject THWTicketApp.Web.Services.AppStateService AppState
@@ -69,6 +70,7 @@ else
         <MudIconButton Icon="@(_isFavorite ? Icons.Material.Filled.Star : Icons.Material.Filled.StarOutline)"
                        Color="@(_isFavorite ? Color.Warning : Color.Default)"
                        OnClick="ToggleFavoriteAsync"
+                       Disabled="_favoriteBusy"
                        aria-label="@L.T("detail.favorite")" />
         <MudTooltip Text="@(_isSubscribed ? L.T("detail.unsubscribe") : L.T("detail.subscribe"))">
             <MudIconButton Icon="@(_isSubscribed ? Icons.Material.Filled.NotificationsActive : Icons.Material.Filled.NotificationsNone)"
@@ -779,6 +781,7 @@ else
     // Subscription + favorites
     private bool _isSubscribed;
     private bool _isFavorite;
+    private bool _favoriteBusy;
 
     // Attachments
     private bool _isUploading;
@@ -1772,20 +1775,40 @@ else
 
     // ─── Favorites / Subscription ───────────────────────────────────────
 
+    // #favorites — stored per user on the server (FavoritesService), so the
+    // star is the same on every device.
     private async Task LoadFavoriteStateAsync()
     {
-        var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
-        var favs = JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
-        _isFavorite = favs.Contains(TicketUid);
+        try
+        {
+            _isFavorite = await Favorites.IsFavoriteAsync(TicketUid);
+        }
+        catch (Exception)
+        {
+            // Offline / server unreachable: show the outline star; toggling
+            // reports the error instead of silently pretending to succeed.
+            _isFavorite = false;
+        }
     }
 
     private async Task ToggleFavoriteAsync()
     {
-        var favJson = await LocalStorage.GetItemAsync("favorite_tickets") ?? "[]";
-        var favs = JsonSerializer.Deserialize<List<int>>(favJson) ?? [];
-        if (_isFavorite) favs.Remove(TicketUid); else favs.Add(TicketUid);
-        _isFavorite = !_isFavorite;
-        await LocalStorage.SetItemAsync("favorite_tickets", JsonSerializer.Serialize(favs));
+        _favoriteBusy = true;
+        try
+        {
+            if (await Favorites.SetAsync(TicketUid, !_isFavorite))
+                _isFavorite = !_isFavorite;
+            else
+                Snackbar.Add(L.T("favorites.save_failed"), Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"{L.T("common.error")}: {ErrorHelper.Categorize(ex).Message}", Severity.Error);
+        }
+        finally
+        {
+            _favoriteBusy = false;
+        }
     }
 
     private async Task LoadSubscriptionStateAsync()
