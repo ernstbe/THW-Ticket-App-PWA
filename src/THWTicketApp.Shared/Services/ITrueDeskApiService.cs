@@ -244,4 +244,13 @@ public interface ITrueDeskApiService
     Task<string?> GetCaptchaSvgAsync();
     Task<(bool Success, bool Exists, string? Error)> CheckEmailAsync(string email, string captcha);
     Task<(bool Success, string? Error)> RegisterAsync(string username, string fullname, string email, string password, string captcha);
+
+    // Invitation + password-reset links (#invite, v2, unauthenticated).
+    // isInvite selects /public/invite vs /public/password-reset.
+    /// <summary>Who the link is for, or null when it is invalid, expired or used.</summary>
+    Task<(string Fullname, string Username)?> CheckAccountLinkAsync(bool isInvite, string token);
+    /// <summary>Sets the password via the link; returns the username to log in with.</summary>
+    Task<(bool Success, string? Username, string? Error, bool LinkInvalid)> AcceptAccountLinkAsync(bool isInvite, string token, string password, string passwordConfirm);
+    /// <summary>Asks for a reset mail. The server answers the same for unknown addresses.</summary>
+    Task<bool> RequestPasswordResetAsync(string email);
 }

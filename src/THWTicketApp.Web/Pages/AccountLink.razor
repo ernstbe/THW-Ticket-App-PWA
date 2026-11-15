@@ -1,0 +1,168 @@
+@page "/einladung/{Token}"
+@page "/passwort-zuruecksetzen/{Token}"
+@layout THWTicketApp.Web.Layout.LoginLayout
+@using MudBlazor
+@inject THWTicketApp.Shared.Services.ITrueDeskApiService ApiService
+@inject THWTicketApp.Web.Services.AuthStateProvider AuthStateProvider
+@inject THWTicketApp.Web.Services.AppSettingsInitializer SettingsInit
+@inject NavigationManager Navigation
+@inject THWTicketApp.Web.Services.LocalizationService L
+
+@* #invite: target of the invitation mail (7 days) and the password-reset
+   mail (1 hour). The user picks a password and is logged in right away. *@
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center" Style="height: 100vh;">
+    <MudCard Elevation="4" Class="pa-8 mx-auto" Style="width: 100%; max-width: 440px;">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <div class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-2">THW</MudText>
+                    <MudText Typo="Typo.h5">@L.T(IsInvite ? "link.invite_title" : "link.reset_title")</MudText>
+                </div>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @if (_checking)
+            {
+                <div class="d-flex justify-center my-6"><MudProgressCircular Indeterminate="true" /></div>
+            }
+            else if (_invalid)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4">
+                    @L.T(IsInvite ? "link.invite_invalid" : "link.reset_invalid")
+                </MudAlert>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href="@(IsInvite ? "login" : "passwort-vergessen")">
+                    @L.T(IsInvite ? "link.to_login" : "link.request_new")
+                </MudButton>
+            }
+            else
+            {
+                <MudText Class="mb-4">
+                    @string.Format(L.T(IsInvite ? "link.invite_intro" : "link.reset_intro"), _fullname, _username)
+                </MudText>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+                }
+
+                <MudTextField @bind-Value="_password" Label="@L.T("link.password")" Variant="Variant.Outlined"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                              HelperText="@L.T("link.password_hint")"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                              Disabled="@_isLoading" Class="mb-3" UserAttributes="@NewPasswordAttributes" />
+
+                <MudTextField @bind-Value="_passwordConfirm" Label="@L.T("link.password_confirm")" Variant="Variant.Outlined"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                              Disabled="@_isLoading" Class="mb-3" UserAttributes="@NewPasswordAttributes" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large"
+                           OnClick="@SubmitAsync" Disabled="@_isLoading">
+                    @if (_isLoading)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    }
+                    else
+                    {
+                        <MudText>@L.T(IsInvite ? "link.invite_submit" : "link.reset_submit")</MudText>
+                    }
+                </MudButton>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [Parameter] public string Token { get; set; } = string.Empty;
+
+    private static readonly Dictionary<string, object> NewPasswordAttributes = new() { ["autocomplete"] = "new-password" };
+
+    private bool IsInvite => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("einladung", StringComparison.OrdinalIgnoreCase);
+
+    private bool _checking = true;
+    private bool _invalid;
+    private bool _isLoading;
+    private bool _showPassword;
+    private string _fullname = string.Empty;
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private string _passwordConfirm = string.Empty;
+    private string? _errorMessage;
+
+    internal const int MinPasswordLength = 8;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await SettingsInit.InitializeAsync();
+        var account = await ApiService.CheckAccountLinkAsync(IsInvite, Token);
+        if (account is null)
+        {
+            _invalid = true;
+        }
+        else
+        {
+            _fullname = account.Value.Fullname;
+            _username = account.Value.Username;
+        }
+        _checking = false;
+        StateHasChanged();
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_isLoading) return;
+        _errorMessage = null;
+
+        if (_password.Length < MinPasswordLength)
+        {
+            _errorMessage = L.T("link.password_too_short");
+            return;
+        }
+        if (_password != _passwordConfirm)
+        {
+            _errorMessage = L.T("link.password_mismatch");
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var result = await ApiService.AcceptAccountLinkAsync(IsInvite, Token, _password, _passwordConfirm);
+            if (result.LinkInvalid)
+            {
+                _invalid = true;
+                return;
+            }
+            if (!result.Success)
+            {
+                // Server messages for these endpoints are German and meant for the user.
+                _errorMessage = string.IsNullOrEmpty(result.Error) ? L.T("link.failed") : result.Error;
+                return;
+            }
+
+            if (await ApiService.AuthenticateAsync(result.Username!, _password))
+            {
+                AuthStateProvider.NotifyAuthStateChanged();
+                Navigation.NavigateTo("./", replace: true);
+            }
+            else
+            {
+                // Password is set; only the automatic login failed.
+                Navigation.NavigateTo("login", replace: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Account link failed: {ex}");
+            _errorMessage = L.T("link.failed");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

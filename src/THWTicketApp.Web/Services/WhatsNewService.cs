@@ -139,6 +139,11 @@ public sealed class WhatsNewService
         [
             "Markiere Tickets in der Detailansicht mit dem Stern ⭐. In der Ticketliste zeigt der neue Filter „★ Favoriten“ nur noch deine markierten Tickets — kombinierbar mit „Aktiv“, „Meine Tickets“ usw.",
             "Favoriten werden jetzt in deinem Konto gespeichert und sind auf Handy und PC dieselben. Bisher auf diesem Gerät markierte Tickets werden automatisch übernommen."
+        ]),
+        new WhatsNewEntry(26, "16.11.2026", "Passwort selbst festlegen",
+        [
+            "„Passwort vergessen?“ auf der Anmeldeseite schickt dir jetzt einen Link (1 Stunde gültig), über den du selbst ein neues Passwort festlegst. Es wird kein Passwort mehr per E-Mail verschickt.",
+            "Neue Kolleginnen und Kollegen bekommen eine Einladung per Link und vergeben ihr Passwort beim ersten Öffnen selbst."
         ])
     ];
 
