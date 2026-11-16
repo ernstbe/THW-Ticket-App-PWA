@@ -212,13 +212,13 @@
                        OnClick="BatchAssignToMeAsync" Disabled="_isLoading">
                 @L.T("tickets.assign_me")
             </MudButton>
-            @if (_assignableUsers.Count > 0)
+            @if (_bulkAssignableUsers.Count > 0)
             {
                 <MudMenu Label="@L.T("batch.assign_to")"
                          StartIcon="@Icons.Material.Filled.PersonAddAlt"
                          Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
                          Disabled="_isLoading" Dense="true" MaxHeight="400">
-                    @foreach (var u in _assignableUsers)
+                    @foreach (var u in _bulkAssignableUsers)
                     {
                         var user = u;
                         <MudMenuItem OnClick="@(() => BatchAssignToUserAsync(user))">
@@ -338,7 +338,12 @@ else
     private bool _batchMode;
     private HashSet<string> _selectedTicketIds = new();
     private List<Status> _allStatuses = [];
-    private List<User> _assignableUsers = [];
+    // Bulk "assign to…" only offers people who can see the groups of ALL
+    // selected tickets (the server rejects everyone else per ticket).
+    // Agent lists are cached per group for the lifetime of the page.
+    private List<User> _bulkAssignableUsers = [];
+    private readonly Dictionary<string, List<User>> _assigneesByGroup = new();
+    private int _bulkAssigneesVersion;
 
     // Advanced filter
     private bool _showAdvancedFilter;
@@ -364,7 +369,6 @@ else
             _activeFilter = InitialFilter;
         await LoadSavedFiltersAsync();
         await LoadStatusesAsync();
-        await LoadAssignableUsersAsync();
         await LoadTicketsAsync();
         Realtime.AnyTicketChanged += OnRealtimeChange;
     }
@@ -382,19 +386,53 @@ else
         catch { /* status dropdowns just stay empty — bulk close fallback still works */ }
     }
 
-    private async Task LoadAssignableUsersAsync()
+    private async Task<List<User>> GetAssigneesForGroupAsync(string groupId)
     {
+        if (_assigneesByGroup.TryGetValue(groupId, out var cached)) return cached;
+        var json = await ApiService.GetAssigneesAsync(groupId);
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var response = JsonSerializer.Deserialize<GetUserResponse>(json, options);
+        var users = (response?.UsersOrAccounts ?? [])
+            .Where(u => !u.Deleted)
+            .OrderBy(u => u.Fullname ?? u.Username, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        _assigneesByGroup[groupId] = users;
+        return users;
+    }
+
+    // Recomputes the bulk "assign to…" list for the current selection: the
+    // intersection of the assignable agents of every selected ticket's group.
+    private async Task RefreshBulkAssigneesAsync()
+    {
+        var version = ++_bulkAssigneesVersion;
+        var groupIds = _allTickets
+            .Where(t => _selectedTicketIds.Contains(t.Id))
+            .Select(t => t.Group?.Id)
+            .Where(g => !string.IsNullOrEmpty(g))
+            .Select(g => g!)
+            .Distinct()
+            .ToList();
+
+        List<User> result = [];
         try
         {
-            var json = await ApiService.GetAssigneesAsync();
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var response = JsonSerializer.Deserialize<GetUserResponse>(json, options);
-            _assignableUsers = (response?.UsersOrAccounts ?? [])
-                .Where(u => !u.Deleted)
-                .OrderBy(u => u.Fullname ?? u.Username, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            for (var i = 0; i < groupIds.Count; i++)
+            {
+                var users = await GetAssigneesForGroupAsync(groupIds[i]);
+                if (i == 0)
+                {
+                    result = users;
+                    continue;
+                }
+                var allowed = users.Select(u => u.Id).ToHashSet();
+                result = result.Where(u => allowed.Contains(u.Id)).ToList();
+            }
         }
-        catch { /* bulk "assign to…" menu just stays hidden */ }
+        catch { result = []; /* bulk "assign to…" menu just stays hidden */ }
+
+        if (version != _bulkAssigneesVersion) return; // selection changed meanwhile
+        _bulkAssignableUsers = result;
+        StateHasChanged();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -842,6 +880,7 @@ else
         if (selected) _selectedTicketIds.Add(ticketId);
         else _selectedTicketIds.Remove(ticketId);
         StateHasChanged();
+        _ = RefreshBulkAssigneesAsync();
     }
 
     private void ClearSelection()
@@ -888,6 +927,7 @@ else
         // would have no way to verify which tickets they're acting on.
         foreach (var t in PagedTickets) _selectedTicketIds.Add(t.Id);
         StateHasChanged();
+        _ = RefreshBulkAssigneesAsync();
     }
 
     // Batch endpoints are v2-only with no offline queue, so gate the bulk

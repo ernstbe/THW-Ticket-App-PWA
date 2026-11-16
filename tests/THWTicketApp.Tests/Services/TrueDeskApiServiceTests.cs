@@ -38,6 +38,41 @@ public class TrueDeskApiServiceTests
     }
 
     // -----------------------------------------------------------------
+    // Assignees
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAssigneesAsync_v2_withGroup_sendsGroupFilterAndNoPageLimit()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"accounts\":[]}");
+        await MakeV2Sut().GetAssigneesAsync("grp1");
+
+        Assert.Equal(HttpMethod.Get, LastRequest.Method);
+        Assert.Equal("/api/v2/accounts", LastRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("type=agents", LastRequest.RequestUri.Query);
+        Assert.Contains("limit=-1", LastRequest.RequestUri.Query);
+        Assert.Contains("group=grp1", LastRequest.RequestUri.Query);
+    }
+
+    [Fact]
+    public async Task GetAssigneesAsync_v2_withoutGroup_omitsGroupFilter()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"accounts\":[]}");
+        await MakeV2Sut().GetAssigneesAsync();
+
+        Assert.DoesNotContain("group=", LastRequest.RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task GetAssigneesAsync_v1_usesGetAssigneesEndpoint()
+    {
+        _handler.SetDefault(HttpStatusCode.OK, "{\"success\":true,\"users\":[]}");
+        await _sut.GetAssigneesAsync("grp1");
+
+        Assert.Equal("/api/v1/users/getassignees", LastRequest.RequestUri!.AbsolutePath);
+    }
+
+    // -----------------------------------------------------------------
     // Teams
     // -----------------------------------------------------------------
 

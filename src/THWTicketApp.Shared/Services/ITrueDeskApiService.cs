@@ -82,7 +82,12 @@ public interface ITrueDeskApiService
 
     Task<string> GetStatusesAsync();
     Task<string> GetUsersAsync();
-    Task<string> GetAssigneesAsync();
+    /// <summary>
+    /// Agents that can be set as assignee. With <paramref name="groupId"/> (v2)
+    /// the server narrows the list to agents who can see that group — the same
+    /// rule it enforces when the assignment is saved.
+    /// </summary>
+    Task<string> GetAssigneesAsync(string? groupId = null);
     Task<string> GetTicketTypesAsync();
     Task<string> GetTagsAsync();
     Task<string> GetGroupsAsync();

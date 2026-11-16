@@ -865,9 +865,16 @@ public class TrueDeskApiService : ITrueDeskApiService
         return await response.Content.ReadAsStringAsync();
     }
 
-    public async Task<string> GetAssigneesAsync()
+    public async Task<string> GetAssigneesAsync(string? groupId = null)
     {
-        var endpoint = IsV2 ? $"{BaseUrl}/accounts?type=agents" : $"{BaseUrl}/users/getassignees";
+        // v2: limit=-1 — the server defaults to 25 accounts per page, which
+        // silently cut off larger agent lists. group= narrows the list to agents
+        // who may be assigned to tickets in that group (the server rejects
+        // everyone else on save). v1 has no such filter.
+        var endpoint = IsV2
+            ? $"{BaseUrl}/accounts?type=agents&limit=-1"
+              + (string.IsNullOrEmpty(groupId) ? "" : $"&group={Uri.EscapeDataString(groupId)}")
+            : $"{BaseUrl}/users/getassignees";
         var response = await SendWithAutoRefreshAsync(() => _httpClient.GetAsync(endpoint));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync();

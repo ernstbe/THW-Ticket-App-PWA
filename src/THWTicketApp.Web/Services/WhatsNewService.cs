@@ -149,6 +149,10 @@ public sealed class WhatsNewService
         [
             "Du kannst dich jetzt auch per E-Mail benachrichtigen lassen: bei Kommentaren zu deinen oder dir zugewiesenen Tickets, Erwähnungen und Zuweisungen – und auf Wunsch bei jedem neuen Ticket in deinen Gruppen.",
             "Das ist standardmäßig aus. Einschalten kannst du es unter Einstellungen → „E-Mail-Benachrichtigungen“. Die E-Mail enthält nur Ticketnummer, Betreff und einen Link in die App."
+        ]),
+        new WhatsNewEntry(28, "16.11.2026", "Zuweisen nur noch im eigenen Team",
+        [
+            "Bei „Zuständig“, „Weitere Zuständige“ und „Zuweisen an…“ in der Ticketliste stehen jetzt nur noch Personen zur Auswahl, die die Gruppe des Tickets auch sehen dürfen. Tickets landen dadurch nicht mehr bei Leuten aus anderen Teams, die sie gar nicht öffnen können."
         ])
     ];
 

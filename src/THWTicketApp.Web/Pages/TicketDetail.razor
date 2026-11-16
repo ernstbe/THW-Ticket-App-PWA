@@ -756,6 +756,8 @@ else
     private List<Priority> _priorities = [];
     private List<Group> _groups = [];
     private List<User> _users = [];
+    // Group the current _users list was fetched for (null = not loaded yet).
+    private string? _assigneesGroupId;
     private List<Tag> _availableTags = [];
     private List<TicketType> _ticketTypes = [];
 
@@ -945,6 +947,11 @@ else
                     _editIssue = _ticket.Issue ?? string.Empty;
                 }
                 _dueDateLocal = _ticket.DueDate == DateTime.MinValue ? null : _ticket.DueDate;
+                // Assignee pickers only offer people who can see the ticket's
+                // group — refetch whenever the group differs (first load, group
+                // change, navigation to another ticket).
+                if (_ticket.Group?.Id != _assigneesGroupId)
+                    await LoadAssigneesAsync(_ticket.Group?.Id);
                 // Reached only for a real ticket (uid > 0), so "recently viewed" never
                 // records a bogus #0 entry (#302).
                 _ = RecentTickets.RecordAsync(
@@ -1006,17 +1013,27 @@ else
             var groupResp = JsonSerializer.Deserialize<GetGroupResponse>(groupsTask.Result, options);
             _groups = groupResp?.Groups ?? [];
 
-            try
-            {
-                var usersJson = await ApiService.GetAssigneesAsync();
-                var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersJson, options);
-                _users = userResponse?.UsersOrAccounts ?? [];
-            }
-            catch { _users = []; }
-
             StateHasChanged();
         }
         catch { /* sidebar functionality degrades but core view works */ }
+    }
+
+    private async Task LoadAssigneesAsync(string? groupId)
+    {
+        _assigneesGroupId = groupId;
+        try
+        {
+            var usersJson = await ApiService.GetAssigneesAsync(groupId);
+            var userResponse = JsonSerializer.Deserialize<GetUserResponse>(
+                usersJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            // Ignore a response that arrives after the ticket moved on to another group.
+            if (_assigneesGroupId == groupId)
+                _users = (userResponse?.UsersOrAccounts ?? []).Where(u => !u.Deleted).ToList();
+        }
+        catch
+        {
+            if (_assigneesGroupId == groupId) _users = [];
+        }
     }
 
     // ─── Inline title/description editing ───────────────────────────────
