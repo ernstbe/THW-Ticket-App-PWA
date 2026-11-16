@@ -105,7 +105,7 @@ else
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudSelect T="Group" @bind-Value="_selectedGroup" Label="@L.T("detail.group")" Variant="Variant.Outlined"
+                <MudSelect T="Group" Value="_selectedGroup" ValueChanged="OnGroupChangedAsync" Label="@L.T("detail.group")" Variant="Variant.Outlined"
                            Required="true" RequiredError="@L.T("tickets.group_required")"
                            ToStringFunc="@(g => GroupDisplayHelper.GetDisplayName(g, L))" Class="mb-4">
                     @foreach (var group in _groups)
@@ -405,14 +405,7 @@ else
             // Optional data: assignees (requires Agent/Admin role) and templates
             // (v2 endpoint, fails with v1 accesstoken). Fetched separately so a
             // failure doesn't break the whole form — the dropdowns just stay empty.
-            try
-            {
-                var usersJson = await ApiService.GetAssigneesAsync();
-                var userResponse = JsonSerializer.Deserialize<GetUserResponse>(usersJson, options);
-                if (userResponse != null)
-                    _users = userResponse.UsersOrAccounts;
-            }
-            catch { /* Assignees unavailable for this role — hide dropdown */ }
+            await LoadAssigneesAsync();
 
             try
             {
@@ -427,6 +420,36 @@ else
             _isLoading = false;
             StateHasChanged();
         }
+    }
+
+    // Assignee list follows the selected group: only agents who can see the
+    // group are offered (the server rejects everyone else on save).
+    private async Task OnGroupChangedAsync(Group? group)
+    {
+        _selectedGroup = group;
+        await LoadAssigneesAsync();
+    }
+
+    private async Task LoadAssigneesAsync()
+    {
+        var groupId = _selectedGroup?.Id;
+        try
+        {
+            var usersJson = await ApiService.GetAssigneesAsync(groupId);
+            var userResponse = JsonSerializer.Deserialize<GetUserResponse>(
+                usersJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (_selectedGroup?.Id != groupId) return; // superseded by a newer group pick
+            _users = (userResponse?.UsersOrAccounts ?? []).Where(u => !u.Deleted).ToList();
+        }
+        catch
+        {
+            // Assignees unavailable for this role — hide dropdown
+            if (_selectedGroup?.Id != groupId) return;
+            _users = [];
+        }
+        // Drop a previously picked assignee who can't take tickets in the new group.
+        if (_selectedAssignee != null)
+            _selectedAssignee = _users.FirstOrDefault(u => u.Id == _selectedAssignee.Id);
     }
 
     private async Task CreateTicketAsync()
