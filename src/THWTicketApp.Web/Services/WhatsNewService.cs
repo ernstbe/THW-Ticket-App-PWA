@@ -152,7 +152,7 @@ public sealed class WhatsNewService
         ]),
         new WhatsNewEntry(28, "16.11.2026", "Zuweisen nur noch im eigenen Team",
         [
-            "Bei „Zuständig“ und „Weitere Zuständige“ stehen jetzt nur noch Personen zur Auswahl, die die Gruppe des Tickets auch sehen dürfen. Tickets landen dadurch nicht mehr bei Leuten aus anderen Teams, die sie gar nicht öffnen können."
+            "Bei „Zuständig“, „Weitere Zuständige“ und „Zuweisen an…“ in der Ticketliste stehen jetzt nur noch Personen zur Auswahl, die die Gruppe des Tickets auch sehen dürfen. Tickets landen dadurch nicht mehr bei Leuten aus anderen Teams, die sie gar nicht öffnen können."
         ])
     ];
 
